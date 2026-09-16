@@ -5,7 +5,7 @@
 > **Handoff Source**: `Antigravity IDE` (Interactive Cockpit & Visual Inspector)  
 > **Timestamp**: 2026-09-16T12:55:00+03:00  
 > **Last updated:** 2026-09-17 — Phase 2.5 deployment-package session — Claude Code CLI  
-> **VCS:** git initialized 2026-09-16 at workspace root, branch `main`. Phase 1 = `fc071f6`, Phase 2 = `a28299b` (both [APPROVED], pushed). Phase 2.5 deployment package committed this session (hash recorded below) — **push pending: yes** — Ibrahim runs `git push`. Remote `origin` = https://github.com/ibrahimalkateb965-tech/EduTrackPro.git. Quarantine enforced by root `.gitignore` (Rule 8).  
+> **VCS:** git initialized 2026-09-16 at workspace root, branch `main`. Phase 1 = `fc071f6`, Phase 2 = `a28299b` (both [APPROVED], pushed). Phase 2.5 deployment package = `eabac22` [APPROVED] — **push pending: yes** — Ibrahim runs `git push`. Remote `origin` = https://github.com/ibrahimalkateb965-tech/EduTrackPro.git. Quarantine enforced by root `.gitignore` (Rule 8).  
 
 ---
 
@@ -160,7 +160,7 @@ Delivered under `Clients/03_GHERAS_Center/edutrack_pro/` (written by Claude Code
 
 ## 6. THE ONE THING TO DO NEXT (frozen 2026-09-17 01:15)
 
-Phase 2.5 deployment package is **[APPROVED]** and committed on `main`. **First action next session: `git status -sb` must show `[ahead 0]`; if not, Ibrahim runs `git push`.**
+Phase 2.5 deployment package is **[APPROVED]** and committed on `main` as `eabac22`. **First action next session: `git status -sb` must show `[ahead 0]`; if not, Ibrahim runs `git push`.**
 
 Then, once Ibrahim has cleared the three VPS blockers above (SSH key, DNS A-record, port 443), run from Git Bash:
 
