@@ -113,7 +113,7 @@ EDGE=""
 if systemctl is-active --quiet caddy; then
   log "Host Caddy detected — installing /etc/caddy/sites/gheras.caddy"
   mkdir -p /etc/caddy/sites /var/log/caddy
-  id caddy >/dev/null 2>&1 && chown caddy:caddy /var/log/caddy
+  id caddy >/dev/null 2>&1 && chown -R caddy:caddy /var/log/caddy
   chmod -R a+rX "$ROOT/web" "$ROOT/assets"   # the caddy service user must read the static tree
   render_caddy "$ROOT" "127.0.0.1:8000" /etc/caddy/sites/gheras.caddy
   if ! grep -qE '^\s*import\s+/etc/caddy/sites/\*' /etc/caddy/Caddyfile; then
