@@ -154,8 +154,10 @@ Governed by [.agents/CONTEXT_GOVERNANCE.md](file:///f:/AI%20PROJECTS/Autovemtech
   1. **🟢 Green Zone (< 180k tokens):** 100% attention; normal operations with `lean-ctx` signatures.
   2. **🟡 Yellow Zone (180k – 240k tokens):** Strict ban on `mode='full'` reads; line range inspection only.
   3. **🟠 Orange Zone (240k – 300k tokens):** Scope freeze, clean git commit, log ADR in `MEMORY_STORE.md`, generate resumption prompt.
-  4. **🔴 Red Zone (> 300k tokens):** Mandatory Hook 25 strategic reset (`/clear` and respawn fresh context).
 - **Active Offloading Engine:** Route all boilerplate, shell commands, and DB migrations to OpenCode CLI (GLM 5.3 Flash & Meta Muse Spark) to conserve expensive Claude Opus Max token budget.
+- **Claude-Exclusive Statusline Golden Safety Calibration (150,000 tokens):**
+  The 150,000 token safety cap applies **EXCLUSIVELY to Claude Code CLI** (and not to other agents like Antigravity IDE / Gemini or OpenCode, which operate up to their 300,000 golden sweet spot or full model limits). Claude statusline scripts (`statusline.ps1` / `statusline.js`) must strictly calculate context consumption against this 150,000 cap to safeguard against Claude's quadratic cache cost escalation $O(N^2)$.
+  Display format: `ctx {tokens}k/150k ({pct}%)` with calibrated thresholds: Cyan (<60%), Yellow (60–84%), Red (>=85% / strategic clear trigger).
 
 ---
 
