@@ -183,3 +183,25 @@ def test_cli_dry_run_and_bad_file(db, tmp_path, capsys, monkeypatch):
 
     assert importer_main([str(path)]) == 0
     assert db.execute("SELECT count(*) AS n FROM students").fetchone()["n"] == 2
+
+
+def test_cli_set_admin_password_from_env(db, client, capsys, monkeypatch):
+    # Clean-instance seed: the 003 placeholder hash must be replaced without a TTY.
+    db.execute(
+        "INSERT INTO users (branch_id, username, password_hash, role, is_active) "
+        "VALUES (%s, 'admin', '$argon2id$REPLACE_ON_FIRST_RUN', 'manager', true)",
+        (MAIN_BRANCH,),
+    )
+    db.commit()
+    assert client.post("/api/v1/auth/login", json={"username": "admin", "password": "Deploy-2026!"}).status_code == 401
+
+    monkeypatch.setenv("EDUTRACK_ADMIN_PASSWORD", "short")
+    assert importer_main(["--set-admin-password"]) == 1
+    assert "at least 8" in capsys.readouterr().err
+
+    monkeypatch.setenv("EDUTRACK_ADMIN_PASSWORD", "Deploy-2026!")
+    assert importer_main(["--set-admin-password"]) == 0
+    assert "1 row(s)" in capsys.readouterr().out
+    stored = db.execute("SELECT password_hash FROM users WHERE username = 'admin'").fetchone()["password_hash"]
+    assert stored.startswith("$argon2id$") and verify_password(stored, "Deploy-2026!")
+    assert client.post("/api/v1/auth/login", json={"username": "admin", "password": "Deploy-2026!"}).status_code == 200

@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import getpass
 import json
+import os
 import sys
 import uuid
 
@@ -30,10 +31,23 @@ def _resolve_branch_id(raw: str | None):
     return get_settings().main_branch_id
 
 
-def _run_set_admin_password() -> int:
+def _read_admin_password() -> str | None:
+    """Return the new admin password, or None when the two prompts disagree.
+
+    Non-interactive deployments (deploy.sh, CI) pass EDUTRACK_ADMIN_PASSWORD
+    instead of answering the getpass prompts.
+    """
+    from_env = os.environ.get("EDUTRACK_ADMIN_PASSWORD")
+    if from_env is not None:
+        return from_env
     first = getpass.getpass("New admin password: ")
     second = getpass.getpass("Confirm admin password: ")
-    if first != second:
+    return first if first == second else None
+
+
+def _run_set_admin_password() -> int:
+    first = _read_admin_password()
+    if first is None:
         print("error: passwords do not match", file=sys.stderr)
         return 1
     if len(first) < 8:

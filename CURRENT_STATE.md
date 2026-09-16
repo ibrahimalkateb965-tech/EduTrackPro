@@ -4,8 +4,8 @@
 > **Master Orchestrator**: `Claude Code CLI` (Opus Max / Sonnet 5)  
 > **Handoff Source**: `Antigravity IDE` (Interactive Cockpit & Visual Inspector)  
 > **Timestamp**: 2026-09-16T12:55:00+03:00  
-> **Last updated:** 2026-09-16 — Phase 2 kickoff session — Claude Code CLI  
-> **VCS:** git initialized 2026-09-16 at workspace root, branch `main`, HEAD `a28299b` (Phase 2 [APPROVED]; Phase 1 [APPROVED] = `fc071f6`). Remote `origin` = https://github.com/ibrahimalkateb965-tech/EduTrackPro.git — **push pending: yes** — `a28299b` is `[ahead 1]`; Ibrahim runs `git push`. Quarantine enforced by root `.gitignore` (Rule 8).  
+> **Last updated:** 2026-09-17 — Phase 2.5 deployment-package session — Claude Code CLI  
+> **VCS:** git initialized 2026-09-16 at workspace root, branch `main`. Phase 1 = `fc071f6`, Phase 2 = `a28299b` (both [APPROVED], pushed). Phase 2.5 deployment package committed this session (hash recorded below) — **push pending: yes** — Ibrahim runs `git push`. Remote `origin` = https://github.com/ibrahimalkateb965-tech/EduTrackPro.git. Quarantine enforced by root `.gitignore` (Rule 8).  
 
 ---
 
@@ -124,12 +124,55 @@ Scope chosen by Ibrahim: **(a)** REST API server (FastAPI + PostgreSQL) + `ghera
 
 ---
 
-## 6. THE ONE THING TO DO NEXT (frozen 2026-09-16 23:55)
+## 5b. Phase 2.5 — Clean VPS Deployment Package (Claude Code — closed 2026-09-17, ~01:15 AST)
 
-Phase 2 is **[APPROVED]** and committed on `main` as `a28299b` (Phase 1 = `fc071f6`). **First action next session: `git status -sb` must show `[ahead 0]`; if not, Ibrahim runs `git push`.** Then choose one of:
+**Scope clarification from the client (2026-09-16):** no legacy data migration. EduTrack Pro starts as a **100% clean fresh instance**; the `gheras_simple_v1` importer stays in the codebase but is **not** part of the deployment path.
 
-- **(a)** Phase 3 — Android app module: Compose UI over the Room layer + `homework-core`, first Room/KSP compile, teacher + guardian screens, and the API scoping for those two roles (`routers/crud.py` TODO) so the app can sync against `/api/v1`.
-- **(b)** Deployment — run `server/docker-compose.yml` on the Hostinger VPS behind Caddy, apply 001→003, run `--set-admin-password`, import the client's real `GHERAS_Backup_*.json` with `--dry-run` first, point the dashboard at the live API (Day-10 promise).
-- **(c)** Client checkpoint — Milestone m1+m2 preview pack for Gheras: dashboard screenshots against the live API, the 11 templates rendered with imported data, Arabic acceptance note.
+Delivered under `Clients/03_GHERAS_Center/edutrack_pro/` (written by Claude Code directly — deploy scripts are security-sensitive and would have needed a full audit anyway):
 
-Pre-conditions: free ≥ 4 GB RAM before running the fleet, one `opencode run` at a time with ≤ 4 files per batch, Codex via `-s workspace-write`.
+| File | Purpose |
+| :--- | :--- |
+| `deploy/deploy.sh` | Idempotent VPS-side deploy: secrets → db → migration check (001→003, ≥ 43 tables, admin seed row) → `gheras_app` password → API build → non-interactive admin seed → host-Caddy site install + `caddy validate` + reload (bundled `--profile edge` fallback) → HTTPS smoke (health, dashboard 200, `server/` 404, admin login 200). |
+| `deploy/push.sh` | Developer-side: `tar` the `assets db server web deploy` tree to `/opt/edutrack` over SSH, then run `deploy.sh`. |
+| `deploy/docker-compose.prod.yml` | `db` (no published port, **TCP** healthcheck so init scripts finish before "healthy"), `api` (loopback `127.0.0.1:8000`, healthcheck on `/api/v1/health`), optional `caddy` profile. |
+| `deploy/Caddyfile.gheras` | Site block template: `/api/*` → uvicorn; static allow-list `/web/*` + `/assets/*`; `*.md`, `db/`, `server/`, `deploy/` → 404; security headers; `/` → `/web/dashboard/`. |
+| `deploy/DEPLOY.md`, `deploy/.env.prod.example` | Runbook (pre-reqs, deploy, day-2 ops) and documented env shape. |
+| `server/Dockerfile`, `server/.dockerignore`, `server/uv.lock` | `python:3.12-slim` + `uv sync --frozen --no-dev`, non-root user. The old compose command needed a lockfile that did not exist — now generated and committed. |
+| `server/docker-compose.yml` | Dev compose now builds from the Dockerfile (`--reload`, source bind-mount). |
+| `server/edutrack_api/importer/__main__.py` | `--set-admin-password` reads `EDUTRACK_ADMIN_PASSWORD` when set (deploy.sh / CI); TTY prompts unchanged. |
+| `server/tests/test_importer.py` | +1 test: placeholder hash → 401, short password rejected, env-driven set → argon2id hash → login 200. |
+
+### Verification (Claude Code exclusive)
+- `pytest`: **19/19** with the API connecting as the restricted **`gheras_app`** role (Phase 2 tests had only run as superuser) — grants from `003` are sufficient for every endpoint, `audit_log` insert and `revoked_tokens` included.
+- `pyflakes` clean; new files: 0 BOM, 0 Eastern digits, 0 forbidden words, LF only.
+- `docker compose config` valid for `db` + `api` + `caddy` (edge profile).
+- Caddy 2.10 `validate` on the rendered site block: **Valid configuration**.
+- Local end-to-end with real Caddy + real uvicorn + embedded PostgreSQL 16: `/` → 302 `/web/dashboard/`; dashboard, JS, CSS, logo, print template + `print.css` → 200 with correct MIME; `NOTES.md`, `server/pyproject.toml`, `db/…sql`, `deploy/deploy.sh`, `/web/../server/…` → **404**; security headers present. Clean seed flow: placeholder hash → login 401 → `EDUTRACK_ADMIN_PASSWORD=… --set-admin-password` → login 200 → all 19 dashboard endpoints 200 (`attendance/students` is POST-only → 405 on GET, correct) → logout 204 → token revoked (401). Headless-Chrome render of the login gate through Caddy verified (logo + RTL + brand palette).
+- **Not executed:** the actual VPS run. Docker Desktop locally starves the machine (1.0 GB free with it up) — the compose stack was validated, not run.
+
+### Blockers requiring the developer (Arabic debrief for Antigravity IDE)
+1. **مفتاح SSH غير مسجل على الخادم**: المفتاحان المحليان (`vps_secure_key` و `id_ed25519`) مرفوضان (`Permission denied (publickey)`) على `187.55.226.225`. يلزم إضافة المفتاح العام عبر لوحة Hostinger (VPS → SSH keys) أو الطرفية داخل المتصفح.
+2. **سجل DNS للاسم العام غير موجود**: `autovem.tech` يشير إلى الخادم لكن `gheras.autovem.tech` بلا سجل A. اختيار الاسم النهائي قرار إبراهيم (يفضّل نطاق العميل الخاص إن وُجد؛ `deploy.sh` يقبل أي اسم).
+3. **المنفذ 443 لا يستجيب من الخارج** رغم أن Caddy المضيف يرد على 80 بتحويل 308 إلى HTTPS — يلزم فتح 443 في جدار حماية Hostinger قبل إصدار الشهادة.
+4. `git push` يبقى إجراء إبراهيم.
+
+---
+
+## 6. THE ONE THING TO DO NEXT (frozen 2026-09-17 01:15)
+
+Phase 2.5 deployment package is **[APPROVED]** and committed on `main`. **First action next session: `git status -sb` must show `[ahead 0]`; if not, Ibrahim runs `git push`.**
+
+Then, once Ibrahim has cleared the three VPS blockers above (SSH key, DNS A-record, port 443), run from Git Bash:
+
+```bash
+cd "Clients/03_GHERAS_Center/edutrack_pro"
+export EDUTRACK_ADMIN_PASSWORD='<strong password>'     # optional — otherwise generated and printed once
+bash deploy/push.sh root@187.55.226.225 <public-hostname> -i ~/.ssh/vps_secure_key
+```
+
+`deploy.sh` ends with a summary; success = health JSON, `dashboard: HTTP 200`, `server/ blocked: HTTP 404`, `admin login: HTTP 200`. Record the hostname and the admin password location (never the password itself) here afterwards. After that, choose:
+
+- **(a)** Phase 3 — Android app module (Compose UI over Room + `homework-core`, teacher/guardian API scoping in `routers/crud.py`).
+- **(c)** Client checkpoint — dashboard screenshots against the live API + the 11 templates + Arabic acceptance note.
+
+Pre-conditions: free ≥ 4 GB RAM before running the fleet (never with Docker Desktop up), one `opencode run` at a time with ≤ 4 files per batch, Codex via `-s workspace-write`.

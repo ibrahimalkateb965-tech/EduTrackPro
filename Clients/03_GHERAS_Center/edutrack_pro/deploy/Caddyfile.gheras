@@ -1,0 +1,45 @@
+# EduTrack Pro site block — rendered by deploy.sh (tokens: __HOST__, __ROOT__, __API__).
+# Host Caddy: installed to /etc/caddy/sites/gheras.caddy and imported by /etc/caddy/Caddyfile.
+__HOST__ {
+	encode zstd gzip
+	root * __ROOT__
+
+	header {
+		X-Content-Type-Options nosniff
+		X-Frame-Options SAMEORIGIN
+		Referrer-Policy strict-origin-when-cross-origin
+		Strict-Transport-Security "max-age=31536000"
+		-Server
+	}
+
+	# REST API (FastAPI / uvicorn)
+	handle /api/* {
+		reverse_proxy __API__
+	}
+
+	# Landing → dashboard
+	redir / /web/dashboard/ 302
+
+	# Static allow-list: the dashboard, the 11 print templates and the logo.
+	# Everything else in the tree (db/, server/, deploy/, notes) stays unreachable.
+	@notes path *.md *.MD
+	handle @notes {
+		respond 404
+	}
+	handle /web/* {
+		file_server
+	}
+	handle /assets/* {
+		file_server
+	}
+	handle {
+		respond 404
+	}
+
+	log {
+		output file /var/log/caddy/gheras.access.log {
+			roll_size 10MiB
+			roll_keep 5
+		}
+	}
+}
