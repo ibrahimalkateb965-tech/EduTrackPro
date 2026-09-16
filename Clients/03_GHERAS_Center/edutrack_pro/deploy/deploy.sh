@@ -79,7 +79,7 @@ ADMIN_ROWS="$("${PSQL[@]}" -c "SELECT count(*) FROM users WHERE username='admin'
 echo "schema ok: $TABLES tables, admin seed present"
 
 log "Setting the gheras_app role password"
-"${PSQL[@]}" -v pw="$GHERAS_APP_PASSWORD" -c "ALTER ROLE gheras_app WITH LOGIN PASSWORD :'pw'" >/dev/null
+"${PSQL[@]}" -c "ALTER ROLE gheras_app WITH LOGIN PASSWORD '$GHERAS_APP_PASSWORD'" >/dev/null
 
 # ---------------------------------------------------------------- api
 log "Building and starting the API"
