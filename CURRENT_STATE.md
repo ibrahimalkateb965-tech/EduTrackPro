@@ -5,7 +5,7 @@
 > **Handoff Source**: `Antigravity IDE` (Interactive Cockpit & Visual Inspector)  
 > **Timestamp**: 2026-09-16T12:55:00+03:00  
 > **Last updated:** 2026-09-16 — Phase 2 kickoff session — Claude Code CLI  
-> **VCS:** git initialized 2026-09-16 at workspace root, branch `main`, HEAD `dc06d28` (Phase 1 [APPROVED] = `fc071f6`; `5c2fd00` state record; `dc06d28` governance doc). Remote `origin` = https://github.com/ibrahimalkateb965-tech/EduTrackPro.git — **push pending: no** (`main...origin/main` in sync, verified 2026-09-16). Quarantine enforced by root `.gitignore` (Rule 8).  
+> **VCS:** git initialized 2026-09-16 at workspace root, branch `main`, HEAD `a28299b` (Phase 2 [APPROVED]; Phase 1 [APPROVED] = `fc071f6`). Remote `origin` = https://github.com/ibrahimalkateb965-tech/EduTrackPro.git — **push pending: yes** — `a28299b` is `[ahead 1]`; Ibrahim runs `git push`. Quarantine enforced by root `.gitignore` (Rule 8).  
 
 ---
 
@@ -126,7 +126,7 @@ Scope chosen by Ibrahim: **(a)** REST API server (FastAPI + PostgreSQL) + `ghera
 
 ## 6. THE ONE THING TO DO NEXT (frozen 2026-09-16 23:55)
 
-Phase 2 is **[APPROVED]** and committed on `main` (see git log). **First action next session: `git status -sb` must show `[ahead 0]`; if not, Ibrahim runs `git push`.** Then choose one of:
+Phase 2 is **[APPROVED]** and committed on `main` as `a28299b` (Phase 1 = `fc071f6`). **First action next session: `git status -sb` must show `[ahead 0]`; if not, Ibrahim runs `git push`.** Then choose one of:
 
 - **(a)** Phase 3 — Android app module: Compose UI over the Room layer + `homework-core`, first Room/KSP compile, teacher + guardian screens, and the API scoping for those two roles (`routers/crud.py` TODO) so the app can sync against `/api/v1`.
 - **(b)** Deployment — run `server/docker-compose.yml` on the Hostinger VPS behind Caddy, apply 001→003, run `--set-admin-password`, import the client's real `GHERAS_Backup_*.json` with `--dry-run` first, point the dashboard at the live API (Day-10 promise).
