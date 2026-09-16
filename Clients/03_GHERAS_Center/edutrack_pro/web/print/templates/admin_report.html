@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>التقرير الإداري</title>
+<link rel="stylesheet" href="../print.css">
+</head>
+<body>
+<div class="sheet">
+  <header class="doc-header">
+    <img class="doc-logo" src="../gheras_logo.png" alt="مركز غراس">
+    <div class="doc-header-center">
+      <div class="doc-center-name">مركز غراس</div>
+      <div class="doc-tagline">من غراس تبدأ المعرفة وتصنع القمة</div>
+      <div class="doc-title">التقرير الإداري</div>
+    </div>
+    <div class="doc-meta">
+      <div class="meta-row"><span class="meta-label">الفترة:</span> {{period}}</div>
+      <div class="meta-row"><span class="meta-label">التاريخ:</span> {{date}}</div>
+    </div>
+  </header>
+
+  <main class="doc-body">
+    <div class="kpi">
+      <div class="kpi-item">
+        <span class="kpi-label">عدد الطلاب</span>
+        <span class="kpi-value">{{students_count}}</span>
+      </div>
+      <div class="kpi-item">
+        <span class="kpi-label">نسبة الحضور</span>
+        <span class="kpi-value">{{attendance_pct}}%</span>
+      </div>
+      <div class="kpi-item">
+        <span class="kpi-label">المحصل</span>
+        <span class="kpi-value">{{collected}} ريال</span>
+      </div>
+      <div class="kpi-item">
+        <span class="kpi-label">المتأخرات</span>
+        <span class="kpi-value">{{outstanding}} ريال</span>
+      </div>
+      <div class="kpi-item">
+        <span class="kpi-label">المصروفات</span>
+        <span class="kpi-value">{{expenses}} ريال</span>
+      </div>
+      <div class="kpi-item">
+        <span class="kpi-label">الصافي</span>
+        <span class="kpi-value">{{net}} ريال</span>
+      </div>
+    </div>
+
+    <h2>ملخص المجموعات</h2>
+    <table>
+      <thead>
+        <tr>
+          <th scope="col">المجموعة</th>
+          <th scope="col">عدد الطلاب</th>
+          <th scope="col">نسبة الحضور</th>
+        </tr>
+      </thead>
+      <tbody>
+      {{#by_group}}
+        <tr>
+          <td>{{group}}</td>
+          <td>{{students}}</td>
+          <td>{{attendance_pct}}%</td>
+        </tr>
+      {{/by_group}}
+      </tbody>
+    </table>
+
+    <h2>أعلى المتأخرات</h2>
+    <table>
+      <thead>
+        <tr>
+          <th scope="col">الطالب</th>
+          <th scope="col">المبلغ</th>
+        </tr>
+      </thead>
+      <tbody>
+      {{#top_outstanding}}
+        <tr>
+          <td>{{student}}</td>
+          <td>{{amount}} ريال</td>
+        </tr>
+      {{/top_outstanding}}
+      </tbody>
+    </table>
+
+    <h2>أحدث المصروفات</h2>
+    <table>
+      <thead>
+        <tr>
+          <th scope="col">الوصف</th>
+          <th scope="col">الفئة</th>
+          <th scope="col">المبلغ</th>
+          <th scope="col">التاريخ</th>
+        </tr>
+      </thead>
+      <tbody>
+      {{#recent_expenses}}
+        <tr>
+          <td>{{description}}</td>
+          <td>{{category}}</td>
+          <td>{{amount}} ريال</td>
+          <td>{{date}}</td>
+        </tr>
+      {{/recent_expenses}}
+      </tbody>
+    </table>
+  </main>
+
+  <footer class="doc-footer">
+    <span>حوطة بني تميم</span>
+    <span>صفحة 1 من 1</span>
+  </footer>
+</div>
+</body>
+</html>

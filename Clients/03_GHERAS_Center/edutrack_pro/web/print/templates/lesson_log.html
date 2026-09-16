@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>سجل الحصص</title>
+<link rel="stylesheet" href="../print.css">
+</head>
+<body>
+<div class="sheet">
+  <header class="doc-header">
+    <img class="doc-logo" src="../gheras_logo.png" alt="مركز غراس">
+    <div class="doc-header-center">
+      <div class="doc-center-name">مركز غراس</div>
+      <div class="doc-tagline">من غراس تبدأ المعرفة وتصنع القمة</div>
+      <div class="doc-title">سجل الحصص</div>
+    </div>
+    <div class="doc-meta">
+      <div class="meta-row"><span class="meta-label">القاعة:</span> {{room}}</div>
+      <div class="meta-row"><span class="meta-label">المادة:</span> {{subject}}</div>
+      <div class="meta-row"><span class="meta-label">المعلم:</span> {{teacher}}</div>
+      <div class="meta-row"><span class="meta-label">الفترة:</span> من {{from}} إلى {{to}}</div>
+      <div class="meta-row"><span class="meta-label">التاريخ:</span> {{date}}</div>
+    </div>
+  </header>
+
+  <main class="doc-body">
+    <h2>تفاصيل الحصص</h2>
+    <table>
+      <thead>
+        <tr>
+          <th scope="col">التاريخ</th>
+          <th scope="col">الحالة</th>
+          <th scope="col">ما تم تغطيته</th>
+          <th scope="col">الواجب</th>
+          <th scope="col">ملاحظات</th>
+        </tr>
+      </thead>
+      <tbody>
+      {{#logs}}
+        <tr>
+          <td>{{date}}</td>
+          <td>{{status}}</td>
+          <td>{{covered}}</td>
+          <td>{{homework}}</td>
+          <td>{{notes}}</td>
+        </tr>
+      {{/logs}}
+      </tbody>
+    </table>
+  </main>
+
+  <div class="signatures">
+    <div class="signature">
+      <div class="sig-line"></div>
+      <div class="sig-name">المعلم</div>
+    </div>
+    <div class="signature">
+      <div class="sig-line"></div>
+      <div class="sig-name">المشرف</div>
+    </div>
+  </div>
+
+  <footer class="doc-footer">
+    <span>حوطة بني تميم</span>
+    <span>صفحة 1 من 1</span>
+  </footer>
+</div>
+</body>
+</html>

@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>سند قبض</title>
+<link rel="stylesheet" href="../print.css">
+</head>
+<body class="page-a5-landscape">
+<div class="sheet">
+  <header class="doc-header">
+    <img class="doc-logo" src="../gheras_logo.png" alt="مركز غراس">
+    <div class="doc-header-center">
+      <div class="doc-center-name">مركز غراس</div>
+      <div class="doc-tagline">من غراس تبدأ المعرفة وتصنع القمة</div>
+      <div class="doc-title">سند قبض</div>
+    </div>
+    <div class="doc-meta">
+      <div class="meta-row"><span class="meta-label">رقم السند:</span> {{receipt_no}}</div>
+      <div class="meta-row"><span class="meta-label">التاريخ:</span> {{date}}</div>
+    </div>
+  </header>
+
+  <main class="doc-body">
+    <table>
+      <tbody>
+        <tr>
+          <th scope="row">الطالب</th>
+          <td>{{student_name}}</td>
+          <th scope="row">طريقة الدفع</th>
+          <td>{{method}}</td>
+        </tr>
+        <tr>
+          <th scope="row">المبلغ</th>
+          <td>{{amount}} ريال</td>
+          <th scope="row">مرجع القسط</th>
+          <td>{{installment_ref}}</td>
+        </tr>
+        <tr>
+          <th scope="row">الرصيد المتبقي</th>
+          <td colspan="3">{{remaining_balance}} ريال</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="amount-words">
+      <span class="amount-words-label">المبلغ كتابةً:</span>
+      {{amount_words}}
+    </div>
+  </main>
+
+  <div class="signatures">
+    <div class="signature">
+      <div class="sig-line"></div>
+      <div class="sig-name">المحاسب</div>
+    </div>
+    <div class="signature">
+      <div class="sig-line"></div>
+      <div class="sig-name">المستلم</div>
+    </div>
+  </div>
+
+  <footer class="doc-footer">
+    <span>حوطة بني تميم</span>
+    <span>صفحة 1 من 1</span>
+  </footer>
+</div>
+</body>
+</html>

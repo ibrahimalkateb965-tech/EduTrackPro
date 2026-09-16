@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>التقرير الشهري</title>
+<link rel="stylesheet" href="../print.css">
+</head>
+<body>
+<div class="sheet">
+  <header class="doc-header">
+    <img class="doc-logo" src="../gheras_logo.png" alt="مركز غراس">
+    <div class="doc-header-center">
+      <div class="doc-center-name">مركز غراس</div>
+      <div class="doc-tagline">من غراس تبدأ المعرفة وتصنع القمة</div>
+      <div class="doc-title">التقرير الشهري</div>
+    </div>
+    <div class="doc-meta">
+      <div class="meta-row"><span class="meta-label">الشهر:</span> {{month}}</div>
+      <div class="meta-row"><span class="meta-label">التاريخ:</span> {{date}}</div>
+    </div>
+  </header>
+
+  <main class="doc-body">
+    <div class="kpi">
+      <div class="kpi-item">
+        <span class="kpi-label">إجمالي الدخل</span>
+        <span class="kpi-value">{{total_income}} ريال</span>
+      </div>
+      <div class="kpi-item">
+        <span class="kpi-label">إجمالي المصروفات</span>
+        <span class="kpi-value">{{total_expenses}} ريال</span>
+      </div>
+      <div class="kpi-item">
+        <span class="kpi-label">إجمالي الرواتب</span>
+        <span class="kpi-value">{{payroll_total}} ريال</span>
+      </div>
+      <div class="kpi-item">
+        <span class="kpi-label">الصافي</span>
+        <span class="kpi-value">{{net}} ريال</span>
+      </div>
+    </div>
+
+    <h2>تحصيلات الشهر</h2>
+    <table>
+      <thead>
+        <tr>
+          <th scope="col">الطالب</th>
+          <th scope="col">المبلغ</th>
+          <th scope="col">طريقة الدفع</th>
+          <th scope="col">التاريخ</th>
+        </tr>
+      </thead>
+      <tbody>
+      {{#collections}}
+        <tr>
+          <td>{{student}}</td>
+          <td>{{amount}} ريال</td>
+          <td>{{method}}</td>
+          <td>{{date}}</td>
+        </tr>
+      {{/collections}}
+      </tbody>
+    </table>
+
+    <h2>المصروفات حسب الفئة</h2>
+    <table>
+      <thead>
+        <tr>
+          <th scope="col">الفئة</th>
+          <th scope="col">المبلغ</th>
+        </tr>
+      </thead>
+      <tbody>
+      {{#expense_categories}}
+        <tr>
+          <td>{{category}}</td>
+          <td>{{amount}} ريال</td>
+        </tr>
+      {{/expense_categories}}
+      </tbody>
+    </table>
+
+    <div class="auth-block">
+      <div class="auth-title">إغلاق الشهر</div>
+      <table>
+        <tbody>
+          <tr>
+            <th scope="row">أغلق بواسطة</th>
+            <td>{{closed_by}}</td>
+            <th scope="row">تاريخ الإغلاق</th>
+            <td>{{closed_at}}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </main>
+
+  <div class="signatures">
+    <div class="signature">
+      <div class="sig-line"></div>
+      <div class="sig-name">المحاسب</div>
+    </div>
+    <div class="signature">
+      <div class="sig-line"></div>
+      <div class="sig-name">مدير المركز</div>
+    </div>
+  </div>
+
+  <footer class="doc-footer">
+    <span>حوطة بني تميم</span>
+    <span>صفحة 1 من 1</span>
+  </footer>
+</div>
+</body>
+</html>

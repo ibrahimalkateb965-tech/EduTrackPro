@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>بطاقة ولي الأمر</title>
+<link rel="stylesheet" href="../print.css">
+</head>
+<body class="page-a5">
+<div class="sheet">
+  <header class="doc-header">
+    <img class="doc-logo" src="../gheras_logo.png" alt="مركز غراس">
+    <div class="doc-header-center">
+      <div class="doc-center-name">مركز غراس</div>
+      <div class="doc-tagline">من غراس تبدأ المعرفة وتصنع القمة</div>
+      <div class="doc-title">بطاقة ولي الأمر</div>
+    </div>
+    <div class="doc-meta">
+      <div class="meta-row"><span class="meta-label">رقم البطاقة:</span> {{card_no}}</div>
+      <div class="meta-row"><span class="meta-label">التاريخ:</span> {{date}}</div>
+    </div>
+  </header>
+
+  <main class="doc-body">
+    <div class="card-row">
+      <div class="photo-box">صورة الطالب</div>
+      <table>
+        <tbody>
+          <tr>
+            <th scope="row">اسم الطالب</th>
+            <td>{{student_name}}</td>
+          </tr>
+          <tr>
+            <th scope="row">المجموعة</th>
+            <td>{{group_name}}</td>
+          </tr>
+          <tr>
+            <th scope="row">القاعة</th>
+            <td>{{room_name}}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th colspan="2">أرقام التواصل</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <th scope="row">هاتف الأب</th>
+          <td>{{father_phone}}</td>
+        </tr>
+        <tr>
+          <th scope="row">هاتف الأم</th>
+          <td>{{mother_phone}}</td>
+        </tr>
+        <tr>
+          <th scope="row">هاتف ولي الأمر</th>
+          <td>{{guardian_phone}}</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="auth-block">
+      <div class="auth-title">تفويض استلام الطالب</div>
+      <table>
+        <tbody>
+          <tr>
+            <th scope="row">طريقة الاستلام</th>
+            <td>{{pickup_type}}</td>
+          </tr>
+          <tr>
+            <th scope="row">المصرح له بالاستلام</th>
+            <td>{{pickup_name}}</td>
+          </tr>
+          <tr>
+            <th scope="row">صلة القرابة</th>
+            <td>{{pickup_relation}}</td>
+          </tr>
+          <tr>
+            <th scope="row">هاتف المصرح له</th>
+            <td>{{pickup_phone}}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="qr-row">
+      <div class="qr-box">رمز التحقق</div>
+      <div class="qr-note">تُبرز هذه البطاقة عند اصطحاب الطالب من المركز</div>
+    </div>
+  </main>
+
+  <footer class="doc-footer">
+    <span>حوطة بني تميم</span>
+    <span>صفحة 1 من 1</span>
+  </footer>
+</div>
+</body>
+</html>

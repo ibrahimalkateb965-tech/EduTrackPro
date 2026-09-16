@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>كشف حساب الطالب</title>
+<link rel="stylesheet" href="../print.css">
+</head>
+<body>
+<div class="sheet">
+  <header class="doc-header">
+    <img class="doc-logo" src="../gheras_logo.png" alt="مركز غراس">
+    <div class="doc-header-center">
+      <div class="doc-center-name">مركز غراس</div>
+      <div class="doc-tagline">من غراس تبدأ المعرفة وتصنع القمة</div>
+      <div class="doc-title">كشف حساب الطالب</div>
+    </div>
+    <div class="doc-meta">
+      <div class="meta-row"><span class="meta-label">رقم الكشف:</span> {{statement_no}}</div>
+      <div class="meta-row"><span class="meta-label">التاريخ:</span> {{date}}</div>
+    </div>
+  </header>
+
+  <main class="doc-body">
+    <h2>بيانات الطالب</h2>
+    <table>
+      <tbody>
+        <tr>
+          <th scope="row">الطالب</th>
+          <td>{{student_name}}</td>
+          <th scope="row">المجموعة</th>
+          <td>{{group_name}}</td>
+        </tr>
+        <tr>
+          <th scope="row">القاعة</th>
+          <td>{{room_name}}</td>
+          <th scope="row">جوال ولي الأمر</th>
+          <td>{{guardian_phone}}</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>خطة الأقساط</h2>
+    <table>
+      <tbody>
+        <tr>
+          <th scope="row">إجمالي المبلغ</th>
+          <td>{{total_amount}} ريال</td>
+          <th scope="row">عدد الأقساط</th>
+          <td>{{installments_count}}</td>
+        </tr>
+        <tr>
+          <th scope="row">الفاصل الزمني</th>
+          <td colspan="3">كل {{interval_days}} يوم</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>الأقساط</h2>
+    <table>
+      <thead>
+        <tr>
+          <th scope="col">م</th>
+          <th scope="col">تاريخ الاستحقاق</th>
+          <th scope="col">المبلغ</th>
+          <th scope="col">المدفوع</th>
+          <th scope="col">الحالة</th>
+        </tr>
+      </thead>
+      <tbody>
+      {{#installments}}
+        <tr>
+          <td>{{seq}}</td>
+          <td>{{due_date}}</td>
+          <td>{{amount}} ريال</td>
+          <td>{{paid_amount}} ريال</td>
+          <td>{{status}}</td>
+        </tr>
+      {{/installments}}
+      </tbody>
+    </table>
+
+    <h2>المدفوعات</h2>
+    <table>
+      <thead>
+        <tr>
+          <th scope="col">التاريخ</th>
+          <th scope="col">رقم السند</th>
+          <th scope="col">طريقة الدفع</th>
+          <th scope="col">المبلغ</th>
+        </tr>
+      </thead>
+      <tbody>
+      {{#payments}}
+        <tr>
+          <td>{{date}}</td>
+          <td>{{receipt_no}}</td>
+          <td>{{method}}</td>
+          <td>{{amount}} ريال</td>
+        </tr>
+      {{/payments}}
+      </tbody>
+    </table>
+
+    <div class="kpi">
+      <div class="kpi-item">
+        <span class="kpi-label">إجمالي الخطة</span>
+        <span class="kpi-value">{{total_amount}} ريال</span>
+      </div>
+      <div class="kpi-item">
+        <span class="kpi-label">إجمالي المدفوع</span>
+        <span class="kpi-value">{{total_paid}} ريال</span>
+      </div>
+      <div class="kpi-item">
+        <span class="kpi-label">الرصيد المتبقي</span>
+        <span class="kpi-value">{{balance}} ريال</span>
+      </div>
+    </div>
+  </main>
+
+  <div class="signatures">
+    <div class="signature">
+      <div class="sig-line"></div>
+      <div class="sig-name">المحاسب</div>
+    </div>
+    <div class="signature">
+      <div class="sig-line"></div>
+      <div class="sig-name">مدير المركز</div>
+    </div>
+  </div>
+
+  <footer class="doc-footer">
+    <span>حوطة بني تميم</span>
+    <span>صفحة 1 من 1</span>
+  </footer>
+</div>
+</body>
+</html>

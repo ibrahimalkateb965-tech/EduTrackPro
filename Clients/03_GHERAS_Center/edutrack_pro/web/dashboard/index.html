@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>مركز غراس | لوحة الإدارة</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/gheras.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar">
+      <div class="brand"><img src="../../assets/gheras_logo.png" alt="شعار مركز غراس"><span>مركز غراس<small>EduTrack Pro</small></span></div>
+      <nav aria-label="التنقل الرئيسي">
+        <a href="#/home" data-route="home">الرئيسية</a><a href="#/students" data-route="students">الطلاب</a><a href="#/attendance" data-route="attendance">الحضور</a><a href="#/payments" data-route="payments">الرسوم والمدفوعات</a><a href="#/expenses" data-route="expenses">المصروفات</a><a href="#/accounts" data-route="accounts">الحسابات</a><a href="#/staff" data-route="staff">الموظفون</a><a href="#/rooms" data-route="rooms">القاعات</a><a href="#/reports" data-route="reports">التقارير</a>
+      </nav>
+    </aside>
+    <section class="page"><header class="topbar"><button id="menu-toggle" class="icon-button" aria-label="فتح القائمة">☰</button><div class="user-menu"><span id="user-name">الإدارة</span><button id="logout-button" class="button button-outline">تسجيل الخروج</button></div></header><main id="view" tabindex="-1"></main></section>
+  </div>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

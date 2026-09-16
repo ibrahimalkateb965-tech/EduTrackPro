@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>تقرير الإحصائيات</title>
+<link rel="stylesheet" href="../print.css">
+</head>
+<body>
+<div class="sheet">
+  <header class="doc-header">
+    <img class="doc-logo" src="../gheras_logo.png" alt="مركز غراس">
+    <div class="doc-header-center">
+      <div class="doc-center-name">مركز غراس</div>
+      <div class="doc-tagline">من غراس تبدأ المعرفة وتصنع القمة</div>
+      <div class="doc-title">تقرير الإحصائيات</div>
+    </div>
+    <div class="doc-meta">
+      <div class="meta-row"><span class="meta-label">الفترة:</span> {{period}}</div>
+      <div class="meta-row"><span class="meta-label">التاريخ:</span> {{date}}</div>
+    </div>
+  </header>
+
+  <main class="doc-body">
+    <div class="kpi">
+      <div class="kpi-item">
+        <span class="kpi-label">عدد الطلاب</span>
+        <span class="kpi-value">{{students_count}}</span>
+      </div>
+      <div class="kpi-item">
+        <span class="kpi-label">نسبة الحضور</span>
+        <span class="kpi-value">{{attendance_pct}}%</span>
+      </div>
+      <div class="kpi-item">
+        <span class="kpi-label">نسبة التحصيل</span>
+        <span class="kpi-value">{{collection_pct}}%</span>
+      </div>
+      <div class="kpi-item">
+        <span class="kpi-label">المتأخرات</span>
+        <span class="kpi-value">{{outstanding}} ريال</span>
+      </div>
+    </div>
+
+    <h2>توزيع الطلاب حسب المجموعات</h2>
+    <table>
+      <thead>
+        <tr>
+          <th scope="col">المجموعة</th>
+          <th scope="col">عدد الطلاب</th>
+          <th scope="col">النسبة</th>
+        </tr>
+      </thead>
+      <tbody>
+      {{#by_group}}
+        <tr>
+          <td>{{group}}</td>
+          <td>{{students}}</td>
+          <td>
+            <div style="display: flex; align-items: center; gap: 2mm;">
+              <div style="flex: 1 1 auto; height: 4mm; background: var(--g-bg); border: 0.35mm solid var(--g-border); border-radius: 1mm; overflow: hidden;">
+                <div style="height: 100%; width: {{pct}}%; background: var(--g-teal);"></div>
+              </div>
+              <span style="flex: 0 0 auto; font-weight: 600; color: var(--g-teal-dark);">{{pct}}%</span>
+            </div>
+          </td>
+        </tr>
+      {{/by_group}}
+      </tbody>
+    </table>
+
+    <h2>التوزيع حسب الجنس</h2>
+    <table>
+      <thead>
+        <tr>
+          <th scope="col">الفئة</th>
+          <th scope="col">العدد</th>
+          <th scope="col">النسبة</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <th scope="row">بنين</th>
+          <td>{{boys_count}}</td>
+          <td>
+            <div style="display: flex; align-items: center; gap: 2mm;">
+              <div style="flex: 1 1 auto; height: 4mm; background: var(--g-bg); border: 0.35mm solid var(--g-border); border-radius: 1mm; overflow: hidden;">
+                <div style="height: 100%; width: {{boys_pct}}%; background: var(--g-teal);"></div>
+              </div>
+              <span style="flex: 0 0 auto; font-weight: 600; color: var(--g-teal-dark);">{{boys_pct}}%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <th scope="row">بنات</th>
+          <td>{{girls_count}}</td>
+          <td>
+            <div style="display: flex; align-items: center; gap: 2mm;">
+              <div style="flex: 1 1 auto; height: 4mm; background: var(--g-bg); border: 0.35mm solid var(--g-border); border-radius: 1mm; overflow: hidden;">
+                <div style="height: 100%; width: {{girls_pct}}%; background: var(--g-orange);"></div>
+              </div>
+              <span style="flex: 0 0 auto; font-weight: 600; color: var(--g-teal-dark);">{{girls_pct}}%</span>
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>نسب الأداء</h2>
+    <table>
+      <tbody>
+        <tr>
+          <th scope="row">نسبة التحصيل</th>
+          <td>
+            <div style="display: flex; align-items: center; gap: 2mm;">
+              <div style="flex: 1 1 auto; height: 4mm; background: var(--g-bg); border: 0.35mm solid var(--g-border); border-radius: 1mm; overflow: hidden;">
+                <div style="height: 100%; width: {{collection_pct}}%; background: var(--g-orange);"></div>
+              </div>
+              <span style="flex: 0 0 auto; font-weight: 600; color: var(--g-teal-dark);">{{collection_pct}}%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <th scope="row">نسبة الحضور</th>
+          <td>
+            <div style="display: flex; align-items: center; gap: 2mm;">
+              <div style="flex: 1 1 auto; height: 4mm; background: var(--g-bg); border: 0.35mm solid var(--g-border); border-radius: 1mm; overflow: hidden;">
+                <div style="height: 100%; width: {{attendance_pct}}%; background: var(--g-teal);"></div>
+              </div>
+              <span style="flex: 0 0 auto; font-weight: 600; color: var(--g-teal-dark);">{{attendance_pct}}%</span>
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>ملاحظات</h2>
+    <table>
+      <tbody>
+        <tr>
+          <th scope="row">الملاحظات</th>
+          <td>{{notes}}</td>
+        </tr>
+      </tbody>
+    </table>
+  </main>
+
+  <footer class="doc-footer">
+    <span>حوطة بني تميم</span>
+    <span>صفحة 1 من 1</span>
+  </footer>
+</div>
+</body>
+</html>

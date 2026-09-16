@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>تقرير الطالب</title>
+<link rel="stylesheet" href="../print.css">
+</head>
+<body>
+<div class="sheet">
+  <header class="doc-header">
+    <img class="doc-logo" src="../gheras_logo.png" alt="مركز غراس">
+    <div class="doc-header-center">
+      <div class="doc-center-name">مركز غراس</div>
+      <div class="doc-tagline">من غراس تبدأ المعرفة وتصنع القمة</div>
+      <div class="doc-title">تقرير الطالب</div>
+    </div>
+    <div class="doc-meta">
+      <div class="meta-row"><span class="meta-label">رقم التقرير:</span> {{report_no}}</div>
+      <div class="meta-row"><span class="meta-label">التاريخ:</span> {{date}}</div>
+    </div>
+  </header>
+
+  <main class="doc-body">
+    <table>
+      <tbody>
+        <tr>
+          <th scope="row">الطالب</th>
+          <td>{{student_name}}</td>
+          <th scope="row">المجموعة</th>
+          <td>{{group_name}}</td>
+        </tr>
+        <tr>
+          <th scope="row">القاعة</th>
+          <td>{{room_name}}</td>
+          <th scope="row">جوال ولي الأمر</th>
+          <td>{{guardian_phone}}</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>ملخص الحضور</h2>
+    <div class="kpi">
+      <div class="kpi-item">
+        <span class="kpi-label">حاضر</span>
+        <span class="kpi-value">{{present_count}}</span>
+      </div>
+      <div class="kpi-item">
+        <span class="kpi-label">غائب</span>
+        <span class="kpi-value">{{absent_count}}</span>
+      </div>
+      <div class="kpi-item">
+        <span class="kpi-label">متأخر</span>
+        <span class="kpi-value">{{late_count}}</span>
+      </div>
+      <div class="kpi-item">
+        <span class="kpi-label">مستأذن</span>
+        <span class="kpi-value">{{excused_count}}</span>
+      </div>
+      <div class="kpi-item">
+        <span class="kpi-label">نسبة الحضور</span>
+        <span class="kpi-value">{{attendance_pct}}%</span>
+      </div>
+    </div>
+
+    <h2>التقييمات الدراسية</h2>
+    <p>المواد المشمولة: القرآن، لغتي، الإنجليزي، الرياضيات</p>
+    <table>
+      <thead>
+        <tr>
+          <th scope="col">المادة</th>
+          <th scope="col">نوع التقييم</th>
+          <th scope="col">التاريخ</th>
+          <th scope="col">النتيجة</th>
+          <th scope="col">المعلم</th>
+        </tr>
+      </thead>
+      <tbody>
+      {{#evaluations}}
+        <tr>
+          <td>{{subject}}</td>
+          <td>{{eval_type}}</td>
+          <td>{{date}}</td>
+          <td>{{value}}</td>
+          <td>{{teacher}}</td>
+        </tr>
+      {{/evaluations}}
+      </tbody>
+    </table>
+
+    <h2>تقدم المهارات</h2>
+    <table>
+      <thead>
+        <tr>
+          <th scope="col">المادة</th>
+          <th scope="col">المهارة</th>
+          <th scope="col">المستوى</th>
+          <th scope="col">التاريخ</th>
+        </tr>
+      </thead>
+      <tbody>
+      {{#skills}}
+        <tr>
+          <td>{{subject}}</td>
+          <td>{{skill}}</td>
+          <td>{{level}}</td>
+          <td>{{date}}</td>
+        </tr>
+      {{/skills}}
+      </tbody>
+    </table>
+
+    <h2>خطط الدراسة</h2>
+    <table>
+      <thead>
+        <tr>
+          <th scope="col">المادة</th>
+          <th scope="col">المهارة</th>
+          <th scope="col">الهدف</th>
+          <th scope="col">تاريخ البداية</th>
+          <th scope="col">تاريخ الانتهاء</th>
+        </tr>
+      </thead>
+      <tbody>
+      {{#plans}}
+        <tr>
+          <td>{{subject}}</td>
+          <td>{{skill}}</td>
+          <td>{{goal}}</td>
+          <td>{{start_date}}</td>
+          <td>{{end_date}}</td>
+        </tr>
+      {{/plans}}
+      </tbody>
+    </table>
+
+    <h2>ملاحظات المعلم</h2>
+    <table>
+      <tbody>
+        <tr>
+          <th scope="row">الملاحظات</th>
+          <td>{{teacher_notes}}</td>
+        </tr>
+      </tbody>
+    </table>
+  </main>
+
+  <div class="signatures">
+    <div class="signature">
+      <div class="sig-line"></div>
+      <div class="sig-name">المعلم</div>
+    </div>
+    <div class="signature">
+      <div class="sig-line"></div>
+      <div class="sig-name">مدير المركز</div>
+    </div>
+  </div>
+
+  <footer class="doc-footer">
+    <span>حوطة بني تميم</span>
+    <span>صفحة 1 من 1</span>
+  </footer>
+</div>
+</body>
+</html>

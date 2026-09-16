@@ -1,0 +1,69 @@
+# ============================================================
+# Autovemtech workspace — strict quarantine (AGENTS.md Rule 8)
+# Repository scope: EduTrack Pro (Clients/03_GHERAS_Center/edutrack_pro)
+# ============================================================
+
+# --- Secrets & credentials ---
+.env
+*.env
+google-ads.yaml
+google_ads_config.yaml
+client_secrets.json
+*.pem
+*.key
+*.p12
+*.jks
+*.keystore
+
+# --- Personal identity & confidential (NEVER track) ---
+Digital persona/
+Visa/
+docs/
+
+# --- AI fleet internals & orchestration state ---
+.agents/
+.claude/
+fleet_orders/
+fleet_templates/
+fleet_proposal.json
+PROJECT_CONTEXT.md
+GOOGLE_ADS_API_RESUMPTION.md
+open_*.bat
+scripts/
+tools/
+
+# --- Other clients (Rule 51: zero cross-client bleed) ---
+Clients/*
+!Clients/03_GHERAS_Center/
+Clients/03_GHERAS_Center/*
+!Clients/03_GHERAS_Center/edutrack_pro/
+
+# --- Documents / binaries that must not enter the repo ---
+*.pdf
+*.docx
+*.xlsx
+*.log
+
+# --- Build caches ---
+**/build/
+**/.gradle/
+**/.kotlin/
+**/.idea/
+**/*.iml
+**/local.properties
+hs_err_pid*.log
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+
+# --- Node ---
+node_modules/
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+desktop.ini
