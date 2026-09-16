@@ -4,8 +4,8 @@
 > **Master Orchestrator**: `Claude Code CLI` (Opus Max / Sonnet 5)  
 > **Handoff Source**: `Antigravity IDE` (Interactive Cockpit & Visual Inspector)  
 > **Timestamp**: 2026-09-16T12:55:00+03:00  
-> **Last updated:** 2026-09-16 18:25 — Phase 1 close-out session — Claude Code CLI  
-> **VCS:** workspace is NOT a git repository (no commit hash; truth = files on disk under `Clients/03_GHERAS_Center/edutrack_pro/`)  
+> **Last updated:** 2026-09-16 18:45 — Phase 1 close-out session — Claude Code CLI  
+> **VCS:** git initialized 2026-09-16 at workspace root, branch `main`, HEAD `fc071f6` (Phase 1 [APPROVED], 84 files). Remote `origin` = https://github.com/ibrahimalkateb965-tech/EduTrackPro.git — **push pending: yes** (link + push must be run by Ibrahim; blocked for the AI by the permission classifier). Quarantine enforced by root `.gitignore` (Rule 8).  
 
 ---
 
@@ -92,7 +92,7 @@
 
 ## 5. THE ONE THING TO DO NEXT (frozen 2026-09-16 18:25)
 
-Phase 1 is **[APPROVED]** and closed. The next session must start with Ibrahim choosing one of:
+Phase 1 is **[APPROVED]** and committed locally as `fc071f6` on `main`. **First action next session: confirm `git remote -v` shows origin and `git status -sb` shows `[ahead 0]` (i.e. the push happened).** Then Ibrahim chooses one of:
 
 - **(a)** Phase 2 — build the `/api/v1` REST server (FastAPI + PostgreSQL) per `edutrack_pro/docs/PHASE1_SPEC.md §4`, including the `gheras_simple_v1` JSON importer, so the dashboard and print templates go live (Day-10 promise).
 - **(b)** Phase 2 — Android app module: Compose UI wiring the Room layer + `homework-core`, Room/KSP compile, teacher + guardian screens (Tier 2 deliverable).
