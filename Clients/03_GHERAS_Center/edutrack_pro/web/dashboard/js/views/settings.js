@@ -353,6 +353,6 @@ export async function render(container, api) {
     el('div', { class: 'form-actions' }, backupBtn)
   );
 
-  const cards = [header, pwdForm, userMgmtCard, centerInfoCard].filter(Boolean);
+  const cards = [header, pwdForm, userMgmtCard, me?.role === 'manager' ? centerInfoCard : null].filter(Boolean);
   container.append(...cards);
 }

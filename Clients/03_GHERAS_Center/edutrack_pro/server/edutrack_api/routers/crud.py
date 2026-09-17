@@ -101,6 +101,14 @@ def _allowed(user: dict, table: str, write: bool) -> None:
     if user["role"] == "supervisor":
         perms = user.get("permissions", {})
 
+        # Staff and Rooms access
+        staff_and_rooms = {"staff", "rooms", "schedules"}
+        if table in staff_and_rooms:
+            if write:
+                raise ApiError(403, "forbidden", "إدارة الموظفين والقاعات مخصصة للمدير العام فقط")
+            if not perms.get("students", False) and not perms.get("attendance", False):
+                raise ApiError(403, "forbidden", "ليس لديك صلاحية الوصول إلى الموظفين والقاعات")
+
         # Finance resources
         finance_tables = {
             "payments", "receipts", "expenses", "expense_categories",

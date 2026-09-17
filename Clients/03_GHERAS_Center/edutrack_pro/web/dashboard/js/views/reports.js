@@ -154,9 +154,13 @@ export async function render(container, api) {
     renderDaily(daily)
   );
 
+  const isFinanceAllowed = !api.currentUser || api.currentUser.role === 'manager' || api.currentUser.permissions?.finance;
+  const financeDocs = ['receipt', 'admin_report', 'monthly_report', 'student_receipt', 'statistics_report'];
+  const allowedDocs = DOCS.filter(doc => isFinanceAllowed || !financeDocs.includes(doc.file));
+
   const printSection = el('section', { class: 'panel' },
     el('div', { class: 'panel-head' }, el('h2', {}, 'مستندات الطباعة')),
-    el('div', { class: 'cards-grid' }, ...DOCS.map(docCard))
+    el('div', { class: 'cards-grid' }, ...allowedDocs.map(docCard))
   );
 
   const auditBody = el('tbody');
