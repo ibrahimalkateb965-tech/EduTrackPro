@@ -48,7 +48,7 @@ async function showLogin(id) {
   userName.textContent = 'الإدارة';
   loginActive = true;
   document.body.classList.add('auth-locked');
-  const { render } = await import('./views/login.js');
+  const { render } = await import('./views/login.js?v=1.1');
   if (id !== undefined && id !== renderId) return;
   main.replaceChildren();
   await render(main, api);
@@ -103,7 +103,7 @@ async function handleRoute() {
   loginActive = false;
   document.body.classList.remove('auth-locked');
   let view;
-  try { view = await import(`./views/${route}.js`); } catch (error) {
+  try { view = await import(`./views/${route}.js?v=1.1`); } catch (error) {
     toast('تعذر تحميل هذه الصفحة', true);
     return;
   }
