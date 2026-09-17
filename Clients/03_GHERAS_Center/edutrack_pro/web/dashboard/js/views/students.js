@@ -78,6 +78,16 @@ function statusBadge(student) {
   return el('span', { class: status === 'active' ? 'badge' : 'badge red' }, STATUS_LABELS[status] || status);
 }
 
+function genderBadge(student) {
+  const girl = isGirl(student);
+  const text = student.gender || (girl ? 'بنات' : 'بنين');
+  const isBnt = text === 'بنات';
+  return el('span', { 
+    class: 'badge',
+    style: isBnt ? 'background: #fce7f3; color: #9d174d; border: 1px solid #fbcfe8;' : 'background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd;'
+  }, isBnt ? '👧 بنات' : '👦 بنين');
+}
+
 function printCardHref(student) {
   return `../print/templates/guardian_card.html?id=${encodeURIComponent(student.id || '')}`;
 }
@@ -87,12 +97,61 @@ function studentRow(student, api) {
   edit.addEventListener('click', () => openStudentForm(api, student));
   const printCard = el('a', { class: 'button button-outline', href: printCardHref(student), target: '_blank', rel: 'noopener' }, 'بطاقة الطالب');
   return el('tr', {},
-    el('td', {}, student.name || '—'),
+    el('td', { style: 'font-weight:600;' }, student.name || '—'),
     el('td', {}, student.group_name || '—'),
+    el('td', {}, genderBadge(student)),
     el('td', {}, roomLabel(student)),
     el('td', {}, student.guardian_phone || '—'),
     el('td', {}, statusBadge(student)),
     el('td', {}, edit, ' ', printCard)
+  );
+}
+
+const TABS = [
+  ['all', 'كل الطلاب'],
+  ['morning', 'الصباح'],
+  ['evening', 'المساء'],
+  ['english_all', 'الإنجليزي (الكل)'],
+  ['english_boys', 'الإنجليزي (أولاد)'],
+  ['english_girls', 'الإنجليزي (بنات)'],
+  ['qudrat', 'القدرات']
+];
+
+function countForTab(tabId) {
+  return students.filter(student => {
+    if (tabId === 'morning') return student.group_name === 'الصباح';
+    if (tabId === 'evening') return student.group_name === 'المساء';
+    if (tabId === 'qudrat') return student.group_name === 'القدرات';
+    if (tabId === 'english_all') return isEnglishGroup(student.group_name);
+    if (tabId === 'english_boys') return isEnglishGroup(student.group_name) && !isGirl(student);
+    if (tabId === 'english_girls') return isEnglishGroup(student.group_name) && isGirl(student);
+    return true;
+  }).length;
+}
+
+function updateTabs(api) {
+  if (!tabsContainer) return;
+  tabsContainer.replaceChildren(
+    ...TABS.map(([id, label]) => {
+      const count = countForTab(id);
+      const btn = el('button', {
+        class: activeTab === id ? 'button' : 'button button-outline',
+        type: 'button',
+        style: 'display:inline-flex; align-items:center; gap:6px;'
+      }, 
+        el('span', {}, label),
+        el('span', { 
+          class: 'badge',
+          style: activeTab === id ? 'background:rgba(255,255,255,0.25); color:inherit; padding:2px 6px; font-size:11px;' : 'padding:2px 6px; font-size:11px;' 
+        }, String(count))
+      );
+      btn.onclick = () => {
+        activeTab = id;
+        updateTabs(api);
+        paint(api);
+      };
+      return btn;
+    })
   );
 }
 
@@ -108,13 +167,14 @@ function paint(api) {
     if (activeTab === 'morning') return student.group_name === 'الصباح';
     if (activeTab === 'evening') return student.group_name === 'المساء';
     if (activeTab === 'qudrat') return student.group_name === 'القدرات';
+    if (activeTab === 'english_all') return isEnglishGroup(student.group_name);
     if (activeTab === 'english_boys') return isEnglishGroup(student.group_name) && !isGirl(student);
     if (activeTab === 'english_girls') return isEnglishGroup(student.group_name) && isGirl(student);
     return true;
   });
   const rows = list.map(student => studentRow(student, api));
   const emptyText = students.length ? 'لا توجد نتائج مطابقة للبحث أو التصفية الحالية' : 'لا يوجد طلاب مسجلون بعد';
-  tbody.replaceChildren(...(rows.length ? rows : [el('tr', {}, el('td', { colspan: '6', class: 'muted' }, emptyText))]));
+  tbody.replaceChildren(...(rows.length ? rows : [el('tr', {}, el('td', { colspan: '7', class: 'muted' }, emptyText))]));
 }
 
 async function reload(api) {
@@ -123,6 +183,7 @@ async function reload(api) {
   } catch (error) {
     toast(error.message, true);
   }
+  updateTabs(api);
   paint(api);
 }
 
@@ -149,6 +210,9 @@ function openStudentForm(api, student) {
   } else if (activeTab === 'english_girls') {
     defaultGroup = 'الإنجليزي';
     defaultGender = 'بنات';
+  } else if (activeTab === 'english_all') {
+    defaultGroup = 'الإنجليزي';
+    defaultGender = 'بنين';
   } else if (activeTab === 'morning') {
     defaultGroup = 'الصباح';
   } else if (activeTab === 'evening') {
@@ -158,35 +222,52 @@ function openStudentForm(api, student) {
   }
 
   const fields = [
-    el('label', {}, el('span', {}, 'اسم الطالب'), el('input', { name: 'name', type: 'text', required: 'required', value: value('name') })),
-    el('label', {}, el('span', {}, 'رقم الهوية'), el('input', { name: 'national_id', type: 'text', value: value('national_id') })),
+    // --- 1. البيانات الأساسية والأكاديمية ---
+    el('div', { class: 'form-section-title', style: 'grid-column: 1 / -1; font-weight: bold; margin: 4px 0 6px; padding-bottom: 4px; border-bottom: 1.5px solid var(--border, #e2e8f0); color: var(--primary, #0284c7); display: flex; align-items: center; gap: 6px;' }, '👤 البيانات الأساسية والأكاديمية'),
+
+    el('label', {}, el('span', { style: 'font-weight:600;' }, 'اسم الطالب *'), el('input', { name: 'name', type: 'text', required: 'required', placeholder: 'الاسم الثلاثي أو الرباعي', value: value('name') })),
+
+    el('label', { style: 'background: rgba(14, 165, 233, 0.08); padding: 6px 10px; border-radius: 8px; border: 1.5px solid rgba(14, 165, 233, 0.3);' }, 
+      el('span', { style: 'font-weight: 700; color: #0369a1; display: flex; align-items: center; gap: 4px;' }, '⚥ تحديد الجنس (بنين / بنات) *'), 
+      select('gender', [['بنين', '👦 بنين (أولاد)'], ['بنات', '👧 بنات']], value('gender') || (editing ? (isGirl(student || {}) ? 'بنات' : 'بنين') : defaultGender))
+    ),
+
+    el('label', {}, el('span', { style: 'font-weight:600;' }, 'المجموعة الدراسية *'), select('group_name', groupOptions, value('group_name') || defaultGroup)),
+    el('label', {}, el('span', {}, 'الفصل / القاعة'), select('room_id', roomOptions, value('room_id'))),
+    el('label', {}, el('span', {}, 'رقم الهوية الوطنية / الإقامة'), el('input', { name: 'national_id', type: 'text', value: value('national_id') })),
     el('label', {}, el('span', {}, 'تاريخ الميلاد'), el('input', { name: 'birth_date', type: 'date', value: value('birth_date') })),
-    el('label', {}, el('span', {}, 'الجنسية'), el('input', { name: 'nationality', type: 'text', value: value('nationality') })),
-    el('label', {}, el('span', {}, 'صعوبات تعلم'), select('has_difficulties', YES_NO, boolValue('has_difficulties'))),
-    el('label', {}, el('span', {}, 'تفاصيل الصعوبات'), el('textarea', { name: 'difficulty_notes' }, value('difficulty_notes'))),
-    el('label', {}, el('span', {}, 'ملاحظات عن الطالب'), el('textarea', { name: 'child_notes' }, value('child_notes'))),
+    el('label', {}, el('span', {}, 'الجنسية'), el('input', { name: 'nationality', type: 'text', value: value('nationality') || 'سعودي' })),
+
+    // --- 2. بيانات ولي الأمر والتواصل ---
+    el('div', { class: 'form-section-title', style: 'grid-column: 1 / -1; font-weight: bold; margin: 12px 0 6px; padding-bottom: 4px; border-bottom: 1.5px solid var(--border, #e2e8f0); color: var(--primary, #0284c7); display: flex; align-items: center; gap: 6px;' }, '📞 بيانات ولي الأمر والتواصل'),
+
+    el('label', {}, el('span', { style: 'font-weight:600;' }, 'هاتف ولي الأمر *'), el('input', { name: 'guardian_phone', type: 'text', required: 'required', value: value('guardian_phone') })),
+    el('label', {}, el('span', {}, 'علاقة ولي الأمر'), select('guardian_relation', relationOptions, value('guardian_relation') || 'الأب')),
     el('label', {}, el('span', {}, 'اسم الأب'), el('input', { name: 'father_name', type: 'text', value: value('father_name') })),
     el('label', {}, el('span', {}, 'هاتف الأب'), el('input', { name: 'father_phone', type: 'text', value: value('father_phone') })),
     el('label', {}, el('span', {}, 'اسم الأم'), el('input', { name: 'mother_name', type: 'text', value: value('mother_name') })),
     el('label', {}, el('span', {}, 'هاتف الأم'), el('input', { name: 'mother_phone', type: 'text', value: value('mother_phone') })),
-    el('label', {}, el('span', {}, 'هاتف ولي الأمر'), el('input', { name: 'guardian_phone', type: 'text', required: 'required', value: value('guardian_phone') })),
-    el('label', {}, el('span', {}, 'علاقة ولي الأمر'), select('guardian_relation', relationOptions, value('guardian_relation') || 'الأب')),
     el('label', {}, el('span', {}, 'طريقة الاستلام'), el('input', { name: 'pickup_type', type: 'text', value: value('pickup_type') })),
     el('label', {}, el('span', {}, 'اسم المستلم'), el('input', { name: 'pickup_name', type: 'text', value: value('pickup_name') })),
     el('label', {}, el('span', {}, 'علاقة المستلم'), el('input', { name: 'pickup_relation', type: 'text', value: value('pickup_relation') })),
     el('label', {}, el('span', {}, 'هاتف المستلم'), el('input', { name: 'pickup_phone', type: 'text', value: value('pickup_phone') })),
+
+    // --- 3. البيانات التعليمية والملاحظات ---
+    el('div', { class: 'form-section-title', style: 'grid-column: 1 / -1; font-weight: bold; margin: 12px 0 6px; padding-bottom: 4px; border-bottom: 1.5px solid var(--border, #e2e8f0); color: var(--primary, #0284c7); display: flex; align-items: center; gap: 6px;' }, '📝 البيانات التعليمية والملاحظات'),
+
     el('label', {}, el('span', {}, 'دراسة سابقة'), select('previous_study', YES_NO, boolValue('previous_study'))),
     el('label', {}, el('span', {}, 'المدرسة السابقة'), el('input', { name: 'previous_school', type: 'text', value: value('previous_school') })),
     el('label', {}, el('span', {}, 'المستوى السابق'), el('input', { name: 'previous_level', type: 'text', value: value('previous_level') })),
-    el('label', {}, el('span', {}, 'ملاحظات تعليمية'), el('textarea', { name: 'education_notes' }, value('education_notes'))),
-    el('label', {}, el('span', {}, 'الفصل'), select('room_id', roomOptions, value('room_id'))),
-    el('label', {}, el('span', {}, 'المجموعة'), select('group_name', groupOptions, value('group_name') || defaultGroup)),
-    el('label', {}, el('span', {}, 'القسم / الجنس'), select('gender', [['بنين', 'بنين (أولاد)'], ['بنات', 'بنات']], value('gender') || (editing ? (isGirl(student || {}) ? 'بنات' : 'بنين') : defaultGender)))
+    el('label', {}, el('span', {}, 'صعوبات تعلم'), select('has_difficulties', YES_NO, boolValue('has_difficulties'))),
+    el('label', {}, el('span', {}, 'تفاصيل الصعوبات'), el('textarea', { name: 'difficulty_notes' }, value('difficulty_notes'))),
+    el('label', {}, el('span', {}, 'ملاحظات عن الطالب'), el('textarea', { name: 'child_notes' }, value('child_notes'))),
+    el('label', {}, el('span', {}, 'ملاحظات تعليمية'), el('textarea', { name: 'education_notes' }, value('education_notes')))
   ];
-  const submit = el('button', { class: 'button', type: 'submit' }, editing ? 'حفظ التعديلات' : 'إضافة');
+
+  const submit = el('button', { class: 'button', type: 'submit' }, editing ? 'حفظ التعديلات' : 'إضافة طالب');
   const cancel = el('button', { class: 'button button-outline', type: 'button' }, 'إلغاء');
   const form = el('form', { class: 'form-grid' }, ...fields, el('div', { class: 'form-actions' }, submit, cancel));
-  const dialog = modal(editing ? 'تعديل بيانات الطالب' : 'إضافة طالب', form);
+  const dialog = modal(editing ? 'تعديل بيانات الطالب' : 'إضافة طالب جديد', form);
   cancel.addEventListener('click', dialog.close);
   form.addEventListener('submit', async event => {
     event.preventDefault();
@@ -203,7 +284,7 @@ function openStudentForm(api, student) {
       if (editing) await api.patch(`students/${student.id}`, payload);
       else await api.post('students', payload);
       dialog.close();
-      toast(editing ? 'تم تحديث بيانات الطالب' : 'تمت إضافة الطالب');
+      toast(editing ? 'تم تحديث بيانات الطالب بنجاح' : 'تمت إضافة الطالب بنجاح');
       await reload(api);
     } catch (error) {
       toast(error.message, true);
@@ -223,11 +304,12 @@ export async function render(container, api) {
   const tabParam = params.get('tab');
   const group = params.get('group');
   const gender = params.get('gender');
-  if (tabParam && ['all', 'morning', 'evening', 'english_boys', 'english_girls', 'qudrat'].includes(tabParam)) {
+  if (tabParam && ['all', 'morning', 'evening', 'english_all', 'english_boys', 'english_girls', 'qudrat'].includes(tabParam)) {
     activeTab = tabParam;
   } else if (isEnglishGroup(group)) {
     if (gender === 'girls' || gender === 'بنات') activeTab = 'english_girls';
-    else activeTab = 'english_boys';
+    else if (gender === 'boys' || gender === 'بنين') activeTab = 'english_boys';
+    else activeTab = 'english_all';
   } else if (group === 'الصباح' || group === 'morning') {
     activeTab = 'morning';
   } else if (group === 'المساء' || group === 'evening') {
@@ -238,39 +320,14 @@ export async function render(container, api) {
     activeTab = 'all';
   }
 
-  const TABS = [
-    ['all', 'كل الطلاب'],
-    ['morning', 'الصباح'],
-    ['evening', 'المساء'],
-    ['english_boys', 'طلاب الإنجليزي (أولاد)'],
-    ['english_girls', 'طالبات الإنجليزي (بنات)'],
-    ['qudrat', 'القدرات']
-  ];
-
-  tabsContainer = el('div', { class: 'toolbar', style: 'margin-bottom:12px; gap:6px;' });
-  function updateTabs() {
-    tabsContainer.replaceChildren(
-      ...TABS.map(([id, label]) => {
-        const btn = el('button', {
-          class: activeTab === id ? 'button' : 'button button-outline',
-          type: 'button'
-        }, label);
-        btn.onclick = () => {
-          activeTab = id;
-          updateTabs();
-          paint(api);
-        };
-        return btn;
-      })
-    );
-  }
-  updateTabs();
+  tabsContainer = el('div', { class: 'toolbar', style: 'margin-bottom:12px; gap:6px; flex-wrap:wrap;' });
+  updateTabs(api);
 
   const search = el('input', { type: 'search', placeholder: 'ابحث بالاسم أو رقم الهوية أو الهاتف', 'aria-label': 'بحث في الطلاب' });
   search.addEventListener('input', () => { query = search.value.trim(); paint(api); });
-  const addButton = el('button', { class: 'button', type: 'button' }, 'إضافة طالب');
+  const addButton = el('button', { class: 'button', type: 'button' }, '➕ إضافة طالب');
   addButton.addEventListener('click', () => openStudentForm(api, null));
-  tbody = el('tbody', {}, el('tr', {}, el('td', { colspan: '6', class: 'muted' }, 'جارٍ التحميل...')));
+  tbody = el('tbody', {}, el('tr', {}, el('td', { colspan: '7', class: 'muted' }, 'جارٍ التحميل...')));
   container.append(
     el('div', { class: 'view-header' }, el('h1', {}, 'الطلاب')),
     tabsContainer,
@@ -279,6 +336,7 @@ export async function render(container, api) {
       el('thead', {}, el('tr', {},
         el('th', {}, 'الاسم'),
         el('th', {}, 'المجموعة'),
+        el('th', {}, 'القسم (الجنس)'),
         el('th', {}, 'الفصل'),
         el('th', {}, 'هاتف ولي الأمر'),
         el('th', {}, 'الحالة'),
