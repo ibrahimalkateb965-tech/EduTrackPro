@@ -19,16 +19,46 @@ function getParams() {
   return new URLSearchParams(hash.slice(qIdx + 1));
 }
 
+function isEnglishGroup(g) {
+  const norm = String(g || '').trim();
+  return norm === 'الإنجليزي' || norm === 'الانجليزي' || norm === 'انجليزي' || norm === 'إنجليزي' || norm.toLowerCase() === 'english';
+}
+
+const MALE_NAMES = new Set([
+  'حمزة', 'أسامة', 'اسامة', 'حذيفة', 'معاوية', 'طلحة', 'عبيدة', 'قتادة',
+  'عنترة', 'سلامة', 'عكرمة', 'ميسرة', 'عمارة', 'حنظلة', 'سلمة', 'طه',
+  'عطية', 'جمعة', 'رفاعة', 'شيبة', 'أمية', 'امية', 'عبدالله', 'سعدالله',
+  'حارثة', 'ربيعة', 'عبيدة', 'قتيبة', 'مالك', 'محمد', 'أحمد', 'احمد',
+  'علي', 'عمر', 'عمرو', 'خالد', 'سعد', 'سعود', 'فهد', 'سلمان', 'عبدالعزيز',
+  'عبدالرحمن', 'يوسف', 'إبراهيم', 'ابراهيم', 'صالح', 'سليمان', 'عبد الله',
+  'بلال', 'ياسر', 'طارق', 'زياد', 'وليد', 'فيصل', 'سلطان', 'ماجد', 'بندر',
+  'تركي', 'مشعل', 'نايف', 'نواف', 'بدر', 'سالم', 'منصور', 'ناصر', 'حسام',
+  'عبدالملك', 'عبدالرحيم', 'عبدالكريم', 'عبدالمجيد', 'عبداللطيف', 'عبدالوهاب'
+]);
+
+const FEMALE_NAMES = new Set([
+  'مريم', 'فاطمة', 'فاطمه', 'عائشة', 'عائشه', 'نورة', 'نوره', 'نور', 'سارة', 'ساره',
+  'ريم', 'هدى', 'أمل', 'منى', 'شهد', 'رهف', 'جنى', 'خلود', 'ليلى', 'زينب', 'لمى',
+  'أسماء', 'ريناد', 'دانة', 'دانه', 'تسنيم', 'عبير', 'روان', 'شروق', 'حنين', 'يارا',
+  'ريما', 'هند', 'بشاير', 'أروى', 'غيداء', 'أفنان', 'جود', 'بيان', 'خلود', 'وسن'
+]);
+
 function isGirl(student) {
-  if (student.gender === 'بنات') return true;
-  if (student.gender === 'بنين') return false;
+  const g = String(student.gender || '').trim();
+  if (g === 'بنات' || g === 'female' || g === 'أنثى') return true;
+  if (g === 'بنين' || g === 'male' || g === 'ذكر' || g === 'أولاد') return false;
+
   const text = `${student.child_notes || ''} ${student.education_notes || ''} ${student.room_name || ''}`;
   if (text.includes('بنات') || text.includes('أنثى')) return true;
   if (text.includes('بنين') || text.includes('أولاد') || text.includes('ذكر')) return false;
+
   const firstName = (student.name || '').trim().split(/\s+/)[0] || '';
-  if (firstName.endsWith('ة') || firstName.endsWith('ه')) return true;
-  const femaleNames = ['مريم', 'فاطمة', 'عائشة', 'نورة', 'نور', 'سارة', 'ريم', 'هدى', 'أمل', 'منى', 'شهد', 'رهف', 'جنى', 'خلود', 'ليلى', 'زينب', 'لمى', 'أسماء', 'ريناد', 'دانة', 'تسنيم'];
-  return femaleNames.includes(firstName);
+  if (MALE_NAMES.has(firstName)) return false;
+  if (FEMALE_NAMES.has(firstName)) return true;
+
+  if (firstName.endsWith('ة')) return true;
+
+  return false;
 }
 
 function toList(data) {
@@ -78,8 +108,8 @@ function paint(api) {
     if (activeTab === 'morning') return student.group_name === 'الصباح';
     if (activeTab === 'evening') return student.group_name === 'المساء';
     if (activeTab === 'qudrat') return student.group_name === 'القدرات';
-    if (activeTab === 'english_boys') return student.group_name === 'الإنجليزي' && !isGirl(student);
-    if (activeTab === 'english_girls') return student.group_name === 'الإنجليزي' && isGirl(student);
+    if (activeTab === 'english_boys') return isEnglishGroup(student.group_name) && !isGirl(student);
+    if (activeTab === 'english_girls') return isEnglishGroup(student.group_name) && isGirl(student);
     return true;
   });
   const rows = list.map(student => studentRow(student, api));
@@ -110,6 +140,23 @@ function openStudentForm(api, student) {
   const roomOptions = [['', 'بدون فصل']].concat(rooms.map(room => [room.id, room.name]));
   const groupOptions = [['', 'اختر المجموعة']].concat(GROUPS.map(group => [group, group]));
   const relationOptions = GUARDIAN_RELATIONS.map(relation => [relation, relation]);
+
+  let defaultGroup = '';
+  let defaultGender = 'بنين';
+  if (activeTab === 'english_boys') {
+    defaultGroup = 'الإنجليزي';
+    defaultGender = 'بنين';
+  } else if (activeTab === 'english_girls') {
+    defaultGroup = 'الإنجليزي';
+    defaultGender = 'بنات';
+  } else if (activeTab === 'morning') {
+    defaultGroup = 'الصباح';
+  } else if (activeTab === 'evening') {
+    defaultGroup = 'المساء';
+  } else if (activeTab === 'qudrat') {
+    defaultGroup = 'القدرات';
+  }
+
   const fields = [
     el('label', {}, el('span', {}, 'اسم الطالب'), el('input', { name: 'name', type: 'text', required: 'required', value: value('name') })),
     el('label', {}, el('span', {}, 'رقم الهوية'), el('input', { name: 'national_id', type: 'text', value: value('national_id') })),
@@ -133,8 +180,8 @@ function openStudentForm(api, student) {
     el('label', {}, el('span', {}, 'المستوى السابق'), el('input', { name: 'previous_level', type: 'text', value: value('previous_level') })),
     el('label', {}, el('span', {}, 'ملاحظات تعليمية'), el('textarea', { name: 'education_notes' }, value('education_notes'))),
     el('label', {}, el('span', {}, 'الفصل'), select('room_id', roomOptions, value('room_id'))),
-    el('label', {}, el('span', {}, 'المجموعة'), select('group_name', groupOptions, value('group_name'))),
-    el('label', {}, el('span', {}, 'القسم / الجنس'), select('gender', [['بنين', 'بنين (أولاد)'], ['بنات', 'بنات']], value('gender') || (isGirl(student || {}) ? 'بنات' : 'بنين')))
+    el('label', {}, el('span', {}, 'المجموعة'), select('group_name', groupOptions, value('group_name') || defaultGroup)),
+    el('label', {}, el('span', {}, 'القسم / الجنس'), select('gender', [['بنين', 'بنين (أولاد)'], ['بنات', 'بنات']], value('gender') || (editing ? (isGirl(student || {}) ? 'بنات' : 'بنين') : defaultGender)))
   ];
   const submit = el('button', { class: 'button', type: 'submit' }, editing ? 'حفظ التعديلات' : 'إضافة');
   const cancel = el('button', { class: 'button button-outline', type: 'button' }, 'إلغاء');
@@ -150,7 +197,7 @@ function openStudentForm(api, student) {
     payload.previous_study = payload.previous_study === 'true';
     payload.room_id = payload.room_id || null;
     if (payload.birth_date === '') payload.birth_date = null;
-    payload.gender = payload.gender || (isGirl(student || {}) ? 'بنات' : 'بنين');
+    payload.gender = payload.gender || (editing ? (isGirl(student || {}) ? 'بنات' : 'بنين') : defaultGender);
 
     try {
       if (editing) await api.patch(`students/${student.id}`, payload);
@@ -173,16 +220,19 @@ export async function render(container, api) {
 
   // Parse initial tab from URL hash params
   const params = getParams();
+  const tabParam = params.get('tab');
   const group = params.get('group');
   const gender = params.get('gender');
-  if (group === 'الإنجليزي') {
+  if (tabParam && ['all', 'morning', 'evening', 'english_boys', 'english_girls', 'qudrat'].includes(tabParam)) {
+    activeTab = tabParam;
+  } else if (isEnglishGroup(group)) {
     if (gender === 'girls' || gender === 'بنات') activeTab = 'english_girls';
     else activeTab = 'english_boys';
-  } else if (group === 'الصباح') {
+  } else if (group === 'الصباح' || group === 'morning') {
     activeTab = 'morning';
-  } else if (group === 'المساء') {
+  } else if (group === 'المساء' || group === 'evening') {
     activeTab = 'evening';
-  } else if (group === 'القدرات') {
+  } else if (group === 'القدرات' || group === 'qudrat') {
     activeTab = 'qudrat';
   } else {
     activeTab = 'all';

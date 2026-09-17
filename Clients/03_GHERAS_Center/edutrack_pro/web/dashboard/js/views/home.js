@@ -2,8 +2,8 @@ import { el, toast, modal, fmtSAR } from '../ui.js';
 
 const TOOLS = [
   { label: 'الطلاب', icon: '♟', route: '#/students', perm: 'students' },
-  { label: 'طلاب الإنجليزي — أولاد', icon: '👦', route: '#/students?group=الإنجليزي&gender=boys', perm: 'students' },
-  { label: 'طلاب الإنجليزي — بنات', icon: '👧', route: '#/students?group=الإنجليزي&gender=girls', perm: 'students' },
+  { label: 'طلاب الإنجليزي — أولاد', icon: '👦', route: '#/students?tab=english_boys', perm: 'students' },
+  { label: 'طلاب الإنجليزي — بنات', icon: '👧', route: '#/students?tab=english_girls', perm: 'students' },
   { label: 'القاعات', icon: '▦', route: '#/rooms' },
   { label: 'الجدول الدراسي', icon: '📅', route: '#/rooms' },
   { label: 'المعلمون والمشرفون', icon: '♙', route: '#/staff?tab=teachers_supervisors' },

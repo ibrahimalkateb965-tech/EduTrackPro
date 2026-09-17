@@ -10,6 +10,7 @@ let evalEntries = new Map();
 let selectedDate = fmtDate(new Date());
 let selectedSubject = 'القرآن';
 let groupFilter = '';
+let genderFilter = '';
 let activeTab = 'attendance';
 let tbody = null;
 let printLink = null;
@@ -61,7 +62,7 @@ function attendanceRow(student) {
   note.addEventListener('input', () => setEntry(student.id, 'note', note.value));
   return el('tr', {},
     el('td', {}, student.name || '—'),
-    el('td', {}, student.group_name || '—'),
+    el('td', {}, student.group_name ? (student.group_name + (student.gender ? ` (${student.gender})` : '')) : '—'),
     el('td', {}, status),
     el('td', {}, note)
   );
@@ -90,14 +91,14 @@ function evaluationRow(student) {
 
   return el('tr', {},
     el('td', {}, student.name || '—'),
-    el('td', {}, student.group_name || '—'),
+    el('td', {}, student.group_name ? (student.group_name + (student.gender ? ` (${student.gender})` : '')) : '—'),
     el('td', {}, scoreInput),
     el('td', {}, noteInput)
   );
 }
 
 function paint() {
-  const list = students.filter(student => !groupFilter || student.group_name === groupFilter);
+  const list = students.filter(student => (!groupFilter || student.group_name === groupFilter) && (!genderFilter || student.gender === genderFilter));
   if (activeTab === 'evaluation') {
     const rows = list.map(student => evaluationRow(student));
     const emptyText = students.length ? 'لا يوجد طلاب في هذه المجموعة' : 'لا يوجد طلاب نشطون بعد';
@@ -141,7 +142,7 @@ async function loadEntries(api) {
 
 async function saveAttendance(api, button) {
   button.disabled = true;
-  const targetList = groupFilter ? students.filter(student => student.group_name === groupFilter) : students;
+  const targetList = students.filter(student => (!groupFilter || student.group_name === groupFilter) && (!genderFilter || student.gender === genderFilter));
   const rows = targetList.map(student => {
     const entry = entries.get(student.id) || {};
     return { student_id: student.id, date: selectedDate, status: entry.status || 'حاضر', note: entry.note || null };
@@ -157,7 +158,7 @@ async function saveAttendance(api, button) {
 
 async function saveEvaluations(api, button) {
   button.disabled = true;
-  const targetList = groupFilter ? students.filter(student => student.group_name === groupFilter) : students;
+  const targetList = students.filter(student => (!groupFilter || student.group_name === groupFilter) && (!genderFilter || student.gender === genderFilter));
   const rows = targetList.map(student => {
     const entry = evalEntries.get(student.id) || {};
     return {
@@ -183,6 +184,7 @@ export async function render(container, api) {
   selectedDate = fmtDate(new Date());
   selectedSubject = 'القرآن';
   groupFilter = '';
+  genderFilter = '';
   container.replaceChildren();
 
   // Parse initial tab from URL hash params
@@ -235,6 +237,13 @@ export async function render(container, api) {
     groupSelect.value = groupFilter;
     groupSelect.addEventListener('change', () => { groupFilter = groupSelect.value; paint(); });
 
+    const genderSelect = el('select', { 'aria-label': 'تصفية بالقسم' });
+    genderSelect.append(el('option', { value: '' }, 'كل الأقسام (بنين وبنات)'));
+    genderSelect.append(el('option', { value: 'بنين' }, 'بنين (أولاد)'));
+    genderSelect.append(el('option', { value: 'بنات' }, 'بنات'));
+    genderSelect.value = genderFilter;
+    genderSelect.addEventListener('change', () => { genderFilter = genderSelect.value; paint(); });
+
     toolbarContainer.replaceChildren();
 
     if (activeTab === 'evaluation') {
@@ -250,12 +259,12 @@ export async function render(container, api) {
       const saveBtn = el('button', { class: 'button', type: 'button' }, '💾 حفظ التقييم اليومي');
       saveBtn.onclick = () => saveEvaluations(api, saveBtn);
 
-      toolbarContainer.append(dateInput, groupSelect, subjectSelect, saveBtn);
+      toolbarContainer.append(dateInput, groupSelect, genderSelect, subjectSelect, saveBtn);
 
       theadContainer.replaceChildren(
         el('tr', {},
           el('th', {}, 'الطالب'),
-          el('th', {}, 'المجموعة'),
+          el('th', {}, 'المجموعة / القسم'),
           el('th', {}, 'الدرجة (من 10)'),
           el('th', {}, 'الملاحظة')
         )
@@ -265,12 +274,12 @@ export async function render(container, api) {
       saveButton.addEventListener('click', () => saveAttendance(api, saveButton));
       printLink = el('a', { class: 'button button-outline', href: reportHref(), target: '_blank', rel: 'noopener' }, '📄 تقرير الحضور');
 
-      toolbarContainer.append(dateInput, groupSelect, saveButton, printLink);
+      toolbarContainer.append(dateInput, groupSelect, genderSelect, saveButton, printLink);
 
       theadContainer.replaceChildren(
         el('tr', {},
           el('th', {}, 'الطالب'),
-          el('th', {}, 'المجموعة'),
+          el('th', {}, 'المجموعة / القسم'),
           el('th', {}, 'الحالة'),
           el('th', {}, 'ملاحظة')
         )
