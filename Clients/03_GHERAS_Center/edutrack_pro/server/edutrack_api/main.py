@@ -47,10 +47,10 @@ def create_app() -> FastAPI:
 
     api = APIRouter(prefix="/api/v1")
     api.include_router(auth.router)
-    api.include_router(crud.router)
     api.include_router(attendance.router)
     api.include_router(reports.router)
     api.include_router(print.router)
+    api.include_router(crud.router)
 
     @api.get("/health")
     async def health() -> dict:

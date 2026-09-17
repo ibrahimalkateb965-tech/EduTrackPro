@@ -137,10 +137,15 @@ Autovemtech operates an autonomous multi-CLI fleet governed by [fleet_config.jso
 | :--- | :--- | :--- | :--- |
 | **Claude Code CLI** | `claude` | Opus Max / Sonnet 5 | Master Orchestrator, Staff Architect, **Sole Testing Authority**, Quality Gatekeeper. |
 | **Codex CLI / Desktop** | `codex` / ChatGPT Desktop | GPT-5.6 Soul / gpt-6-astra | Algorithmic logic, complex math engines, heavy refactoring, data pipelines. |
-| **OpenCode CLI (Worker A)** | `opencode` (Flash) | `-m opencode-go/glm-5.3-flash` | **Ultra-Fast Terminal Executor**: Shell commands, CLI build tasks, scaffolding, rapid scripts (runs in parallel). |
+| **OpenCode CLI (Worker A)** | `opencode` (Flash) | `-m opencode-go/glm-5.3-flash` | **Ultra-Fast Terminal Executor**: Shell commands, CLI build tasks, scaffolding, rapid scripts (runs in parallel with Worker B; **MAX 1 instance of GLM concurrently**). |
 | **OpenCode CLI (Worker B)** | `opencode` (Muse) | `-m opencode-go/muse-spark-1.3-contributor` | **Database & Data Architect**: Database schemas, migrations, DAOs, repositories, data transformers (runs in parallel). |
 | **Antigravity CLI (`agcli`)** | `agcli` | Gemini 3.8 Flash High | **Autonomous Terminal Executor**: Headless generation of UI components, Jetpack Compose, Web views, and domain logic. |
 | **Antigravity IDE** | Editor Workbench | Gemini 3.8 Flash High | **Interactive Human-AI Cockpit**: High-level strategy, consultation, visual inspection, monitoring real-time outputs, and manually refining/optimizing commands with the user *before* routing them to the CLI fleet. **Never target Antigravity IDE with automated CLI delegate prompts.** |
+
+### OpenCode CLI Concurrency Invariant
+> [!IMPORTANT]
+> **OpenCode Parallel Execution Rule**: Worker A (`GLM 5.3 Flash`) and Worker B (`Meta Muse Spark 1.3`) are designed to operate concurrently in parallel on separate tasks (e.g. terminal execution + database modeling).
+> However, **NEVER spawn more than ONE instance of `opencode-go/glm-5.3-flash` simultaneously**. Exceeding 1 concurrent GLM Flash instance triggers API provider concurrency lockouts (HTTP 429).
 
 ### Mandatory Testing & Verification Monopoly
 > [!CAUTION]
@@ -178,8 +183,9 @@ Governed by [.agents/CONTEXT_GOVERNANCE.md](file:///f:/AI%20PROJECTS/Autovemtech
 5. **Rule 51 (Clean Templates & Zero Cross-Project Bleed)**:
    - Templates in `_Agency_Templates/` and MCP docx generators must be 100% generic structural templates.
    - Never allow data from one client (e.g., Shajan) to bleed into another (e.g., YAZ or Apex).
-6. **Rule 1 (BiDi & RTL Isolation)**:
-   - In all Arabic markdown, HTML, and SVG files, isolate English terms, acronyms, and paths using `<bdi>` or `<span dir="ltr">` to prevent punctuation inversion.
+6. **Rule 1 (BiDi & RTL Isolation & Artifact Pre-Flight Gate)**:
+   - **Mandatory `<div dir="rtl">` Wrapper:** Every Arabic markdown artifact (`implementation_plan.md`, `walkthrough.md`, `learning_proposal.md`, reports, client summaries) MUST strictly begin with `<div dir="rtl">` on Line 1 and end with `</div>` on the final line.
+   - **Strict BiDi Isolation:** In all Arabic markdown, HTML, and SVG files, isolate all English terms, acronyms, model names, CLI commands, code symbols, and file paths using `<bdi>` (e.g. `<bdi>OpenCode CLI</bdi>` or `<bdi>`web/print/`</bdi>`) or `<span dir="ltr">` to prevent punctuation and line-flow inversion.
 7. **Rule 7 (Digital Concierge & Government Visa Services Standard)**:
    - **Role Definition:** Act strictly as a "Tech Facilitator & Digital Concierge" assisting non-tech-savvy clients with official government self-service portals (e.g. Nusuk B2C at `umrah.nusuk.sa`, 96-hour Transit Visa via Saudia/Flynas).
    - **100% Upfront Collection Rule:** Always collect the full government fees + agency facilitation fees from the client upfront before initiating payment. Use a dedicated prepaid digital card (STC Pay / Urpay) loaded only with the exact transaction amount to ensure 100% financial security.
@@ -188,4 +194,9 @@ Governed by [.agents/CONTEXT_GOVERNANCE.md](file:///f:/AI%20PROJECTS/Autovemtech
    - **Mandatory Repository Foundation:** Every software engineering project must have an active local Git repository (`.git`) linked to GitHub from Day 0 before writing application code.
    - **Proactive AI Reminder Gate:** If the user starts a project or requests feature development in a workspace that lacks `.git`, the AI assistant MUST proactively pause, alert, and remind the user: *"⚠️ تنبيه حوكمة: مساحة العمل لا تحتوي على مستودع Git مهيأ (`.git`). يجب إنشاء المستودع وضبط الحجر الصحي في `.gitignore` وتثبيت أول commit لحماية المخرجات وتفعيل بروتوكول التصفير الاستراتيجي (Hook 25)."*
    - **Strict AI Quarantine in `.gitignore`:** The repository's `.gitignore` must immediately quarantine: `Digital persona/`, `.agents/`, `.claude/`, `fleet_orders/`, `fleet_templates/`, `.env`, and build caches (`**/build/`, `**/.gradle/`, `*.log`).
+9. **Rule 9 (Decimal-to-Float JSON Invariant for API Endpoints)**:
+   - In FastAPI/Python endpoints querying raw SQL monetary amounts or database aggregates (`sum(amount)`), **NEVER** return raw `Decimal` objects in response payloads.
+   - Pydantic v2 automatically serializes raw `Decimal` objects as JSON strings (`"500.00"`), breaking client arithmetic and test comparisons.
+   - All response dictionaries containing monetary/numeric fields must be routed through the recursive `_convert()` serializer (e.g. `return _resp(...)`) to guarantee all `Decimal` values are converted to rounded `float` numbers (`round(float(val), 2)`).
+
 

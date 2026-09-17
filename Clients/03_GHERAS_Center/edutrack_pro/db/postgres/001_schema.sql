@@ -103,6 +103,7 @@ CREATE TABLE IF NOT EXISTS students (
     education_notes text,
     room_id uuid REFERENCES rooms(id) ON DELETE RESTRICT,
     group_name text CONSTRAINT chk_students_group_name CHECK (group_name IN ('الصباح', 'المساء', 'الإنجليزي', 'القدرات')),
+    gender text CONSTRAINT chk_students_gender CHECK (gender IN ('بنين', 'بنات')),
     status text NOT NULL DEFAULT 'active' CONSTRAINT chk_students_status CHECK (status IN ('active', 'dismissed', 'archived')),
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),

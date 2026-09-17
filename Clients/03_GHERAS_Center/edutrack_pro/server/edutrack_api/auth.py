@@ -68,6 +68,37 @@ def current_user(
     user = dict(user)
     user["_jti"] = jti
     user["_exp"] = claims["exp"]
+
+    if user["role"] == "manager":
+        user["permissions"] = {
+            "attendance": True,
+            "daily_evaluation": True,
+            "monthly_evaluation": True,
+            "students": True,
+            "finance": True,
+        }
+    else:
+        perm_row = conn.execute(
+            "SELECT attendance, daily_evaluation, monthly_evaluation, students, finance "
+            "FROM user_permissions WHERE user_id = %s AND deleted_at IS NULL",
+            (subject,),
+        ).fetchone()
+        if perm_row:
+            user["permissions"] = {
+                "attendance": bool(perm_row["attendance"]),
+                "daily_evaluation": bool(perm_row["daily_evaluation"]),
+                "monthly_evaluation": bool(perm_row["monthly_evaluation"]),
+                "students": bool(perm_row["students"]),
+                "finance": bool(perm_row["finance"]),
+            }
+        else:
+            user["permissions"] = {
+                "attendance": False,
+                "daily_evaluation": False,
+                "monthly_evaluation": False,
+                "students": False,
+                "finance": False,
+            }
     return user
 
 
@@ -78,3 +109,16 @@ def require_roles(*roles: str):
         return user
 
     return dependency
+
+
+def require_permission(perm: str):
+    def dependency(user: dict = Depends(current_user)) -> dict:
+        if user["role"] == "manager":
+            return user
+        perms = user.get("permissions", {})
+        if not perms.get(perm):
+            raise ApiError(403, "forbidden", f"ليس لديك صلاحية الوصول إلى {perm}")
+        return user
+
+    return dependency
+

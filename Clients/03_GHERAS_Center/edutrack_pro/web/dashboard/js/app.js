@@ -1,7 +1,7 @@
 import { api } from './api.js';
 import { toast } from './ui.js';
 
-const ROUTES = ['home', 'students', 'attendance', 'payments', 'expenses', 'accounts', 'staff', 'rooms', 'reports'];
+const ROUTES = ['home', 'students', 'attendance', 'payments', 'expenses', 'accounts', 'staff', 'rooms', 'reports', 'settings'];
 const ALLOWED_ROLES = ['manager', 'supervisor'];
 
 const main = document.getElementById('view');
@@ -17,8 +17,25 @@ let renderId = 0;
 let logoutInFlight = false;
 
 function currentRoute() {
-  const name = location.hash.replace(/^#\/?/, '');
+  const hash = location.hash.replace(/^#\/?/, '');
+  const [name] = hash.split('?');
   return ROUTES.includes(name) ? name : 'home';
+}
+
+function filterSidebarByPermissions(user) {
+  if (!user || user.role === 'manager') {
+    navLinks.forEach(link => { link.style.display = ''; });
+    return;
+  }
+  const perms = user.permissions || {};
+  navLinks.forEach(link => {
+    const route = link.dataset.route;
+    let visible = true;
+    if (route === 'students' && !perms.students) visible = false;
+    if (route === 'attendance' && !perms.attendance && !perms.daily_evaluation) visible = false;
+    if ((route === 'payments' || route === 'expenses' || route === 'accounts') && !perms.finance) visible = false;
+    link.style.display = visible ? '' : 'none';
+  });
 }
 
 function setActiveLink(route) {
@@ -54,10 +71,33 @@ async function handleRoute() {
       return;
     }
     currentUser = me;
+    api.currentUser = me;
     userName.textContent = me.name || me.username || 'الإدارة';
+    filterSidebarByPermissions(me);
   }
   const route = currentRoute();
   if (id !== renderId) return;
+
+  // Enforce frontend permission guard for restricted routes
+  if (currentUser && currentUser.role === 'supervisor') {
+    const perms = currentUser.permissions || {};
+    if (route === 'students' && !perms.students) {
+      toast('ليس لديك صلاحية الوصول إلى قسم الطلاب', true);
+      location.hash = '#/home';
+      return;
+    }
+    if (route === 'attendance' && !perms.attendance && !perms.daily_evaluation) {
+      toast('ليس لديك صلاحية الوصول إلى الحضور والتقييم', true);
+      location.hash = '#/home';
+      return;
+    }
+    if (['payments', 'expenses', 'accounts'].includes(route) && !perms.finance) {
+      toast('ليس لديك صلاحية الوصول إلى العمليات المالية', true);
+      location.hash = '#/home';
+      return;
+    }
+  }
+
   setActiveLink(route);
   sidebar.classList.remove('open');
   loginActive = false;
@@ -80,6 +120,7 @@ async function doLogout() {
   }
   sessionStorage.removeItem('gheras_token');
   currentUser = null;
+  api.currentUser = null;
   logoutInFlight = false;
   const id = ++renderId;
   await showLogin(id);

@@ -47,11 +47,17 @@ def daily(date_: str | None = Query(None, alias="date"), conn=Depends(get_conn),
       LEFT JOIN rooms r ON r.id=s.room_id AND r.deleted_at IS NULL WHERE a.date=%s AND a.status='غائب'
       AND a.deleted_at IS NULL AND s.deleted_at IS NULL""", (report_day,)).fetchall()
     result = row_to_json(base); result["date"] = report_day.isoformat(); result["absences"] = [row_to_json(x) for x in absent]
+    if user["role"] == "supervisor" and not user.get("permissions", {}).get("finance", False):
+        result["collected_today"] = 0
+        result["outstanding_total"] = 0
+        result["expenses_month"] = 0
     return result
 
 
 @router.get("/reports/attendance")
 def attendance(from_: str = Query(alias="from"), to: str = Query(), room_id: str | None = None, conn=Depends(get_conn), user: dict = _ROLES) -> dict:
+    if user["role"] == "supervisor" and not user.get("permissions", {}).get("attendance", False):
+        raise ApiError(403, "forbidden", "ليس لديك صلاحية الوصول إلى تقارير الحضور والغياب")
     start, end = _day(from_), _day(to)
     rows = conn.execute("""SELECT a.student_id,s.name student_name,r.name room_name,a.date,a.status,a.note
       FROM student_attendance a JOIN students s ON s.id=a.student_id LEFT JOIN rooms r ON r.id=s.room_id
@@ -65,6 +71,8 @@ def attendance(from_: str = Query(alias="from"), to: str = Query(), room_id: str
 
 @router.get("/reports/finance")
 def finance(from_: str | None = Query(None, alias="from"), to: str | None = None, conn=Depends(get_conn), user: dict = _ROLES) -> dict:
+    if user["role"] == "supervisor" and not user.get("permissions", {}).get("finance", False):
+        raise ApiError(403, "forbidden", "ليس لديك صلاحية الوصول إلى التقارير المالية")
     start, end = _day(from_, _today().replace(day=1)), _day(to, _today())
     totals = conn.execute("""SELECT (SELECT coalesce(sum(amount),0) FROM payments WHERE paid_on BETWEEN %s AND %s AND deleted_at IS NULL) collected,
       (SELECT coalesce(sum(amount),0) FROM expenses WHERE paid_on BETWEEN %s AND %s AND deleted_at IS NULL) expenses,
@@ -77,27 +85,67 @@ def finance(from_: str | None = Query(None, alias="from"), to: str | None = None
 
 @router.get("/reports/monthly")
 def monthly(month: str | None = None, conn=Depends(get_conn), user: dict = _ROLES) -> dict:
-    value=_month(month); start=date.fromisoformat(value+"-01")
-    end=date(start.year+1,1,1) if start.month==12 else date(start.year,start.month+1,1)
-    attendance_row=conn.execute("SELECT count(*) FILTER (WHERE status='حاضر') present,count(*) FILTER (WHERE status='غائب') absent,count(*) FILTER (WHERE status='متأخر') late,count(*) FILTER (WHERE status='مستأذن') excused FROM student_attendance WHERE date>=%s AND date<%s AND deleted_at IS NULL",(start,end)).fetchone()
-    att=row_to_json(attendance_row); total=sum(att.values()); att["rate"]=(att["present"]+att["late"])/total*100 if total else 0
-    fin=finance(start.isoformat(),(end - timedelta(days=1)).isoformat(),conn,user); result={"month":value,"students_count":conn.execute("SELECT count(*) FROM students WHERE deleted_at IS NULL").fetchone()["count"],"new_students":conn.execute("SELECT count(*) FROM students WHERE created_at>=%s AND created_at<%s AND deleted_at IS NULL",(start,end)).fetchone()["count"],"attendance":att,"finance":{k:fin[k] for k in ("collected","expenses","payroll","net")},"top_absent":[row_to_json(x) for x in conn.execute("SELECT a.student_id,s.name AS student_name,count(*) absent_days FROM student_attendance a JOIN students s ON s.id=a.student_id WHERE a.status='غائب' AND a.date>=%s AND a.date<%s AND a.deleted_at IS NULL AND s.deleted_at IS NULL GROUP BY a.student_id,s.name ORDER BY absent_days DESC LIMIT 10",(start,end)).fetchall()]}
-    record=conn.execute("SELECT id FROM monthly_reports WHERE month=%s AND deleted_at IS NULL ORDER BY created_at LIMIT 1",(value,)).fetchone()
-    if record: conn.execute("UPDATE monthly_reports SET payload_json=%s,generated_at=now(),updated_at=now() WHERE id=%s",(Jsonb(result),record["id"]))
-    else: conn.execute("INSERT INTO monthly_reports (month,payload_json) VALUES (%s,%s)",(value,Jsonb(result)))
+    value = _month(month)
+    start = date.fromisoformat(value + "-01")
+    end = date(start.year + 1, 1, 1) if start.month == 12 else date(start.year, start.month + 1, 1)
+    attendance_row = conn.execute(
+        "SELECT count(*) FILTER (WHERE status='حاضر') present, count(*) FILTER (WHERE status='غائب') absent, "
+        "count(*) FILTER (WHERE status='متأخر') late, count(*) FILTER (WHERE status='مستأذن') excused "
+        "FROM student_attendance WHERE date>=%s AND date<%s AND deleted_at IS NULL",
+        (start, end),
+    ).fetchone()
+    att = row_to_json(attendance_row)
+    total = sum(att.values())
+    att["rate"] = (att["present"] + att["late"]) / total * 100 if total else 0
+
+    has_finance = user["role"] == "manager" or user.get("permissions", {}).get("finance", False)
+    if has_finance:
+        fin_res = finance(start.isoformat(), (end - timedelta(days=1)).isoformat(), conn, user)
+        fin = {k: fin_res[k] for k in ("collected", "expenses", "payroll", "net")}
+    else:
+        fin = {"collected": 0, "expenses": 0, "payroll": 0, "net": 0}
+
+    result = {
+        "month": value,
+        "students_count": conn.execute("SELECT count(*) FROM students WHERE deleted_at IS NULL").fetchone()["count"],
+        "new_students": conn.execute("SELECT count(*) FROM students WHERE created_at>=%s AND created_at<%s AND deleted_at IS NULL", (start, end)).fetchone()["count"],
+        "attendance": att,
+        "finance": fin,
+        "top_absent": [
+            row_to_json(x)
+            for x in conn.execute(
+                "SELECT a.student_id, s.name AS student_name, count(*) absent_days "
+                "FROM student_attendance a JOIN students s ON s.id=a.student_id "
+                "WHERE a.status='غائب' AND a.date>=%s AND a.date<%s AND a.deleted_at IS NULL AND s.deleted_at IS NULL "
+                "GROUP BY a.student_id, s.name ORDER BY absent_days DESC LIMIT 10",
+                (start, end),
+            ).fetchall()
+        ],
+    }
+    record = conn.execute("SELECT id FROM monthly_reports WHERE month=%s AND deleted_at IS NULL ORDER BY created_at LIMIT 1", (value,)).fetchone()
+    if record:
+        conn.execute("UPDATE monthly_reports SET payload_json=%s, generated_at=now(), updated_at=now() WHERE id=%s", (Jsonb(result), record["id"]))
+    else:
+        conn.execute("INSERT INTO monthly_reports (month, payload_json) VALUES (%s, %s)", (value, Jsonb(result)))
     return result
 
 
 @router.get("/reports/student/{student_id}")
 def student(student_id: str, conn=Depends(get_conn), user: dict = _ROLES) -> dict:
+    if user["role"] == "supervisor" and not user.get("permissions", {}).get("students", False):
+        raise ApiError(403, "forbidden", "ليس لديك صلاحية الوصول إلى ملف الطالب")
     item=conn.execute("SELECT * FROM students WHERE id=%s AND deleted_at IS NULL",(student_id,)).fetchone()
     if not item: raise ApiError(404,"not_found","الطالب غير موجود")
     counts=conn.execute("SELECT count(*) FILTER (WHERE status='حاضر') present,count(*) FILTER (WHERE status='غائب') absent,count(*) FILTER (WHERE status='متأخر') late,count(*) FILTER (WHERE status='مستأذن') excused FROM student_attendance WHERE student_id=%s AND deleted_at IS NULL",(student_id,)).fetchone()
-    balance=conn.execute("SELECT total_planned,total_paid,balance outstanding FROM v_student_balance WHERE student_id=%s",(student_id,)).fetchone()
-    return {"student":row_to_json(item),"attendance_summary":row_to_json(counts),"evaluations":[row_to_json(x) for x in conn.execute("SELECT * FROM evaluations WHERE student_id=%s AND deleted_at IS NULL ORDER BY date DESC",(student_id,)).fetchall()],"skill_progress":[row_to_json(x) for x in conn.execute("SELECT * FROM skill_progress WHERE student_id=%s AND deleted_at IS NULL ORDER BY date DESC",(student_id,)).fetchall()],"balance":row_to_json(balance) if balance else {"total_planned":0,"total_paid":0,"outstanding":0},"payments":[row_to_json(x) for x in conn.execute("SELECT * FROM payments WHERE student_id=%s AND deleted_at IS NULL ORDER BY paid_on DESC",(student_id,)).fetchall()]}
+    has_finance = user["role"] == "manager" or user.get("permissions", {}).get("finance", False)
+    balance=conn.execute("SELECT total_planned,total_paid,balance outstanding FROM v_student_balance WHERE student_id=%s",(student_id,)).fetchone() if has_finance else None
+    payments=conn.execute("SELECT * FROM payments WHERE student_id=%s AND deleted_at IS NULL ORDER BY paid_on DESC",(student_id,)).fetchall() if has_finance else []
+    return {"student":row_to_json(item),"attendance_summary":row_to_json(counts),"evaluations":[row_to_json(x) for x in conn.execute("SELECT * FROM evaluations WHERE student_id=%s AND deleted_at IS NULL ORDER BY date DESC",(student_id,)).fetchall()],"skill_progress":[row_to_json(x) for x in conn.execute("SELECT * FROM skill_progress WHERE student_id=%s AND deleted_at IS NULL ORDER BY date DESC",(student_id,)).fetchall()],"balance":row_to_json(balance) if balance else {"total_planned":0,"total_paid":0,"outstanding":0},"payments":[row_to_json(x) for x in payments]}
 
 
 @router.get("/audit-log")
 def audit_log(limit:int=100,offset:int=0,entity:str|None=None,conn=Depends(get_conn),user:dict=_ROLES)->dict:
+    if user["role"] != "manager":
+        raise ApiError(403, "forbidden", "سجل التدقيق مخصص للمدير العام فقط")
     limit=max(1,min(limit,500)); rows=conn.execute("SELECT a.*,coalesce(u.username,s.name) actor_name FROM audit_log a LEFT JOIN users u ON u.id=a.actor_user_id LEFT JOIN staff s ON s.id=u.staff_id WHERE a.deleted_at IS NULL AND (%s::text IS NULL OR a.entity=%s) ORDER BY a.at DESC LIMIT %s OFFSET %s",(entity,entity,limit,offset)).fetchall(); total=conn.execute("SELECT count(*) FROM audit_log WHERE deleted_at IS NULL AND (%s::text IS NULL OR entity=%s)",(entity,entity)).fetchone()["count"]
     return {"items":[row_to_json(x) for x in rows],"total":total,"limit":limit,"offset":offset}

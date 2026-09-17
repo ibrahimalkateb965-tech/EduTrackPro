@@ -26,6 +26,7 @@ RESOURCES = {
     "rooms": "rooms", "schedules": "schedules", "fee-plans": "fee_plans", "installments": "installments",
     "payments": "payments", "receipts": "receipts", "expenses": "expenses", "expense-categories": "expense_categories",
     "payroll-runs": "payroll_runs", "staff-advances": "staff_advances", "staff-assets": "staff_assets",
+    "staff-attendance": "staff_attendance",
     "ledger-accounts": "ledger_accounts", "ledger-entries": "ledger_entries", "assignments": "assignments",
     "submissions": "submissions", "lesson-logs": "lesson_logs", "study-plans": "study_plans",
     "skill-progress": "skill_progress", "evaluations": "evaluations", "tasks": "tasks", "messages": "messages",
@@ -41,6 +42,39 @@ def _clean_user(row: dict) -> dict:
     return result
 
 
+def _clean_user_with_perms(conn, row: dict) -> dict:
+    result = _clean_user(row)
+    perms = conn.execute(
+        "SELECT attendance, daily_evaluation, monthly_evaluation, students, finance "
+        "FROM user_permissions WHERE user_id = %s AND deleted_at IS NULL",
+        (row["id"],),
+    ).fetchone()
+    result["permissions"] = {
+        "attendance": bool(perms["attendance"]) if perms else False,
+        "daily_evaluation": bool(perms["daily_evaluation"]) if perms else False,
+        "monthly_evaluation": bool(perms["monthly_evaluation"]) if perms else False,
+        "students": bool(perms["students"]) if perms else False,
+        "finance": bool(perms["finance"]) if perms else False,
+    }
+    return result
+
+
+def _clean_staff(row: dict, user: dict) -> dict:
+    result = dict(row)
+    if user.get("role") == "supervisor" and not user.get("permissions", {}).get("finance", False):
+        result["base_salary"] = None
+    return result
+
+
+def _format_row(conn, row: dict, table: str, user: dict) -> dict:
+    json_row = row_to_json(row)
+    if table == "users":
+        return _clean_user_with_perms(conn, json_row)
+    if table == "staff":
+        return _clean_staff(json_row, user)
+    return json_row
+
+
 def _repo(request: Request, conn, table: str) -> GenericRepository:
     columns = request.app.state.columns.get(table)
     if columns is None:
@@ -51,10 +85,52 @@ def _repo(request: Request, conn, table: str) -> GenericRepository:
 def _allowed(user: dict, table: str, write: bool) -> None:
     if user["role"] == "manager":
         return
-    restricted = {"users", "branches", "ledger_accounts", "ledger_entries", "payroll_runs", "month_closures"}
-    if user["role"] == "supervisor" and (not write or table not in restricted):
+
+    # Branch management is strictly manager-only
+    if table == "branches":
+        raise ApiError(403, "forbidden", "إدارة الفروع مخصصة للمدير العام فقط")
+
+    # User management: manager has full access; supervisor can read only
+    if table == "users":
+        if write and user["role"] != "manager":
+            raise ApiError(403, "forbidden", "إدارة المستخدمين مخصصة للمدير العام فقط")
+        if not write and user["role"] not in {"manager", "supervisor"}:
+            raise ApiError(403, "forbidden", "إدارة المستخدمين مخصصة للمدير العام فقط")
         return
-    # TODO Phase 3
+
+    if user["role"] == "supervisor":
+        perms = user.get("permissions", {})
+
+        # Finance resources
+        finance_tables = {
+            "payments", "receipts", "expenses", "expense_categories",
+            "payroll_runs", "staff_advances", "ledger_accounts", "ledger_entries",
+            "month_closures", "fee_plans", "installments"
+        }
+        if table in finance_tables and not perms.get("finance", False):
+            raise ApiError(403, "forbidden", "ليس لديك صلاحية الوصول إلى البيانات والعمليات المالية")
+
+        # Student resources
+        student_tables = {"students", "guardians", "student_guardians", "dismissals"}
+        if table in student_tables and not perms.get("students", False):
+            raise ApiError(403, "forbidden", "ليس لديك صلاحية الوصول إلى سجلات الطلاب")
+
+        # Attendance resources
+        attendance_tables = {"student_attendance", "staff_attendance"}
+        if table in attendance_tables and not perms.get("attendance", False):
+            raise ApiError(403, "forbidden", "ليس لديك صلاحية الوصول إلى الحضور والغياب")
+
+        # Evaluation & tracking resources
+        evaluation_tables = {"evaluations", "skill_progress", "study_plans"}
+        if table in evaluation_tables and not (perms.get("daily_evaluation", False) or perms.get("monthly_evaluation", False)):
+            raise ApiError(403, "forbidden", "ليس لديك صلاحية الوصول إلى التقييمات ومتابعة الحفظ")
+
+        # Write restrictions on sensitive ledger closures
+        if write and table in {"ledger_accounts", "ledger_entries", "payroll_runs", "month_closures"}:
+            raise ApiError(403, "forbidden", "ليس لديك صلاحية التعديل على الحسابات والإقفالات المالية")
+
+        return
+
     raise ApiError(403, "forbidden", "ليس لديك صلاحية")
 
 
@@ -135,46 +211,99 @@ def _update_hook(conn, repo, table: str, record_id: UUID, data: dict) -> tuple[d
 
 def _register(path: str, table: str) -> None:
     def list_rows(request: Request, limit: int = 100, offset: int = 0, q: str | None = None,
-                        user: dict = Depends(require_roles("manager", "supervisor")), conn=Depends(get_conn)):
+                  user: dict = Depends(require_roles("manager", "supervisor")), conn=Depends(get_conn)):
         _allowed(user, table, False)
         if not 1 <= limit <= 500 or offset < 0:
             raise ApiError(422, "validation_error", "قيم التصفح غير صحيحة")
         filters = {key: value for key, value in request.query_params.items() if key not in {"limit", "offset", "q"}}
+        if table == "evaluations" and user.get("role") == "supervisor":
+            perms = user.get("permissions", {})
+            has_daily = perms.get("daily_evaluation", False)
+            has_monthly = perms.get("monthly_evaluation", False)
+            requested_type = filters.get("eval_type")
+            if requested_type == "daily" and not has_daily:
+                raise ApiError(403, "forbidden", "ليس لديك صلاحية التقييم اليومي")
+            if requested_type in {"monthly", "weekly"} and not has_monthly:
+                raise ApiError(403, "forbidden", "ليس لديك صلاحية التقييم الشهري والنهائي")
+            if not requested_type:
+                if has_daily and not has_monthly:
+                    filters["eval_type"] = "daily"
+                elif has_monthly and not has_daily:
+                    filters["eval_type"] = "monthly"
         try:
             rows, total = _repo(request, conn, table).list(filters=filters, limit=limit, offset=offset, q=q)
         except ValueError as exc:
             raise ApiError(422, "validation_error", "حقل التصفية غير صحيح") from exc
-        return {"items": [_clean_user(row_to_json(row)) if table == "users" else row_to_json(row) for row in rows], "total": total, "limit": limit, "offset": offset}
+        return {"items": [_format_row(conn, row, table, user) for row in rows], "total": total, "limit": limit, "offset": offset}
 
     def get_row(record_id: UUID, request: Request, user: dict = Depends(require_roles("manager", "supervisor")), conn=Depends(get_conn)):
         _allowed(user, table, False)
         row = _repo(request, conn, table).get(record_id)
         if not row:
             raise ApiError(404, "not_found", "السجل غير موجود")
-        return _clean_user(row_to_json(row)) if table == "users" else row_to_json(row)
+        if table == "evaluations" and user.get("role") == "supervisor":
+            perms = user.get("permissions", {})
+            eval_type = row.get("eval_type")
+            if eval_type == "daily" and not perms.get("daily_evaluation", False):
+                raise ApiError(403, "forbidden", "ليس لديك صلاحية التقييم اليومي")
+            if eval_type in {"monthly", "weekly"} and not perms.get("monthly_evaluation", False):
+                raise ApiError(403, "forbidden", "ليس لديك صلاحية التقييم الشهري والنهائي")
+        return _format_row(conn, row, table, user)
 
     def create_row(body: dict, request: Request, user: dict = Depends(require_roles("manager", "supervisor")), conn=Depends(get_conn)):
         _allowed(user, table, True)
+        if table == "evaluations" and user.get("role") == "supervisor":
+            perms = user.get("permissions", {})
+            eval_type = body.get("eval_type", "daily")
+            if eval_type == "daily" and not perms.get("daily_evaluation", False):
+                raise ApiError(403, "forbidden", "ليس لديك صلاحية التقييم اليومي")
+            if eval_type in {"monthly", "weekly"} and not perms.get("monthly_evaluation", False):
+                raise ApiError(403, "forbidden", "ليس لديك صلاحية التقييم الشهري والنهائي")
+        if table == "staff" and user.get("role") == "supervisor" and not user.get("permissions", {}).get("finance", False):
+            if "base_salary" in body:
+                raise ApiError(403, "forbidden", "ليس لديك صلاحية تحديد أو تعديل الراتب الأساسي")
         try:
             row, details = _create_hook(conn, _repo(request, conn, table), table, dict(body), user)
             write_audit(conn, user["id"], "create", table, row["id"], details)
-            return _clean_user(row_to_json(row)) if table == "users" else row_to_json(row)
+            return _format_row(conn, row, table, user)
         except psycopg.Error as exc:
             raise map_db_error(exc) from exc
 
     def update_row(record_id: UUID, body: dict, request: Request, user: dict = Depends(require_roles("manager", "supervisor")), conn=Depends(get_conn)):
         _allowed(user, table, True)
+        if table == "evaluations" and user.get("role") == "supervisor":
+            perms = user.get("permissions", {})
+            existing = _repo(request, conn, table).get(record_id)
+            if not existing:
+                raise ApiError(404, "not_found", "السجل غير موجود")
+            eval_type = body.get("eval_type", existing.get("eval_type"))
+            if eval_type == "daily" and not perms.get("daily_evaluation", False):
+                raise ApiError(403, "forbidden", "ليس لديك صلاحية التقييم اليومي")
+            if eval_type in {"monthly", "weekly"} and not perms.get("monthly_evaluation", False):
+                raise ApiError(403, "forbidden", "ليس لديك صلاحية التقييم الشهري والنهائي")
+        if table == "staff" and user.get("role") == "supervisor" and not user.get("permissions", {}).get("finance", False):
+            if "base_salary" in body:
+                raise ApiError(403, "forbidden", "ليس لديك صلاحية تحديد أو تعديل الراتب الأساسي")
         try:
             row, details = _update_hook(conn, _repo(request, conn, table), table, record_id, dict(body))
             if not row:
                 raise ApiError(404, "not_found", "السجل غير موجود")
             write_audit(conn, user["id"], "update", table, record_id, details)
-            return _clean_user(row_to_json(row)) if table == "users" else row_to_json(row)
+            return _format_row(conn, row, table, user)
         except psycopg.Error as exc:
             raise map_db_error(exc) from exc
 
     def delete_row(record_id: UUID, request: Request, user: dict = Depends(require_roles("manager", "supervisor")), conn=Depends(get_conn)):
         _allowed(user, table, True)
+        if table == "evaluations" and user.get("role") == "supervisor":
+            perms = user.get("permissions", {})
+            existing = _repo(request, conn, table).get(record_id)
+            if existing:
+                eval_type = existing.get("eval_type")
+                if eval_type == "daily" and not perms.get("daily_evaluation", False):
+                    raise ApiError(403, "forbidden", "ليس لديك صلاحية التقييم اليومي")
+                if eval_type in {"monthly", "weekly"} and not perms.get("monthly_evaluation", False):
+                    raise ApiError(403, "forbidden", "ليس لديك صلاحية التقييم الشهري والنهائي")
         try:
             if not _repo(request, conn, table).soft_delete(record_id):
                 raise ApiError(404, "not_found", "السجل غير موجود")

@@ -8,7 +8,28 @@ const YES_NO = [['false', 'لا'], ['true', 'نعم']];
 let students = [];
 let rooms = [];
 let query = '';
+let activeTab = 'all';
 let tbody = null;
+let tabsContainer = null;
+
+function getParams() {
+  const hash = location.hash.replace(/^#\/?/, '');
+  const qIdx = hash.indexOf('?');
+  if (qIdx === -1) return new URLSearchParams();
+  return new URLSearchParams(hash.slice(qIdx + 1));
+}
+
+function isGirl(student) {
+  if (student.gender === 'بنات') return true;
+  if (student.gender === 'بنين') return false;
+  const text = `${student.child_notes || ''} ${student.education_notes || ''} ${student.room_name || ''}`;
+  if (text.includes('بنات') || text.includes('أنثى')) return true;
+  if (text.includes('بنين') || text.includes('أولاد') || text.includes('ذكر')) return false;
+  const firstName = (student.name || '').trim().split(/\s+/)[0] || '';
+  if (firstName.endsWith('ة') || firstName.endsWith('ه')) return true;
+  const femaleNames = ['مريم', 'فاطمة', 'عائشة', 'نورة', 'نور', 'سارة', 'ريم', 'هدى', 'أمل', 'منى', 'شهد', 'رهف', 'جنى', 'خلود', 'ليلى', 'زينب', 'لمى', 'أسماء', 'ريناد', 'دانة', 'تسنيم'];
+  return femaleNames.includes(firstName);
+}
 
 function toList(data) {
   if (Array.isArray(data)) return data;
@@ -47,12 +68,22 @@ function studentRow(student, api) {
 
 function paint(api) {
   const list = students.filter(student => {
-    if (!query) return true;
-    return [student.name, student.national_id, student.guardian_phone, student.father_phone, student.mother_phone]
-      .some(value => String(value || '').includes(query));
+    // 1. Search filter
+    if (query) {
+      const matchesQuery = [student.name, student.national_id, student.guardian_phone, student.father_phone, student.mother_phone]
+        .some(value => String(value || '').includes(query));
+      if (!matchesQuery) return false;
+    }
+    // 2. Tab filter
+    if (activeTab === 'morning') return student.group_name === 'الصباح';
+    if (activeTab === 'evening') return student.group_name === 'المساء';
+    if (activeTab === 'qudrat') return student.group_name === 'القدرات';
+    if (activeTab === 'english_boys') return student.group_name === 'الإنجليزي' && !isGirl(student);
+    if (activeTab === 'english_girls') return student.group_name === 'الإنجليزي' && isGirl(student);
+    return true;
   });
   const rows = list.map(student => studentRow(student, api));
-  const emptyText = students.length ? 'لا توجد نتائج مطابقة للبحث' : 'لا يوجد طلاب مسجلون بعد';
+  const emptyText = students.length ? 'لا توجد نتائج مطابقة للبحث أو التصفية الحالية' : 'لا يوجد طلاب مسجلون بعد';
   tbody.replaceChildren(...(rows.length ? rows : [el('tr', {}, el('td', { colspan: '6', class: 'muted' }, emptyText))]));
 }
 
@@ -102,7 +133,8 @@ function openStudentForm(api, student) {
     el('label', {}, el('span', {}, 'المستوى السابق'), el('input', { name: 'previous_level', type: 'text', value: value('previous_level') })),
     el('label', {}, el('span', {}, 'ملاحظات تعليمية'), el('textarea', { name: 'education_notes' }, value('education_notes'))),
     el('label', {}, el('span', {}, 'الفصل'), select('room_id', roomOptions, value('room_id'))),
-    el('label', {}, el('span', {}, 'المجموعة'), select('group_name', groupOptions, value('group_name')))
+    el('label', {}, el('span', {}, 'المجموعة'), select('group_name', groupOptions, value('group_name'))),
+    el('label', {}, el('span', {}, 'القسم / الجنس'), select('gender', [['بنين', 'بنين (أولاد)'], ['بنات', 'بنات']], value('gender') || (isGirl(student || {}) ? 'بنات' : 'بنين')))
   ];
   const submit = el('button', { class: 'button', type: 'submit' }, editing ? 'حفظ التعديلات' : 'إضافة');
   const cancel = el('button', { class: 'button button-outline', type: 'button' }, 'إلغاء');
@@ -118,6 +150,8 @@ function openStudentForm(api, student) {
     payload.previous_study = payload.previous_study === 'true';
     payload.room_id = payload.room_id || null;
     if (payload.birth_date === '') payload.birth_date = null;
+    payload.gender = payload.gender || (isGirl(student || {}) ? 'بنات' : 'بنين');
+
     try {
       if (editing) await api.patch(`students/${student.id}`, payload);
       else await api.post('students', payload);
@@ -136,6 +170,52 @@ export async function render(container, api) {
   rooms = [];
   query = '';
   container.replaceChildren();
+
+  // Parse initial tab from URL hash params
+  const params = getParams();
+  const group = params.get('group');
+  const gender = params.get('gender');
+  if (group === 'الإنجليزي') {
+    if (gender === 'girls' || gender === 'بنات') activeTab = 'english_girls';
+    else activeTab = 'english_boys';
+  } else if (group === 'الصباح') {
+    activeTab = 'morning';
+  } else if (group === 'المساء') {
+    activeTab = 'evening';
+  } else if (group === 'القدرات') {
+    activeTab = 'qudrat';
+  } else {
+    activeTab = 'all';
+  }
+
+  const TABS = [
+    ['all', 'كل الطلاب'],
+    ['morning', 'الصباح'],
+    ['evening', 'المساء'],
+    ['english_boys', 'طلاب الإنجليزي (أولاد)'],
+    ['english_girls', 'طالبات الإنجليزي (بنات)'],
+    ['qudrat', 'القدرات']
+  ];
+
+  tabsContainer = el('div', { class: 'toolbar', style: 'margin-bottom:12px; gap:6px;' });
+  function updateTabs() {
+    tabsContainer.replaceChildren(
+      ...TABS.map(([id, label]) => {
+        const btn = el('button', {
+          class: activeTab === id ? 'button' : 'button button-outline',
+          type: 'button'
+        }, label);
+        btn.onclick = () => {
+          activeTab = id;
+          updateTabs();
+          paint(api);
+        };
+        return btn;
+      })
+    );
+  }
+  updateTabs();
+
   const search = el('input', { type: 'search', placeholder: 'ابحث بالاسم أو رقم الهوية أو الهاتف', 'aria-label': 'بحث في الطلاب' });
   search.addEventListener('input', () => { query = search.value.trim(); paint(api); });
   const addButton = el('button', { class: 'button', type: 'button' }, 'إضافة طالب');
@@ -143,6 +223,7 @@ export async function render(container, api) {
   tbody = el('tbody', {}, el('tr', {}, el('td', { colspan: '6', class: 'muted' }, 'جارٍ التحميل...')));
   container.append(
     el('div', { class: 'view-header' }, el('h1', {}, 'الطلاب')),
+    tabsContainer,
     el('div', { class: 'toolbar' }, search, addButton),
     el('div', { class: 'table-wrap' }, el('table', {},
       el('thead', {}, el('tr', {},

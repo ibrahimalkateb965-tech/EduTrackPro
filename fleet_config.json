@@ -56,8 +56,10 @@
       "active_model": "opencode-go/glm-5.3-flash",
       "invocation_command": "opencode run -m opencode-go/glm-5.3-flash",
       "effort_level": "Ultra-High Speed & Low-Latency Terminal Execution",
-      "assigned_role": "Fast Terminal Commands, Shell Execution, Scaffolding & Routine Build Scripts (NO TESTING - PARALLEL WORKER A)",
+      "assigned_role": "Fast Terminal Commands, Shell Execution, Scaffolding & Routine Build Scripts (NO TESTING - PARALLEL WORKER A - MAX 1 INSTANCE CONCURRENTLY)",
       "status": "Active",
+      "concurrency_limit": 1,
+      "concurrency_directive": "Worker A and Worker B may run in parallel on separate tasks, but NEVER spawn more than 1 instance of GLM 5.3 Flash concurrently to prevent rate-limit lockouts.",
       "exclusive_ownership_tree": [
         "scripts/terminal/",
         "build/",

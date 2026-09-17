@@ -418,7 +418,7 @@ tr {
 @media screen {
   body {
     background: #e2e7e9;
-    padding: 8mm 0;
+    padding: 70px 0 20px;
   }
 
   .sheet {
@@ -446,11 +446,140 @@ tr {
     min-height: 210mm;
     padding: 14mm;
   }
+
+  .print-toolbar {
+    position: fixed;
+    top: 12px;
+    right: 20px;
+    left: 20px;
+    z-index: 99999;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: rgba(15, 139, 141, 0.95);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    color: #ffffff;
+    padding: 10px 24px;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(7, 95, 98, 0.35);
+    font-family: "Cairo", Tahoma, sans-serif;
+    direction: rtl;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+  }
+
+  .print-toolbar-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .print-toolbar-badge {
+    background: rgba(255, 255, 255, 0.2);
+    padding: 3px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .print-toolbar-title {
+    font-size: 15px;
+    font-weight: 700;
+  }
+
+  .print-toolbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .print-toolbar-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: 8px;
+    padding: 8px 18px;
+    font-family: inherit;
+    font-size: 13.5px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .print-toolbar-btn.print-btn {
+    background: var(--g-orange);
+    color: #ffffff;
+    box-shadow: 0 2px 8px rgba(245, 124, 0, 0.35);
+  }
+
+  .print-toolbar-btn.print-btn:hover {
+    background: #e65100;
+    transform: translateY(-1px);
+  }
+
+  .print-toolbar-btn.close-btn {
+    background: rgba(255, 255, 255, 0.15);
+    color: #ffffff;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+  }
+
+  .print-toolbar-btn.close-btn:hover {
+    background: rgba(255, 255, 255, 0.25);
+  }
+
+  .print-error-banner {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    left: 20px;
+    z-index: 99999;
+    background: #fff5f5;
+    border: 2px solid var(--g-red);
+    border-radius: 12px;
+    padding: 16px 24px;
+    box-shadow: 0 4px 20px rgba(217, 75, 75, 0.25);
+    direction: rtl;
+    font-family: "Cairo", Tahoma, sans-serif;
+  }
+
+  .print-error-content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+
+  .print-error-icon {
+    font-size: 28px;
+  }
+
+  .print-error-text {
+    flex: 1 1 auto;
+  }
+
+  .print-error-text h3 {
+    margin: 0 0 4px;
+    color: var(--g-red);
+    font-size: 16px;
+  }
+
+  .print-error-text p {
+    margin: 0;
+    color: #555;
+    font-size: 13.5px;
+  }
 }
 
 @media print {
   body {
     background: var(--g-white);
+    padding: 0;
+  }
+
+  .print-toolbar,
+  .print-error-banner {
+    display: none !important;
   }
 
   .sheet {
@@ -469,3 +598,4 @@ tr {
     break-inside: avoid;
   }
 }
+

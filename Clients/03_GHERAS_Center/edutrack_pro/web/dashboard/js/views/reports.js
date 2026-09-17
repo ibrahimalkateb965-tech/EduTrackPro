@@ -20,7 +20,7 @@ const DAILY_LABELS = {
 };
 
 const DOCS = [
-  { file: 'receipt', title: 'سند قبض', description: 'طباعة سند قبض لدفعة محددة برقمها.', fields: [{ kind: 'number', query: 'payment', label: 'رقم الدفعة' }] },
+  { file: 'receipt', title: 'سند قبض', description: 'طباعة سند قبض محدد برقم السند أو رقم الدفعة.', fields: [{ kind: 'number', query: 'payment', label: 'رقم السند' }] },
   { file: 'guardian_card', title: 'بطاقة ولي الأمر', description: 'بطاقة تعريف ولي أمر الطالب.', fields: [{ kind: 'student', query: 'student', label: 'الطالب' }] },
   { file: 'excellence_certificate', title: 'شهادة تميز', description: 'شهادة تميز لطالب مع ذكر سبب التميز.', fields: [{ kind: 'student', query: 'student', label: 'الطالب' }, { kind: 'reason', query: 'reason', label: 'سبب التميز' }] },
   { file: 'student_report', title: 'تقرير الطالب', description: 'تقرير شامل لأداء الطالب.', fields: [{ kind: 'student', query: 'student', label: 'الطالب' }] },

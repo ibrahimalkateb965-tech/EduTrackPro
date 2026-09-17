@@ -46,9 +46,144 @@ def _save(conn, items: list[dict], key: str, table: str, actor: dict) -> dict:
 
 @router.post("/attendance/students")
 def save_students(items: list[dict], conn=Depends(get_conn), user: dict = _ROLES) -> dict:
+    if user["role"] == "supervisor" and not user.get("permissions", {}).get("attendance", False):
+        raise ApiError(403, "forbidden", "ليس لديك صلاحية تسجيل حضور الطلاب")
     return _save(conn, items, "student_id", "student_attendance", user)
 
 
 @router.post("/attendance/staff")
 def save_staff(items: list[dict], conn=Depends(get_conn), user: dict = _ROLES) -> dict:
-    return _save(conn, items, "staff_id", "staff_attendance", user)
+    if user["role"] == "supervisor" and not user.get("permissions", {}).get("attendance", False):
+        raise ApiError(403, "forbidden", "ليس لديك صلاحية تسجيل حضور الموظفين")
+    res = _save(conn, items, "staff_id", "staff_attendance", user)
+
+    # Persist monetary deductions directly into payroll_runs
+    for item in items:
+        try:
+            deduction = float(item.get("deduction", 0) or 0)
+        except (ValueError, TypeError):
+            deduction = 0
+        if deduction > 0 and item.get("staff_id") and item.get("date"):
+            month = str(item["date"])[:7]
+            staff_row = conn.execute("SELECT base_salary, branch_id FROM staff WHERE id = %s", (item["staff_id"],)).fetchone()
+            if staff_row:
+                branch_id = staff_row["branch_id"]
+                base = staff_row["base_salary"] or 0
+                conn.execute(
+                    """
+                    INSERT INTO payroll_runs (branch_id, staff_id, month, base, deductions, note)
+                    VALUES (%(branch_id)s, %(staff_id)s, %(month)s, %(base)s, %(deduction)s, %(note)s)
+                    ON CONFLICT (staff_id, month) DO UPDATE
+                    SET deductions = payroll_runs.deductions + EXCLUDED.deductions,
+                        updated_at = now()
+                    """,
+                    {
+                        "branch_id": branch_id,
+                        "staff_id": item["staff_id"],
+                        "month": month,
+                        "base": base,
+                        "deduction": deduction,
+                        "note": f"خصم غياب {item['date']}",
+                    },
+                )
+    return res
+
+
+@router.get("/daily-evaluations")
+@router.get("/evaluations/daily")
+def list_daily_evaluations(
+    date: str | None = None,
+    room_id: str | None = None,
+    student_id: str | None = None,
+    conn=Depends(get_conn),
+    user: dict = _ROLES,
+) -> dict:
+    if user["role"] == "supervisor" and not user.get("permissions", {}).get("daily_evaluation", False):
+        raise ApiError(403, "forbidden", "ليس لديك صلاحية التقييم اليومي")
+
+    query = """
+        SELECT e.*, s.name as student_name, s.group_name
+        FROM evaluations e
+        JOIN students s ON s.id = e.student_id AND s.deleted_at IS NULL
+        WHERE e.eval_type = 'daily' AND e.deleted_at IS NULL
+    """
+    params = []
+    if date:
+        query += " AND e.date = %s"
+        params.append(date)
+    if student_id:
+        query += " AND e.student_id = %s"
+        params.append(student_id)
+    if room_id:
+        query += " AND s.room_id = %s"
+        params.append(room_id)
+    query += " ORDER BY s.name ASC"
+
+    rows = conn.execute(query, params).fetchall()
+    return {"items": [row_to_json(r) for r in rows], "total": len(rows)}
+
+
+@router.post("/daily-evaluations")
+@router.post("/evaluations/daily")
+def save_daily_evaluations(
+    items: list[dict],
+    conn=Depends(get_conn),
+    user: dict = _ROLES,
+) -> dict:
+    if user["role"] == "supervisor" and not user.get("permissions", {}).get("daily_evaluation", False):
+        raise ApiError(403, "forbidden", "ليس لديك صلاحية التقييم اليومي")
+
+    if not items:
+        return {"saved": 0, "items": []}
+
+    saved = []
+
+    for item in items:
+        student_id = item.get("student_id")
+        eval_date = item.get("date")
+        subject = item.get("subject") or "القرآن"
+        raw_val = item.get("value", 0)
+
+        if not student_id or not eval_date:
+            raise ApiError(422, "validation_error", "بيانات التقييم غير مكتملة")
+        try:
+            val = float(raw_val)
+            if val < 0:
+                raise ValueError()
+        except (ValueError, TypeError):
+            raise ApiError(422, "validation_error", "درجة التقييم يجب أن تكون رقماً أكبر من أو يساوي الصفر")
+
+        # Resolve branch_id from student
+        st_row = conn.execute("SELECT branch_id FROM students WHERE id = %s", (student_id,)).fetchone()
+        branch_id = st_row["branch_id"] if st_row else (user.get("branch_id") or "00000000-0000-0000-0000-000000000001")
+
+        # Check existing evaluation for (student_id, date, subject, eval_type='daily')
+        existing = conn.execute(
+            "SELECT id FROM evaluations WHERE student_id = %s AND date = %s AND subject = %s AND eval_type = 'daily' AND deleted_at IS NULL",
+            (student_id, eval_date, subject),
+        ).fetchone()
+
+        if existing:
+            row = conn.execute(
+                """
+                UPDATE evaluations
+                SET value = %s, teacher_user_id = %s, updated_at = now()
+                WHERE id = %s
+                RETURNING *
+                """,
+                (val, user["id"], existing["id"]),
+            ).fetchone()
+        else:
+            row = conn.execute(
+                """
+                INSERT INTO evaluations (branch_id, student_id, subject, eval_type, date, value, teacher_user_id)
+                VALUES (%s, %s, %s, 'daily', %s, %s, %s)
+                RETURNING *
+                """,
+                (branch_id, student_id, subject, eval_date, val, user["id"]),
+            ).fetchone()
+
+        saved.append(row_to_json(row))
+
+    write_audit(conn, user["id"], "update", "evaluations", None, {"count": len(items), "type": "daily"})
+    return {"saved": len(saved), "items": saved}
