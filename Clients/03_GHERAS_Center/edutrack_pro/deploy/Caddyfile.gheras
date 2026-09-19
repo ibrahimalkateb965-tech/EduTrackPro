@@ -27,6 +27,7 @@ __HOST__ {
 		respond 404
 	}
 	handle /web/* {
+		header Cache-Control "no-cache, must-revalidate"
 		file_server
 	}
 	handle /assets/* {

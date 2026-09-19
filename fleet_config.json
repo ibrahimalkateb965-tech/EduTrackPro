@@ -87,6 +87,41 @@
       ]
     },
     {
+      "id": "cline_flash_executor",
+      "cli_tool": "Cline CLI (GLM Flash)",
+      "active_model": "glm-5.3-flash (medium)",
+      "invocation_command": "cline \"[prompt]\"",
+      "effort_level": "Ultra-High Speed & Low-Latency Terminal Execution ($0.00)",
+      "assigned_role": "Fast Terminal Commands, UI Scaffolding & Generation (NO TESTING - PARALLEL WORKER C)",
+      "status": "Active",
+      "concurrency_directive": "Worker C operates independently and parallel to OpenCode Worker A. Defaults to Act Mode with Auto-approve.",
+      "exclusive_ownership_tree": [
+        "Clients/",
+        "web/",
+        "app/ui/"
+      ],
+      "assigned_skills": [
+        "frontend-design-builder"
+      ]
+    },
+    {
+      "id": "cline_muse_data_architect",
+      "cli_tool": "Cline CLI (Muse Spark)",
+      "active_model": "muse-spark-1.3-contributor",
+      "invocation_command": "cline \"[prompt]\"",
+      "effort_level": "High Reasoning Schema & Data Engineering ($0.00)",
+      "assigned_role": "Data Architecture, API Controllers & Business Logic (NO TESTING - PARALLEL WORKER D)",
+      "status": "Active",
+      "concurrency_directive": "Worker D operates in Act Mode with Auto-approve. Parallel redundancy for Worker B.",
+      "exclusive_ownership_tree": [
+        "server/api/",
+        "data/controllers/"
+      ],
+      "assigned_skills": [
+        "backend-architect"
+      ]
+    },
+    {
       "id": "terminal_ui_engineer",
       "cli_tool": "Antigravity CLI (agcli)",
       "active_model": "Gemini 3.8 Flash (High Reasoning)",
@@ -170,6 +205,8 @@
     "failover_chain": [
       "OpenCode CLI (GLM 5.3 Flash)",
       "OpenCode CLI (Meta Muse Spark 1.3)",
+      "Cline CLI (GLM 5.3 Flash / Worker C)",
+      "Cline CLI (Muse Spark / Worker D)",
       "Google Gemini 3.8 Flash High (agcli / google provider)",
       "Ollama Local Fallback (qwen2.5-coder:1.5b)"
     ],

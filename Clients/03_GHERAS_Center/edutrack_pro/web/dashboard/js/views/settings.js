@@ -69,6 +69,7 @@ export async function render(container, api) {
 
   // 2. Admin User Management & Password Reset (if manager)
   let userMgmtCard = null;
+  let refreshUsersList = null;
   if (me && me.role === 'manager') {
     const usersTableBody = el('tbody', {},
       el('tr', {}, el('td', { colspan: '5', class: 'muted', style: 'text-align:center;' }, 'جاري تحميل المستخدمين...'))
@@ -280,13 +281,67 @@ export async function render(container, api) {
             permsCell.append(el('span', { class: 'muted' }, '—'));
           }
 
-          const actionsCell = el('td', { style: 'display:flex; gap:6px;' });
+          const actionsCell = el('td', { style: 'display:flex; gap:6px; flex-wrap:wrap;' });
           if (u.role === 'supervisor') {
             const editPermsBtn = el('button', { class: 'button button-outline', type: 'button' }, 'تعديل الصلاحيات');
             editPermsBtn.onclick = () => openPermissionsModal(u, loadUsersList);
             actionsCell.append(editPermsBtn);
           }
           actionsCell.append(resetBtn);
+
+          if ((u.role === 'supervisor' || u.role === 'teacher') && u.id !== me?.id) {
+            const delBtn = el('button', {
+              class: 'button button-outline',
+              type: 'button',
+              style: 'color:#dc2626; border-color:#fca5a5; background:#fef2f2;'
+            }, '🗑 حذف الحساب');
+
+            delBtn.onclick = () => {
+              const confirmSubmit = el('button', {
+                class: 'button',
+                type: 'submit',
+                style: 'background:#dc2626; border-color:#dc2626; color:#fff;'
+              }, 'نعم، حذف الحساب نهائياً');
+              const cancelBtn = el('button', { class: 'button button-outline', type: 'button' }, 'إلغاء');
+
+              const modalForm = el('form', {},
+                el('p', { style: 'line-height:1.7; font-size:15px; margin-top:0;' },
+                  'هل أنت متأكد من رغبتك في حذف حساب ',
+                  el('strong', { style: 'color:#dc2626;' }, u.username || 'المستخدم'),
+                  '؟'
+                ),
+                el('div', { class: 'card', style: 'background:#fff1f2; border:1px solid #fecdd3; padding:12px; margin-bottom:16px; border-radius:8px;' },
+                  el('div', { style: 'color:#9f1239; font-weight:600; margin-bottom:4px;' }, '⚠️ تنبيه هام:'),
+                  el('div', { style: 'color:#881337; font-size:13px; line-height:1.6;' },
+                    'سيتم تعطيل وإلغاء وصول هذا المستخدم فوراً إلى المنظومة، مع الحفاظ على سلامة السجلات المرتبطة به في النظام.'
+                  )
+                ),
+                el('div', { class: 'form-actions', style: 'display:flex; justify-content:flex-end; gap:8px;' },
+                  cancelBtn,
+                  confirmSubmit
+                )
+              );
+
+              const { close } = modal(`حذف حساب المستخدم (${u.username})`, modalForm);
+              cancelBtn.onclick = () => close();
+
+              modalForm.onsubmit = async ev => {
+                ev.preventDefault();
+                confirmSubmit.disabled = true;
+                try {
+                  await api.del(`users/${u.id}`);
+                  toast('تم حذف حساب المستخدم بنجاح');
+                  close();
+                  loadUsersList();
+                } catch (err) {
+                  toast(err.message || 'فشلت عملية حذف الحساب', true);
+                  confirmSubmit.disabled = false;
+                }
+              };
+            };
+
+            actionsCell.append(delBtn);
+          }
 
           usersTableBody.append(
             el('tr', {},
@@ -305,6 +360,7 @@ export async function render(container, api) {
       }
     }
 
+    refreshUsersList = loadUsersList;
     addSupervisorBtn.onclick = () => openCreateSupervisorModal(loadUsersList);
     loadUsersList();
   }
@@ -343,6 +399,110 @@ export async function render(container, api) {
     }
   };
 
+  const fileInput = el('input', { type: 'file', accept: '.json,application/json', style: 'display:none;' });
+  const importBtn = el('button', {
+    class: 'button button-outline',
+    type: 'button',
+    style: 'background:#f0fdf4; border-color:#86efac; color:#166534;'
+  }, '📤 استيراد بيانات (JSON)');
+
+  fileInput.addEventListener('change', async event => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    fileInput.value = '';
+
+    try {
+      const text = await file.text();
+      let payload;
+      try {
+        payload = JSON.parse(text);
+      } catch (parseErr) {
+        toast('الملف المحدد ليس بصيغة JSON صالحة', true);
+        return;
+      }
+
+      if (!payload || typeof payload !== 'object') {
+        toast('محتوى ملف JSON غير صالح', true);
+        return;
+      }
+
+      const rootData = (payload.data && typeof payload.data === 'object') ? payload.data : payload;
+      const getLen = val => Array.isArray(val) ? val.length : (val?.items?.length || 0);
+
+      const counts = {
+        students: getLen(rootData.students),
+        rooms: getLen(rootData.rooms),
+        staff: getLen(rootData.staff),
+        users: getLen(rootData.users),
+        payments: getLen(rootData.payments),
+        expenses: getLen(rootData.expenses),
+        attendance: getLen(rootData.attendance),
+        evaluations: getLen(rootData.evaluations),
+      };
+
+      const totalFound = Object.values(counts).reduce((a, b) => a + b, 0);
+      if (totalFound === 0) {
+        toast('لم يتم العثور على سجلات معروفة داخل ملف JSON', true);
+        return;
+      }
+
+      const previewGrid = el('div', { style: 'display:grid; grid-template-columns:repeat(auto-fit, minmax(110px, 1fr)); gap:10px; margin:14px 0;' },
+        counts.students ? el('div', { class: 'card', style: 'padding:10px; text-align:center; background:#f0fdfa;' }, el('div', { style: 'font-size:20px; font-weight:bold; color:#0f766e;' }, String(counts.students)), el('div', { class: 'muted', style: 'font-size:12px;' }, 'طلاب')) : null,
+        counts.rooms ? el('div', { class: 'card', style: 'padding:10px; text-align:center; background:#f0fdfa;' }, el('div', { style: 'font-size:20px; font-weight:bold; color:#0f766e;' }, String(counts.rooms)), el('div', { class: 'muted', style: 'font-size:12px;' }, 'قاعات')) : null,
+        counts.staff ? el('div', { class: 'card', style: 'padding:10px; text-align:center; background:#f0fdfa;' }, el('div', { style: 'font-size:20px; font-weight:bold; color:#0f766e;' }, String(counts.staff)), el('div', { class: 'muted', style: 'font-size:12px;' }, 'موظفون')) : null,
+        counts.users ? el('div', { class: 'card', style: 'padding:10px; text-align:center; background:#f0fdfa;' }, el('div', { style: 'font-size:20px; font-weight:bold; color:#0f766e;' }, String(counts.users)), el('div', { class: 'muted', style: 'font-size:12px;' }, 'مستخدمون')) : null,
+        counts.payments ? el('div', { class: 'card', style: 'padding:10px; text-align:center; background:#f0fdfa;' }, el('div', { style: 'font-size:20px; font-weight:bold; color:#0f766e;' }, String(counts.payments)), el('div', { class: 'muted', style: 'font-size:12px;' }, 'مدفوعات')) : null,
+        counts.expenses ? el('div', { class: 'card', style: 'padding:10px; text-align:center; background:#f0fdfa;' }, el('div', { style: 'font-size:20px; font-weight:bold; color:#0f766e;' }, String(counts.expenses)), el('div', { class: 'muted', style: 'font-size:12px;' }, 'مصروفات')) : null,
+        counts.attendance ? el('div', { class: 'card', style: 'padding:10px; text-align:center; background:#f0fdfa;' }, el('div', { style: 'font-size:20px; font-weight:bold; color:#0f766e;' }, String(counts.attendance)), el('div', { class: 'muted', style: 'font-size:12px;' }, 'حضور')) : null,
+        counts.evaluations ? el('div', { class: 'card', style: 'padding:10px; text-align:center; background:#f0fdfa;' }, el('div', { style: 'font-size:20px; font-weight:bold; color:#0f766e;' }, String(counts.evaluations)), el('div', { class: 'muted', style: 'font-size:12px;' }, 'تقييمات')) : null,
+      );
+
+      const confirmImportBtn = el('button', { class: 'button', type: 'submit' }, 'بدء الاستيراد الآن');
+      const cancelBtn = el('button', { class: 'button button-outline', type: 'button' }, 'إلغاء');
+
+      const modalForm = el('form', {},
+        el('p', { style: 'margin-top:0; font-size:15px; line-height:1.7;' },
+          'تم فحص ملف ', el('strong', { style: 'color:#0f766e;' }, file.name), ' بنجاح. وفيما يلي إحصائيات السجلات الجاهزة للاستيراد:'
+        ),
+        previewGrid,
+        el('div', { class: 'card', style: 'background:#eff6ff; border:1px solid #bfdbfe; padding:12px; margin-bottom:16px; border-radius:8px;' },
+          el('div', { style: 'color:#1d4ed8; font-weight:600; margin-bottom:4px;' }, 'ℹ️ ملاحظة الاستيراد الآمن:'),
+          el('div', { style: 'color:#1e40af; font-size:13px; line-height:1.6;' },
+            'سيتم دمج السجلات بأمان داخل قاعدة البيانات مع تجنب تكرار المعرفات المتطابقة، والحفاظ على سلامة البيانات الحالية.'
+          )
+        ),
+        el('div', { class: 'form-actions', style: 'display:flex; justify-content:flex-end; gap:8px;' },
+          cancelBtn,
+          confirmImportBtn
+        )
+      );
+
+      const { close } = modal('معاينة وتأكيد استيراد البيانات (JSON)', modalForm);
+      cancelBtn.onclick = () => close();
+
+      modalForm.onsubmit = async ev => {
+        ev.preventDefault();
+        confirmImportBtn.disabled = true;
+        confirmImportBtn.textContent = 'جاري معالجة الاستيراد...';
+        toast('جاري معالجة واستيراد البيانات...');
+        try {
+          const res = await api.post('import', payload);
+          toast(res.message || 'تم استيراد البيانات بنجاح');
+          close();
+          if (refreshUsersList) refreshUsersList();
+        } catch (err) {
+          toast(err.message || 'فشلت عملية استيراد البيانات', true);
+          confirmImportBtn.disabled = false;
+          confirmImportBtn.textContent = 'بدء الاستيراد الآن';
+        }
+      };
+    } catch (err) {
+      toast('تعذر قراءة ملف النسخة الاحتياطية', true);
+    }
+  });
+
+  importBtn.onclick = () => fileInput.click();
+
   const centerInfoCard = el('div', { class: 'card', style: 'margin-top:20px;' },
     el('h2', { style: 'margin-top:0; font-size:18px;' }, '🏛️ بيانات المنظومة والنسخ الاحتياطي'),
     el('div', { style: 'line-height:1.8; margin-bottom:14px;' },
@@ -350,7 +510,7 @@ export async function render(container, api) {
       el('div', {}, el('strong', {}, 'الإصدار البرمجي: '), 'EduTrack Pro v2.5 (Clean VPS Architecture)'),
       el('div', {}, el('strong', {}, 'المستخدم الحالي: '), `${me?.name || me?.username || 'الإدارة'} (${me?.role || 'manager'})`)
     ),
-    el('div', { class: 'form-actions' }, backupBtn)
+    el('div', { class: 'form-actions', style: 'display:flex; gap:10px; flex-wrap:wrap;' }, backupBtn, importBtn, fileInput)
   );
 
   const cards = [header, pwdForm, userMgmtCard, me?.role === 'manager' ? centerInfoCard : null].filter(Boolean);

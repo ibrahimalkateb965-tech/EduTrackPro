@@ -74,7 +74,25 @@ EDUTRACK_ADMIN_PASSWORD='new' $C exec -T -e EDUTRACK_ADMIN_PASSWORD api python -
 bash deploy/deploy.sh gheras.autovem.tech   # redeploy after a new push (keeps data)
 ```
 
+## Static Web Asset Caching & Hotfix Standards
+
+1. **SPA Anti-Cache Invariant**:
+   - The Caddy site block for `/web/*` must strictly include:
+     ```caddy
+     handle /web/* {
+         header Cache-Control "no-cache, must-revalidate"
+         file_server
+     }
+     ```
+   - When modifying frontend dashboard files (`app.js`, `views/*.js`), bump the version query parameter in `index.html` and `app.js` (e.g. `?v=2.2`).
+2. **Reliable Base64 Hotfixes on Windows**:
+   - To deploy single updated JS/HTML files without hanging Windows OpenSSH pipes:
+     ```bash
+     python -c "import base64, subprocess; b64=base64.b64encode(open('local.js','rb').read()).decode(); subprocess.run(['ssh','-i','~/.ssh/edutrack_deploy_key','root@187.55.226.225',f'echo \"{b64}\" | base64 -d > /opt/edutrack/web/dashboard/js/local.js'])"
+     ```
+
 ## Out of scope (Phase 3)
 
 Automated off-site backups, rate limiting / refresh tokens, `revoked_tokens` purge job, mobile-role API
 scoping, and server-side rendering of the 11 print templates to PDF.
+

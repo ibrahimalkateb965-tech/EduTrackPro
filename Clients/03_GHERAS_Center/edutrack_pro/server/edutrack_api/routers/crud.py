@@ -303,6 +303,8 @@ def _register(path: str, table: str) -> None:
 
     def delete_row(record_id: UUID, request: Request, user: dict = Depends(require_roles("manager", "supervisor")), conn=Depends(get_conn)):
         _allowed(user, table, True)
+        if table == "users" and record_id == user["id"]:
+            raise ApiError(400, "bad_request", "لا يمكن للمستخدم حذف حسابه الحالي")
         if table == "evaluations" and user.get("role") == "supervisor":
             perms = user.get("permissions", {})
             existing = _repo(request, conn, table).get(record_id)

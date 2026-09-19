@@ -4,22 +4,22 @@ const TOOLS = [
   { label: 'الطلاب', icon: '♟', route: '#/students', perm: 'students' },
   { label: 'طلاب الإنجليزي — أولاد', icon: '👦', route: '#/students?tab=english_boys', perm: 'students' },
   { label: 'طلاب الإنجليزي — بنات', icon: '👧', route: '#/students?tab=english_girls', perm: 'students' },
-  { label: 'القاعات', icon: '▦', route: '#/rooms' },
-  { label: 'الجدول الدراسي', icon: '📅', route: '#/rooms' },
-  { label: 'المعلمون والمشرفون', icon: '♙', route: '#/staff?tab=teachers_supervisors' },
-  { label: 'الموظفون', icon: '▣', route: '#/staff' },
-  { label: 'غياب الموظفين والخصم', icon: '☑', route: '#/staff?tab=absences' },
+  { label: 'القاعات', icon: '▦', route: '#/rooms', perm: 'students' },
+  { label: 'الجدول الدراسي', icon: '📅', route: '#/rooms', perm: 'students' },
+  { label: 'المعلمون والمشرفون', icon: '♙', route: '#/staff?tab=teachers_supervisors', perm: 'manager_only' },
+  { label: 'الموظفون', icon: '▣', route: '#/staff', perm: 'manager_only' },
+  { label: 'غياب الموظفين والخصم', icon: '☑', route: '#/staff?tab=absences', perm: 'manager_only' },
   { label: 'الحضور والغياب (الطلاب)', icon: '☑', route: '#/attendance', perm: 'attendance' },
   { label: 'التقييم اليومي', icon: '★', route: '#/attendance?tab=evaluation', perm: 'daily_evaluation' },
   { label: 'التقييم الشهري', icon: '▥', route: '#/reports', perm: 'monthly_evaluation' },
   { label: 'الرسوم والمدفوعات', icon: '▤', route: '#/payments', perm: 'finance' },
   { label: 'المصروفات', icon: '◔', route: '#/expenses', perm: 'finance' },
   { label: 'البنك والصندوق', icon: '♜', route: '#/accounts', perm: 'finance' },
-  { label: 'التقارير الشاملة', icon: '📊', route: '#/reports' },
-  { label: 'متابعة التقييم', icon: '📋', route: '#/reports' },
-  { label: 'التواصل مع أولياء الأمور', icon: '💬', action: 'contact' },
-  { label: 'النسخ الاحتياطي', icon: '🔐', action: 'backup', perm: 'finance' },
-  { label: 'الإشعارات والتنبيهات', icon: '🔔', action: 'notifications' },
+  { label: 'التقارير الشاملة', icon: '📊', route: '#/reports', perm: 'manager_only' },
+  { label: 'متابعة التقييم', icon: '📋', route: '#/reports', perm: 'manager_only' },
+  { label: 'التواصل مع أولياء الأمور', icon: '💬', action: 'contact', perm: 'students' },
+  { label: 'النسخ الاحتياطي', icon: '🔐', action: 'backup', perm: 'manager_only' },
+  { label: 'الإشعارات والتنبيهات', icon: '🔔', action: 'notifications', perm: 'manager_only' },
   { label: 'الإعدادات وتغيير كلمة المرور', icon: '⚙', route: '#/settings' },
 ];
 
@@ -136,8 +136,10 @@ function whatsappButton(phone) {
 export async function render(container, api) {
   container.replaceChildren();
 
-  let me = null;
-  try { me = await api.get('me') || {}; } catch (error) {}
+  let me = api.currentUser;
+  if (!me) {
+    try { me = await api.get('me') || {}; } catch (error) { me = {}; }
+  }
 
   const isSupervisor = me && me.role === 'supervisor';
   const perms = me?.permissions || {};
@@ -207,6 +209,7 @@ export async function render(container, api) {
 
   // Tools Panel
   const visibleTools = TOOLS.filter(tool => {
+    if (tool.perm === 'manager_only') return !isSupervisor;
     if (!tool.perm) return true;
     if (isSupervisor) return Boolean(perms[tool.perm]);
     return true;
@@ -238,6 +241,9 @@ export async function render(container, api) {
     )
   );
 
-  container.append(welcome, stats, toolsPanel, bottom);
+  container.append(welcome, stats, toolsPanel);
+  if (showAttendance) {
+    container.append(bottom);
+  }
 }
 

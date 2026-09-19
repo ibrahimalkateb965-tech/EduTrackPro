@@ -34,8 +34,9 @@ function filterSidebarByPermissions(user) {
     if (route === 'students' && !perms.students) visible = false;
     if (route === 'attendance' && !perms.attendance && !perms.daily_evaluation) visible = false;
     if ((route === 'payments' || route === 'expenses' || route === 'accounts') && !perms.finance) visible = false;
-    if ((route === 'staff' || route === 'rooms') && !perms.students && !perms.attendance) visible = false;
-    if (route === 'reports' && !perms.students && !perms.attendance && !perms.finance && !perms.daily_evaluation && !perms.monthly_evaluation) visible = false;
+    if (route === 'staff' && user.role !== 'manager') visible = false;
+    if (route === 'rooms' && !perms.students && !perms.attendance) visible = false;
+    if (route === 'reports' && user.role !== 'manager') visible = false;
     link.style.display = visible ? '' : 'none';
   });
 }
@@ -50,7 +51,7 @@ async function showLogin(id) {
   userName.textContent = 'الإدارة';
   loginActive = true;
   document.body.classList.add('auth-locked');
-  const { render } = await import('./views/login.js?v=1.1');
+  const { render } = await import('./views/login.js?v=2.3');
   if (id !== undefined && id !== renderId) return;
   main.replaceChildren();
   await render(main, api);
@@ -75,8 +76,8 @@ async function handleRoute() {
     currentUser = me;
     api.currentUser = me;
     userName.textContent = me.name || me.username || 'الإدارة';
-    filterSidebarByPermissions(me);
   }
+  filterSidebarByPermissions(currentUser);
   const route = currentRoute();
   if (id !== renderId) return;
 
@@ -98,13 +99,13 @@ async function handleRoute() {
       location.hash = '#/home';
       return;
     }
-    if (['staff', 'rooms'].includes(route) && !perms.students && !perms.attendance) {
-      toast('ليس لديك صلاحية الوصول إلى الموظفين والقاعات', true);
+    if (route === 'rooms' && !perms.students && !perms.attendance) {
+      toast('ليس لديك صلاحية الوصول للقاعات', true);
       location.hash = '#/home';
       return;
     }
-    if (route === 'reports' && !perms.students && !perms.attendance && !perms.finance && !perms.daily_evaluation && !perms.monthly_evaluation) {
-      toast('ليس لديك صلاحيات لعرض التقارير', true);
+    if (['staff', 'reports', 'notifications'].includes(route) && currentUser.role !== 'manager') {
+      toast('ليس لديك صلاحية الوصول لهذا القسم', true);
       location.hash = '#/home';
       return;
     }
@@ -115,7 +116,7 @@ async function handleRoute() {
   loginActive = false;
   document.body.classList.remove('auth-locked');
   let view;
-  try { view = await import(`./views/${route}.js?v=1.1`); } catch (error) {
+  try { view = await import(`./views/${route}.js?v=2.3`); } catch (error) {
     toast('تعذر تحميل هذه الصفحة', true);
     return;
   }
