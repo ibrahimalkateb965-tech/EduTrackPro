@@ -1,4 +1,4 @@
-import { el, toast, modal } from '../ui.js';
+import { el, toast, modal, createDatePicker } from '../ui.js';
 
 const GROUPS = ['الصباح', 'المساء', 'الإنجليزي', 'القدرات'];
 const GUARDIAN_RELATIONS = ['الأب', 'الأم', 'ولي الأمر', 'شخص آخر'];
@@ -96,6 +96,21 @@ function studentRow(student, api) {
   const edit = el('button', { class: 'button button-outline', type: 'button' }, 'تعديل');
   edit.addEventListener('click', () => openStudentForm(api, student));
   const printCard = el('a', { class: 'button button-outline', href: printCardHref(student), target: '_blank', rel: 'noopener' }, 'بطاقة الطالب');
+  const commBtn = el('button', {
+    class: 'button',
+    type: 'button',
+    style: 'background:#25d366; padding:5px 9px; font-size:12px; margin-right:4px;',
+    title: 'مراسلة ولي الأمر عبر واتساب'
+  }, '💬 مراسلة');
+  commBtn.addEventListener('click', async () => {
+    try {
+      const { openComposerModal } = await import('./communication.js?v=2.6');
+      await openComposerModal(api, student.id);
+    } catch (err) {
+      toast('تعذر فتح مركز التواصل', true);
+    }
+  });
+
   return el('tr', {},
     el('td', { style: 'font-weight:600;' }, student.name || '—'),
     el('td', {}, student.group_name || '—'),
@@ -103,7 +118,7 @@ function studentRow(student, api) {
     el('td', {}, roomLabel(student)),
     el('td', {}, student.guardian_phone || '—'),
     el('td', {}, statusBadge(student)),
-    el('td', {}, edit, ' ', printCard)
+    el('td', {}, edit, ' ', printCard, ' ', commBtn)
   );
 }
 
@@ -235,7 +250,14 @@ function openStudentForm(api, student) {
     el('label', {}, el('span', { style: 'font-weight:600;' }, 'المجموعة الدراسية *'), select('group_name', groupOptions, value('group_name') || defaultGroup)),
     el('label', {}, el('span', {}, 'الفصل / القاعة'), select('room_id', roomOptions, value('room_id'))),
     el('label', {}, el('span', {}, 'رقم الهوية الوطنية / الإقامة'), el('input', { name: 'national_id', type: 'text', value: value('national_id') })),
-    el('label', {}, el('span', {}, 'تاريخ الميلاد'), el('input', { name: 'birth_date', type: 'date', value: value('birth_date') })),
+    createDatePicker({
+      name: 'birth_date',
+      value: value('birth_date'),
+      label: 'تاريخ الميلاد',
+      minYear: 1970,
+      maxYear: new Date().getFullYear(),
+      showAge: true
+    }),
     el('label', {}, el('span', {}, 'الجنسية'), el('input', { name: 'nationality', type: 'text', value: value('nationality') || 'سعودي' })),
 
     // --- 2. بيانات ولي الأمر والتواصل ---
@@ -264,32 +286,72 @@ function openStudentForm(api, student) {
     el('label', {}, el('span', {}, 'ملاحظات تعليمية'), el('textarea', { name: 'education_notes' }, value('education_notes')))
   ];
 
-  const submit = el('button', { class: 'button', type: 'submit' }, editing ? 'حفظ التعديلات' : 'إضافة طالب');
+  const submit = el('button', { class: 'button', type: 'button', style: 'padding: 10px 24px; font-weight: 700;' }, editing ? 'حفظ التعديلات' : 'إضافة طالب');
   const cancel = el('button', { class: 'button button-outline', type: 'button' }, 'إلغاء');
-  const form = el('form', { class: 'form-grid' }, ...fields, el('div', { class: 'form-actions' }, submit, cancel));
+  const actionsBar = el('div', { class: 'form-actions', style: 'grid-column: 1 / -1; display: flex; gap: 10px; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border, #e2e8f0);' }, submit, cancel);
+  const form = el('form', { class: 'form-grid', novalidate: 'novalidate' }, ...fields, actionsBar);
   const dialog = modal(editing ? 'تعديل بيانات الطالب' : 'إضافة طالب جديد', form);
   cancel.addEventListener('click', dialog.close);
-  form.addEventListener('submit', async event => {
-    event.preventDefault();
-    submit.disabled = true;
-    const payload = Object.fromEntries(new FormData(form).entries());
-    Object.keys(payload).forEach(key => { payload[key] = String(payload[key]).trim(); });
+
+  const saveStudent = async () => {
+    const rawData = new FormData(form);
+    const payload = Object.fromEntries(rawData.entries());
+    Object.keys(payload).forEach(key => {
+      payload[key] = typeof payload[key] === 'string' ? payload[key].trim() : payload[key];
+    });
+
+    if (!payload.name) {
+      toast('يرجى كتابة اسم الطالب *', true);
+      const nameInput = form.querySelector('input[name="name"]');
+      if (nameInput) nameInput.focus();
+      return;
+    }
+
+    if (!payload.guardian_phone) {
+      toast('يرجى إدخال هاتف ولي الأمر *', true);
+      const phoneInput = form.querySelector('input[name="guardian_phone"]');
+      if (phoneInput) phoneInput.focus();
+      return;
+    }
+
     payload.has_difficulties = payload.has_difficulties === 'true';
     payload.previous_study = payload.previous_study === 'true';
     payload.room_id = payload.room_id || null;
-    if (payload.birth_date === '') payload.birth_date = null;
     payload.gender = payload.gender || (editing ? (isGirl(student || {}) ? 'بنات' : 'بنين') : defaultGender);
 
+    // PostgreSQL nullable & check constraint guarantees
+    ['birth_date', 'group_name', 'guardian_relation', 'national_id', 'father_phone', 'mother_phone', 'pickup_phone'].forEach(k => {
+      if (payload[k] === '') payload[k] = null;
+    });
+
+    submit.disabled = true;
+    submit.textContent = 'جاري الحفظ...';
+
     try {
-      if (editing) await api.patch(`students/${student.id}`, payload);
-      else await api.post('students', payload);
+      if (editing) {
+        await api.patch(`students/${student.id}`, payload);
+      } else {
+        await api.post('students', payload);
+      }
       dialog.close();
       toast(editing ? 'تم تحديث بيانات الطالب بنجاح' : 'تمت إضافة الطالب بنجاح');
       await reload(api);
     } catch (error) {
-      toast(error.message, true);
+      console.error('Save student failed:', error);
+      toast(error.message || 'تعذر حفظ بيانات الطالب', true);
       submit.disabled = false;
+      submit.textContent = editing ? 'حفظ التعديلات' : 'إضافة طالب';
     }
+  };
+
+  form.addEventListener('submit', event => {
+    event.preventDefault();
+    saveStudent();
+  });
+
+  submit.addEventListener('click', event => {
+    event.preventDefault();
+    saveStudent();
   });
 }
 

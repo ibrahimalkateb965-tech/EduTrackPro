@@ -1,7 +1,7 @@
 import { api } from './api.js';
 import { toast } from './ui.js';
 
-const ROUTES = ['home', 'students', 'attendance', 'finance', 'staff', 'rooms', 'reports', 'settings'];
+const ROUTES = ['home', 'students', 'attendance', 'communication', 'finance', 'staff', 'rooms', 'reports', 'settings'];
 const ALLOWED_ROLES = ['manager', 'supervisor'];
 
 const main = document.getElementById('view');
@@ -37,6 +37,7 @@ function filterSidebarByPermissions(user) {
     let visible = true;
     if (route === 'students' && !perms.students) visible = false;
     if (route === 'attendance' && !perms.attendance && !perms.daily_evaluation) visible = false;
+    if (route === 'communication' && !perms.students && !perms.attendance) visible = false;
     if (route === 'finance' && !perms.finance) visible = false;
     if (route === 'staff' && user.role !== 'manager') visible = false;
     if (route === 'rooms' && !perms.students && !perms.attendance) visible = false;
@@ -55,7 +56,7 @@ async function showLogin(id) {
   userName.textContent = 'الإدارة';
   loginActive = true;
   document.body.classList.add('auth-locked');
-  const { render } = await import('./views/login.js?v=2.4');
+  const { render } = await import('./views/login.js?v=2.7');
   if (id !== undefined && id !== renderId) return;
   main.replaceChildren();
   await render(main, api);
@@ -103,6 +104,11 @@ async function handleRoute() {
       location.hash = '#/home';
       return;
     }
+    if (route === 'communication' && !perms.students && !perms.attendance) {
+      toast('ليس لديك صلاحية الوصول إلى مركز التواصل', true);
+      location.hash = '#/home';
+      return;
+    }
     if (route === 'rooms' && !perms.students && !perms.attendance) {
       toast('ليس لديك صلاحية الوصول للقاعات', true);
       location.hash = '#/home';
@@ -120,7 +126,7 @@ async function handleRoute() {
   loginActive = false;
   document.body.classList.remove('auth-locked');
   let view;
-  try { view = await import(`./views/${route}.js?v=2.4`); } catch (error) {
+  try { view = await import(`./views/${route}.js?v=2.7`); } catch (error) {
     toast('تعذر تحميل هذه الصفحة', true);
     return;
   }
