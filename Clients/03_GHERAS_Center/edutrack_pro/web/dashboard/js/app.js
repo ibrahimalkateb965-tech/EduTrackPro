@@ -1,7 +1,7 @@
 import { api } from './api.js';
 import { toast } from './ui.js';
 
-const ROUTES = ['home', 'students', 'attendance', 'payments', 'expenses', 'accounts', 'staff', 'rooms', 'reports', 'settings'];
+const ROUTES = ['home', 'students', 'attendance', 'finance', 'staff', 'rooms', 'reports', 'settings'];
 const ALLOWED_ROLES = ['manager', 'supervisor'];
 
 const main = document.getElementById('view');
@@ -18,7 +18,11 @@ let logoutInFlight = false;
 
 function currentRoute() {
   const hash = location.hash.replace(/^#\/?/, '');
-  const [name] = hash.split('?');
+  const [name, query] = hash.split('?');
+  if (name === 'payments' || name === 'expenses' || name === 'accounts') {
+    location.replace(`#/finance?tab=${name}${query ? '&' + query : ''}`);
+    return 'finance';
+  }
   return ROUTES.includes(name) ? name : 'home';
 }
 
@@ -33,7 +37,7 @@ function filterSidebarByPermissions(user) {
     let visible = true;
     if (route === 'students' && !perms.students) visible = false;
     if (route === 'attendance' && !perms.attendance && !perms.daily_evaluation) visible = false;
-    if ((route === 'payments' || route === 'expenses' || route === 'accounts') && !perms.finance) visible = false;
+    if (route === 'finance' && !perms.finance) visible = false;
     if (route === 'staff' && user.role !== 'manager') visible = false;
     if (route === 'rooms' && !perms.students && !perms.attendance) visible = false;
     if (route === 'reports' && user.role !== 'manager') visible = false;
@@ -51,7 +55,7 @@ async function showLogin(id) {
   userName.textContent = 'الإدارة';
   loginActive = true;
   document.body.classList.add('auth-locked');
-  const { render } = await import('./views/login.js?v=2.3');
+  const { render } = await import('./views/login.js?v=2.4');
   if (id !== undefined && id !== renderId) return;
   main.replaceChildren();
   await render(main, api);
@@ -94,8 +98,8 @@ async function handleRoute() {
       location.hash = '#/home';
       return;
     }
-    if (['payments', 'expenses', 'accounts'].includes(route) && !perms.finance) {
-      toast('ليس لديك صلاحية الوصول إلى العمليات المالية', true);
+    if (route === 'finance' && !perms.finance) {
+      toast('ليس لديك صلاحية الوصول إلى الإدارة المالية', true);
       location.hash = '#/home';
       return;
     }
@@ -116,7 +120,7 @@ async function handleRoute() {
   loginActive = false;
   document.body.classList.remove('auth-locked');
   let view;
-  try { view = await import(`./views/${route}.js?v=2.3`); } catch (error) {
+  try { view = await import(`./views/${route}.js?v=2.4`); } catch (error) {
     toast('تعذر تحميل هذه الصفحة', true);
     return;
   }
