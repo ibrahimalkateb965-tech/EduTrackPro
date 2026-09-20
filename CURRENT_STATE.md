@@ -4,8 +4,8 @@
 > **Master Orchestrator**: `Claude Code CLI` (Opus Max / Sonnet 5)  
 > **Handoff Source**: `Antigravity IDE` (Interactive Cockpit & Visual Inspector)  
 > **Timestamp**: 2026-09-16T12:55:00+03:00  
-> **Last updated:** 2026-09-20 — Phase 3 closed: v=2.8 + migration 005 live on the VPS, Phase 3 **[APPROVED]** — Claude Code CLI  
-> **VCS:** git at workspace root, branch `main`, HEAD `2778d82` — **level with `origin/main`, push pending: no**. Phase 1 = `fc071f6`, Phase 2 = `a28299b`, Phase 2.5 = `eabac22`, Phase 3 audit = `52ce581` + `6e2e434` + `469e280` (all [APPROVED]). **Working tree clean** (Ibrahim committed the §5d-approved tree at 08:22, superseding his earlier `keep`). Remote `origin` = https://github.com/ibrahimalkateb965-tech/EduTrackPro.git. Quarantine enforced by root `.gitignore` (Rule 8).  
+> **Last updated:** 2026-09-20 08:57 — Phase 3 closed: v=2.8 + migration 005 live on the VPS, Phase 3 **[APPROVED]**; pre-clear freeze at `9d23862` — Claude Code CLI  
+> **VCS:** git at workspace root, branch `main`, HEAD `9d23862` — **level with `origin/main`, push pending: no**. Phase 1 = `fc071f6`, Phase 2 = `a28299b`, Phase 2.5 = `eabac22`, Phase 3 audit = `52ce581` + `6e2e434` + `469e280` (all [APPROVED]). **Working tree clean** (Ibrahim committed the §5d-approved tree at 08:22, superseding his earlier `keep`). Remote `origin` = https://github.com/ibrahimalkateb965-tech/EduTrackPro.git. Quarantine enforced by root `.gitignore` (Rule 8).  
 
 ---
 
@@ -259,9 +259,9 @@ Ibrahim ran the §6 one-shot after `git push` (7 commits, `main` now level with 
 
 ---
 
-## 6. THE ONE THING TO DO NEXT (frozen 2026-09-20, post-deploy)
+## 6. THE ONE THING TO DO NEXT (frozen 2026-09-20 08:57)
 
-HEAD is `2778d82` on `main` + this state file (uncommitted until Ibrahim commits). Production = v=2.8, migrations 001–005. Ibrahim picks Phase 4:
+HEAD is `9d23862` on `main`, level with `origin/main`, **working tree clean**. Production = v=2.8, migrations 001–005, Phase 3 **[APPROVED]** (§5e). Two lessons flushed to `.agents/MEMORY_STORE.md` (`users.staff_id` not unique → `UPDATE 2`; public `curl` allowed for post-deploy checks). Ibrahim picks Phase 4:
 
 - **(a)** Nightly `pg_dump` backup — `deploy/backup.sh` (`docker compose exec -T db pg_dump -Fc` → `/opt/edutrack/backups/`, 14-day rotation) + `deploy/edutrack-backup.timer`/`.service` installed by `deploy.sh`; restore drill documented in `DEPLOY.md`. Worker A writes the shell, Claude validates with `bash -n` + a restore into embedded PG.
 - **(b)** Settings-driven `academic_year` — `settings` table + `006` migration (OpenCode Worker B), `print.py` reads it instead of the hard-coded `1447-1448 هـ`, a settings-view field; Claude tests on embedded PG. Bundle the `users(staff_id)` partial unique index into 006.
