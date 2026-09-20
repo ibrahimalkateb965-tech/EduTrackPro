@@ -4,8 +4,8 @@
 > **Master Orchestrator**: `Claude Code CLI` (Opus Max / Sonnet 5)  
 > **Handoff Source**: `Antigravity IDE` (Interactive Cockpit & Visual Inspector)  
 > **Timestamp**: 2026-09-16T12:55:00+03:00  
-> **Last updated:** 2026-09-20 08:25 — Commit-hygiene audit (a) + Saturday migration 005 (b), committed by Ibrahim — Claude Code CLI  
-> **VCS:** git at workspace root, branch `main`, HEAD `469e280` — **`[ahead 6]` of `origin/main`, push pending: yes** — Ibrahim runs `git push`. Phase 1 = `fc071f6`, Phase 2 = `a28299b`, Phase 2.5 = `eabac22`, Phase 3 audit = `52ce581` + `6e2e434` + `469e280` (all [APPROVED]). **Working tree clean** (Ibrahim committed the §5d-approved tree at 08:22, superseding his earlier `keep`). Remote `origin` = https://github.com/ibrahimalkateb965-tech/EduTrackPro.git. Quarantine enforced by root `.gitignore` (Rule 8).  
+> **Last updated:** 2026-09-20 — Phase 3 closed: v=2.8 + migration 005 live on the VPS, Phase 3 **[APPROVED]** — Claude Code CLI  
+> **VCS:** git at workspace root, branch `main`, HEAD `2778d82` — **level with `origin/main`, push pending: no**. Phase 1 = `fc071f6`, Phase 2 = `a28299b`, Phase 2.5 = `eabac22`, Phase 3 audit = `52ce581` + `6e2e434` + `469e280` (all [APPROVED]). **Working tree clean** (Ibrahim committed the §5d-approved tree at 08:22, superseding his earlier `keep`). Remote `origin` = https://github.com/ibrahimalkateb965-tech/EduTrackPro.git. Quarantine enforced by root `.gitignore` (Rule 8).  
 
 ---
 
@@ -239,18 +239,33 @@ Executed Ibrahim's combined (a)+(b) order. Tree hygiene: `models`, `changelog` (
 - All views fetch `students` / `messages` with the default `limit=100`; pre-existing pattern across the dashboard, will truncate beyond 100 rows.
 - `tests/test_supervisor_permissions.py:7` unused `make_user` import — pre-existing pyflakes note.
 
-## 6. THE ONE THING TO DO NEXT (frozen 2026-09-20 08:25)
+## 5e. Session 2026-09-20 — Phase 3 production deploy (Ibrahim executed; Claude Code verified from the public side)
 
-HEAD is `469e280` on `main`, `[ahead 6]`, **working tree clean**. The §5d-approved tree is in three commits by Ibrahim: `52ce581` (005 migration, deploy.sh, tree hygiene), `6e2e434` (print.py teacher names, RBAC test alignment), `469e280` (dashboard audit, Saturday UI, communication center). **Nothing is on the VPS yet** — production still serves v=2.7 without 005 and without the teacher-name join. First action next session: `git status -sb`; if still `[ahead 6]`, Ibrahim runs `git push`. Then Ibrahim picks:
+Ibrahim ran the §6 one-shot after `git push` (7 commits, `main` now level with `origin/main`). Pasted results + Claude's own public HTTPS checks:
 
-- **(a)** Deploy now — `bash Clients/03_GHERAS_Center/edutrack_pro/deploy/push.sh root@187.55.226.225 gheras.autovem.tech -i ~/.ssh/edutrack_deploy_key` (applies 005 via the incremental loop, rebuilds `api`, serves v=2.8) + the teacher reactivation SQL below; Claude verifies nothing, Ibrahim pastes the output (`UPDATE 1`, CHECK starting with `'السبت'`, `admin login: HTTP 200`).
-- **(b)** Settings-driven `academic_year` — small `settings` table + `006` migration (OpenCode Worker B), `print.py` reads it instead of the hard-coded `1447-1448 هـ`, a settings-view field; Claude tests on embedded PG.
-- **(c)** Pagination past `limit=100` — every dashboard view calls `students` / `messages` with the default limit; add a `fetchAll` helper in `api.js` (offset loop, ≤ 500 per page) and switch the views; Claude verifies with `node --check` + a seeded 150-student run.
+| Check | Source | Result |
+| :--- | :--- | :--- |
+| `push.sh` → `deploy.sh` | Ibrahim's paste | migrations through 005 applied; `edutrack-api:2` rebuilt and healthy; Caddy reloaded; dashboard 200, health 200, `server/` 404 |
+| `chk_schedules_day` on prod DB | Ibrahim's paste | `CHECK ((day = ANY (ARRAY['السبت', 'الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'])))` — 005 confirmed live |
+| Teacher reactivation (`staff_id 20cf6983-…`) | Ibrahim's paste | **`UPDATE 2`** (expected 1) — two `users` rows share that `staff_id`; both now active. Open item below. |
+| `/api/v1/health`, `/server/pyproject.toml`, dashboard cache tag | Claude Code `curl` from the workstation | 200 / 404 / `v=2.8` ×2 |
 
-### VPS one-shot (Ibrahim; the auto-mode classifier blocks Claude from production SSH)
-```bash
-bash Clients/03_GHERAS_Center/edutrack_pro/deploy/push.sh root@187.55.226.225 gheras.autovem.tech -i ~/.ssh/edutrack_deploy_key
-ssh -i ~/.ssh/edutrack_deploy_key root@187.55.226.225 'cd /opt/edutrack && docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env exec -T db psql -U postgres -d gheras_edutrack -c "UPDATE users SET deleted_at = NULL, is_active = true WHERE staff_id = '"'"'20cf6983-c352-4f6f-86f5-611f5f725020'"'"';" -c "SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conname = '"'"'chk_schedules_day'"'"';"'
-```
+### Phase 3 verdict: **[APPROVED]** — code (§5c/§5d) and production state agree; v=2.8 with teacher-name join and Saturday schedules is what the client sees.
 
-Pre-conditions unchanged: free ≥ 4 GB RAM before running the fleet (never with Docker Desktop up), one `opencode run` at a time with ≤ 4 files per batch, Codex via `-s workspace-write`, embedded PG booter must stay alive in the background while pytest runs (`TEST_DATABASE_URL` = superuser URI for fixtures, `DATABASE_URL` = `gheras_app` URI for the API).
+### Open items (not blockers)
+1. Duplicate user rows for `staff_id 20cf6983-…` — inspect with `SELECT id, username, role, is_active, deleted_at, created_at FROM users WHERE staff_id = '20cf6983-c352-4f6f-86f5-611f5f725020' ORDER BY created_at;` and soft-delete the stray one (`UPDATE users SET deleted_at = now(), is_active = false WHERE id = '<stray>'`). Consider a partial unique index `users(staff_id) WHERE deleted_at IS NULL` in migration 006.
+2. `deploy.sh` smoke line `admin login: HTTP 200` was not in the paste; the script ends only after that step, so it is inferred, not seen.
+3. No automated PostgreSQL backup exists on the VPS yet (day-2 ops gap now that real client data is live).
+
+---
+
+## 6. THE ONE THING TO DO NEXT (frozen 2026-09-20, post-deploy)
+
+HEAD is `2778d82` on `main` + this state file (uncommitted until Ibrahim commits). Production = v=2.8, migrations 001–005. Ibrahim picks Phase 4:
+
+- **(a)** Nightly `pg_dump` backup — `deploy/backup.sh` (`docker compose exec -T db pg_dump -Fc` → `/opt/edutrack/backups/`, 14-day rotation) + `deploy/edutrack-backup.timer`/`.service` installed by `deploy.sh`; restore drill documented in `DEPLOY.md`. Worker A writes the shell, Claude validates with `bash -n` + a restore into embedded PG.
+- **(b)** Settings-driven `academic_year` — `settings` table + `006` migration (OpenCode Worker B), `print.py` reads it instead of the hard-coded `1447-1448 هـ`, a settings-view field; Claude tests on embedded PG. Bundle the `users(staff_id)` partial unique index into 006.
+- **(c)** Pagination past `limit=100` — `fetchAll` helper in `api.js` (offset loop, ≤ 500 per page) and switch the views; Claude verifies with `node --check` + a seeded 150-student run.
+- **(d)** Duplicate-user cleanup only (10 minutes) — Ibrahim pastes the SELECT above, Claude names the stray row, Ibrahim runs the soft-delete.
+
+Pre-conditions unchanged: free ≥ 4 GB RAM before running the fleet (never with Docker Desktop up), one `opencode run` at a time with ≤ 4 files per batch, Codex via `-s workspace-write`, embedded PG booter must stay alive in the background while pytest runs (`TEST_DATABASE_URL` = superuser URI for fixtures, `DATABASE_URL` = `gheras_app` URI for the API). Production SSH/DB stays Ibrahim's action (auto-mode classifier).
