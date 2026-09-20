@@ -60,8 +60,8 @@ function paint() {
 }
 
 async function reload(api) {
-  try { accounts = toList(await api.get('ledger-accounts')); } catch (error) { toast(error.message, true); }
-  try { entries = toList(await api.get('ledger-entries')); } catch (error) { toast(error.message, true); }
+  try { accounts = toList(await api.fetchAll('ledger-accounts')); } catch (error) { toast(error.message, true); }
+  try { entries = toList(await api.fetchAll('ledger-entries')); } catch (error) { toast(error.message, true); }
   paint();
 }
 

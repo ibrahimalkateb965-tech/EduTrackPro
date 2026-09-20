@@ -675,16 +675,16 @@ function renderContent() {
 async function reloadAll(api) {
   try {
     const results = await Promise.allSettled([
-      api.get('students'),
-      api.get('fee-plans'),
-      api.get('payments'),
-      api.get('installments'),
-      api.get('expenses'),
-      api.get('expense-categories'),
-      api.get('ledger-accounts'),
-      api.get('ledger-entries'),
-      api.get('staff'),
-      api.get('payroll-runs'),
+      api.fetchAll('students'),
+      api.fetchAll('fee-plans'),
+      api.fetchAll('payments'),
+      api.fetchAll('installments'),
+      api.fetchAll('expenses'),
+      api.fetchAll('expense-categories'),
+      api.fetchAll('ledger-accounts'),
+      api.fetchAll('ledger-entries'),
+      api.fetchAll('staff'),
+      api.fetchAll('payroll-runs'),
       api.get('reports/finance')
     ]);
 

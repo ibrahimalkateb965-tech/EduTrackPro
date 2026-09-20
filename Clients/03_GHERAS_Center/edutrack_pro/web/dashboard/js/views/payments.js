@@ -108,12 +108,12 @@ function syncTabs() {
 }
 
 async function refreshPlans(api) {
-  try { feePlans = toList(await api.get('fee-plans')); } catch (error) { toast(error.message, true); }
+  try { feePlans = toList(await api.fetchAll('fee-plans')); } catch (error) { toast(error.message, true); }
   paintPlans();
 }
 
 async function refreshPayments(api) {
-  const results = await Promise.allSettled([api.get('payments'), api.get('reports/finance'), api.get('installments')]);
+  const results = await Promise.allSettled([api.fetchAll('payments'), api.get('reports/finance'), api.fetchAll('installments')]);
   const [paymentsRes, financeRes, installmentsRes] = results;
   if (paymentsRes.status === 'fulfilled') payments = toList(paymentsRes.value); else toast(paymentsRes.reason?.message || 'تعذر تحميل المدفوعات', true);
   if (financeRes.status === 'fulfilled') finance = financeRes.value || {}; else toast(financeRes.reason?.message || 'تعذر تحميل البيانات المالية', true);
@@ -206,10 +206,10 @@ function openPaymentForm(api) {
 
 async function loadAll(api) {
   const results = await Promise.allSettled([
-    api.get('students'),
-    api.get('fee-plans'),
-    api.get('payments'),
-    api.get('installments'),
+    api.fetchAll('students'),
+    api.fetchAll('fee-plans'),
+    api.fetchAll('payments'),
+    api.fetchAll('installments'),
     api.get('reports/finance')
   ]);
   const [studentsRes, plansRes, paymentsRes, installmentsRes, financeRes] = results;

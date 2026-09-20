@@ -104,9 +104,9 @@ export async function render(container, api) {
   rooms = [];
   let audit = [];
 
-  try { students = toList(await api.get('students')); } catch (error) { toast(error.message, true); }
-  try { rooms = toList(await api.get('rooms')); } catch (error) { toast(error.message, true); }
-  try { audit = toList(await api.get('audit-log')); } catch (error) { toast(error.message, true); }
+  try { students = toList(await api.fetchAll('students')); } catch (error) { toast(error.message, true); }
+  try { rooms = toList(await api.fetchAll('rooms')); } catch (error) { toast(error.message, true); }
+  try { audit = toList(await api.fetchAll('audit-log')); } catch (error) { toast(error.message, true); }
 
   const isFinanceAllowed = !api.currentUser || api.currentUser.role === 'manager' || api.currentUser.permissions?.finance;
   const financeDocs = ['receipt', 'admin_report', 'monthly_report', 'student_receipt', 'statistics_report'];

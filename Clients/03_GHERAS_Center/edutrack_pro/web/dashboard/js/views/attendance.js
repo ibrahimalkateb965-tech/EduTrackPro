@@ -338,7 +338,7 @@ export async function render(container, api) {
   );
 
   try {
-    students = toList(await api.get('students')).filter(student => (student.status || 'active') === 'active');
+    students = toList(await api.fetchAll('students')).filter(student => (student.status || 'active') === 'active');
   } catch (error) {
     toast(error.message, true);
   }

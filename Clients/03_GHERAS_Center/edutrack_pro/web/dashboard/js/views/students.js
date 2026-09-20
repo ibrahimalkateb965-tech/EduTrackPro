@@ -194,7 +194,7 @@ function paint(api) {
 
 async function reload(api) {
   try {
-    students = toList(await api.get('students'));
+    students = toList(await api.fetchAll('students'));
   } catch (error) {
     toast(error.message, true);
   }
@@ -407,6 +407,6 @@ export async function render(container, api) {
       tbody
     ))
   );
-  try { rooms = toList(await api.get('rooms')); } catch (error) { toast('تعذر تحميل قائمة الفصول', true); }
+  try { rooms = toList(await api.fetchAll('rooms')); } catch (error) { toast('تعذر تحميل قائمة الفصول', true); }
   await reload(api);
 }

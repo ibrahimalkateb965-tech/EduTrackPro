@@ -11,4 +11,21 @@ async function request(path, options = {}) {
   if (!response.ok) throw new Error(data?.error?.message || data?.error?.code || 'تعذر إكمال الطلب');
   return data;
 }
-export const api = { get: path => request(path), post: (path, body) => request(path, { method: 'POST', body }), patch: (path, body) => request(path, { method: 'PATCH', body }), put: (path, body) => request(path, { method: 'PUT', body }), del: path => request(path, { method: 'DELETE' }) };
+const PAGE = 500, HARD_CAP = 20000;
+// Walks a paginated list endpoint ({items,total,limit,offset}) and returns the full array.
+// First page reveals `total`; remaining pages are fetched in parallel. Unpaginated (array) responses pass through.
+async function fetchAll(path) {
+  const sep = path.includes('?') ? '&' : '?';
+  const page = n => request(`${path}${sep}limit=${PAGE}&offset=${n * PAGE}`);
+  const first = await page(0);
+  if (Array.isArray(first)) return first;
+  const items = [...(first?.items || [])];
+  const total = Math.min(Number(first?.total) || items.length, HARD_CAP);
+  const pages = Math.ceil(total / PAGE);
+  if (pages > 1) {
+    const rest = await Promise.all(Array.from({ length: pages - 1 }, (_, i) => page(i + 1)));
+    for (const p of rest) items.push(...(p?.items || []));
+  }
+  return items;
+}
+export const api = { get: path => request(path), fetchAll, post: (path, body) => request(path, { method: 'POST', body }), patch: (path, body) => request(path, { method: 'PATCH', body }), put: (path, body) => request(path, { method: 'PUT', body }), del: path => request(path, { method: 'DELETE' }) };

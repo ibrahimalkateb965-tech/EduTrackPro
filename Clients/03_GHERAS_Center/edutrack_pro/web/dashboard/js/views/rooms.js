@@ -398,7 +398,7 @@ function paintSchedules() {
 async function loadSchedules() {
   schedules = [];
   if (currentRoomId) {
-    try { schedules = toList(await viewApi.get(`schedules?room_id=${currentRoomId}`)); } catch (error) { toast(error.message, true); }
+    try { schedules = toList(await viewApi.fetchAll(`schedules?room_id=${currentRoomId}`)); } catch (error) { toast(error.message, true); }
   }
   schedules.sort((a, b) => (DAY_ORDER.get(a.day) ?? 99) - (DAY_ORDER.get(b.day) ?? 99) || String(a.start_time).localeCompare(String(b.start_time)));
   printLink.setAttribute('href', currentRoomId ? `../print/templates/schedule.html?room=${currentRoomId}` : '#');
@@ -406,10 +406,10 @@ async function loadSchedules() {
 }
 
 async function reload() {
-  try { rooms = toList(await viewApi.get('rooms')); } catch (error) { toast(error.message, true); }
+  try { rooms = toList(await viewApi.fetchAll('rooms')); } catch (error) { toast(error.message, true); }
   const [staffList, teacherList] = await Promise.all([
-    viewApi.get('staff').then(toList).catch(error => { toast(error.message, true); return []; }),
-    viewApi.get('users?role=teacher').then(toList).catch(error => { toast(error.message, true); return []; })
+    viewApi.fetchAll('staff').then(toList).catch(error => { toast(error.message, true); return []; }),
+    viewApi.fetchAll('users?role=teacher').then(toList).catch(error => { toast(error.message, true); return []; })
   ]);
   staff = staffList;
   teachers = teacherList;

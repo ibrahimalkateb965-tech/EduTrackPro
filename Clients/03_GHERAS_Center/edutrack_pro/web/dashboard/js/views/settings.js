@@ -301,7 +301,7 @@ export async function render(container, api) {
         el('tr', {}, el('td', { colspan: '5', class: 'muted', style: 'text-align:center;' }, 'جاري تحديث المستخدمين...'))
       );
       try {
-        const users = await api.get('users');
+        const users = await api.fetchAll('users');
         const list = Array.isArray(users) ? users : users.items || [];
         usersTableBody.replaceChildren();
 
@@ -478,11 +478,11 @@ export async function render(container, api) {
     toast('جاري تجهيز النسخة الاحتياطية...');
     try {
       const [students, rooms, payments, expenses, staff] = await Promise.all([
-        api.get('students').catch(() => []),
-        api.get('rooms').catch(() => []),
-        api.get('payments').catch(() => []),
-        api.get('expenses').catch(() => []),
-        api.get('staff').catch(() => []),
+        api.fetchAll('students').catch(() => []),
+        api.fetchAll('rooms').catch(() => []),
+        api.fetchAll('payments').catch(() => []),
+        api.fetchAll('expenses').catch(() => []),
+        api.fetchAll('staff').catch(() => []),
       ]);
       const backupData = {
         exported_at: new Date().toISOString(),

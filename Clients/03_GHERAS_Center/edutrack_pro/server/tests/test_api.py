@@ -282,3 +282,20 @@ def test_ledger_transfer_posts_matched_pair(db, client, manager):
     assert same.status_code == 422
     plain = client.post(f"{API}/ledger-entries", json={"account_id": bank["id"], "entry_type": "in", "amount": 10, "occurred_on": "2026-09-10"}, headers=manager)
     assert plain.status_code == 200 and plain.json()["entry_type"] == "in"
+
+
+def test_students_pagination_past_100(db, client, manager):
+    """Phase 4 (c): the dashboard walks pages of 500; prove the server envelope beyond the default limit=100."""
+    db.execute(
+        "INSERT INTO students (name, group_name) SELECT 'طالب ' || g, 'الصباح' FROM generate_series(1, 150) g"
+    )
+    db.commit()
+    default = client.get(f"{API}/students", headers=manager).json()
+    assert default["total"] == 150 and len(default["items"]) == 100 and default["limit"] == 100
+    tail = client.get(f"{API}/students?limit=100&offset=100", headers=manager).json()
+    assert tail["total"] == 150 and len(tail["items"]) == 50 and tail["offset"] == 100
+    full = client.get(f"{API}/students?limit=500&offset=0", headers=manager).json()
+    assert len(full["items"]) == 150
+    ids = [row["id"] for row in default["items"]] + [row["id"] for row in tail["items"]]
+    assert ids == [row["id"] for row in full["items"]], "offset walk must be stable and gap-free"
+    assert client.get(f"{API}/students?limit=501", headers=manager).status_code == 422

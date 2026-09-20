@@ -130,13 +130,13 @@ function paint(api) {
 
 async function reload(api) {
   try {
-    staff = toList(await api.get('staff'));
+    staff = toList(await api.fetchAll('staff'));
   } catch (error) {
     toast(error.message, true);
   }
   if (activeTab === 'absences') {
     try {
-      absences = toList(await api.get('staff-attendance'));
+      absences = toList(await api.fetchAll('staff-attendance'));
     } catch (error) {
       toast('تعذر تحميل سجلات غياب الموظفين', true);
     }
@@ -434,6 +434,6 @@ export async function render(container, api) {
     el('div', { class: 'table-wrap' }, el('table', {}, theadEl, tbody))
   );
 
-  try { rooms = toList(await api.get('rooms')); } catch (error) { toast('تعذر تحميل الحلقات', true); }
+  try { rooms = toList(await api.fetchAll('rooms')); } catch (error) { toast('تعذر تحميل الحلقات', true); }
   await reload(api);
 }

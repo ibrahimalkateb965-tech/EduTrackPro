@@ -149,11 +149,11 @@ export async function render(container, api) {
   paymentsList = [];
   attendanceList = [];
 
-  try { studentsList = toList(await api.get('students')); } catch (e) { toast(e.message, true); }
-  try { roomsList = toList(await api.get('rooms')); } catch (e) {}
-  try { messagesList = toList(await api.get('messages')); } catch (e) {}
-  try { feePlansList = toList(await api.get('fee-plans')); } catch (e) {}
-  try { paymentsList = toList(await api.get('payments')); } catch (e) {}
+  try { studentsList = toList(await api.fetchAll('students')); } catch (e) { toast(e.message, true); }
+  try { roomsList = toList(await api.fetchAll('rooms')); } catch (e) {}
+  try { messagesList = toList(await api.fetchAll('messages')); } catch (e) {}
+  try { feePlansList = toList(await api.fetchAll('fee-plans')); } catch (e) {}
+  try { paymentsList = toList(await api.fetchAll('payments')); } catch (e) {}
   attendanceList = await loadAttendance(api);
 
   // Filter out deleted students
@@ -658,10 +658,10 @@ function renderDirectory(api, onComposeForStudent) {
 // -------------------------------------------------------------
 export async function openComposerModal(api, studentId = null, defaultTemplate = null) {
   if (!studentsList.length) {
-    try { studentsList = toList(await api.get('students')); } catch (e) {}
-    try { roomsList = toList(await api.get('rooms')); } catch (e) {}
-    try { feePlansList = toList(await api.get('fee-plans')); } catch (e) {}
-    try { paymentsList = toList(await api.get('payments')); } catch (e) {}
+    try { studentsList = toList(await api.fetchAll('students')); } catch (e) {}
+    try { roomsList = toList(await api.fetchAll('rooms')); } catch (e) {}
+    try { feePlansList = toList(await api.fetchAll('fee-plans')); } catch (e) {}
+    try { paymentsList = toList(await api.fetchAll('payments')); } catch (e) {}
     attendanceList = await loadAttendance(api);
   }
   const todayStr = new Intl.DateTimeFormat('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());

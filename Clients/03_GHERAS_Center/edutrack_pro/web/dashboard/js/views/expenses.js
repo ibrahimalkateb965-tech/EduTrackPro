@@ -58,7 +58,7 @@ function paint(api) {
 
 async function reload(api) {
   try {
-    expenses = toList(await api.get('expenses'));
+    expenses = toList(await api.fetchAll('expenses'));
   } catch (error) {
     toast(error.message, true);
   }
@@ -111,8 +111,8 @@ export async function render(container, api) {
   accounts = [];
   categoryFilter = '';
   container.replaceChildren();
-  try { categories = toList(await api.get('expense-categories')); } catch (error) { toast('تعذر تحميل تصنيفات المصروفات', true); }
-  try { accounts = toList(await api.get('ledger-accounts')); } catch (error) { toast('تعذر تحميل الحسابات', true); }
+  try { categories = toList(await api.fetchAll('expense-categories')); } catch (error) { toast('تعذر تحميل تصنيفات المصروفات', true); }
+  try { accounts = toList(await api.fetchAll('ledger-accounts')); } catch (error) { toast('تعذر تحميل الحسابات', true); }
   const filter = el('select', { 'aria-label': 'تصفية بالتصنيف' });
   filter.append(el('option', { value: '' }, 'كل التصنيفات'));
   categories.forEach(category => filter.append(el('option', { value: category.id }, category.name)));

@@ -70,12 +70,12 @@ function saveShortcuts(ids) {
 function triggerBackup(api) {
   toast('جاري تجهيز النسخة الاحتياطية...');
   Promise.all([
-    api.get('students').catch(() => []),
-    api.get('rooms').catch(() => []),
-    api.get('payments').catch(() => []),
-    api.get('expenses').catch(() => []),
-    api.get('staff').catch(() => []),
-    api.get('ledger-accounts').catch(() => [])
+    api.fetchAll('students').catch(() => []),
+    api.fetchAll('rooms').catch(() => []),
+    api.fetchAll('payments').catch(() => []),
+    api.fetchAll('expenses').catch(() => []),
+    api.fetchAll('staff').catch(() => []),
+    api.fetchAll('ledger-accounts').catch(() => [])
   ]).then(([students, rooms, payments, expenses, staff, accounts]) => {
     const backupData = {
       exported_at: new Date().toISOString(),
