@@ -90,3 +90,100 @@ def read_notification(notification_id: UUID, scope: Scope = _SCOPE, conn=_CONN) 
     if row is None:
         raise ApiError(404, "not_found")
     return row_to_json(row)
+
+
+# ---- batch 2 ---------------------------------------------------------------
+
+
+@router.get("/attendance")
+def list_attendance(
+    limit: int = 100,
+    offset: int = 0,
+    student_id: UUID | None = None,
+    date_from: dt.date | None = None,
+    date_to: dt.date | None = None,
+    scope: Scope = _SCOPE,
+    conn=_CONN,
+) -> dict:
+    _page(limit, offset)
+    filters = {"student_id": student_id, "date_from": date_from, "date_to": date_to}
+    rows, total = me_repo.list_attendance(conn, scope, filters, limit, offset)
+    return _envelope(rows, total, limit, offset)
+
+
+@router.get("/evaluations")
+def list_evaluations(
+    limit: int = 100,
+    offset: int = 0,
+    student_id: UUID | None = None,
+    eval_type: str | None = None,
+    date_from: dt.date | None = None,
+    date_to: dt.date | None = None,
+    scope: Scope = _SCOPE,
+    conn=_CONN,
+) -> dict:
+    _page(limit, offset)
+    filters = {"student_id": student_id, "eval_type": eval_type, "date_from": date_from, "date_to": date_to}
+    rows, total = me_repo.list_evaluations(conn, scope, filters, limit, offset)
+    return _envelope(rows, total, limit, offset)
+
+
+@router.get("/assignments")
+def list_assignments(
+    limit: int = 100,
+    offset: int = 0,
+    student_id: UUID | None = None,
+    due_from: dt.date | None = None,
+    due_to: dt.date | None = None,
+    scope: Scope = _SCOPE,
+    conn=_CONN,
+) -> dict:
+    _page(limit, offset)
+    filters = {"student_id": student_id, "due_from": due_from, "due_to": due_to}
+    rows, total = me_repo.list_assignments(conn, scope, filters, limit, offset)
+    return _envelope(rows, total, limit, offset)
+
+
+@router.get("/submissions")
+def list_submissions(
+    limit: int = 100,
+    offset: int = 0,
+    assignment_id: UUID | None = None,
+    student_id: UUID | None = None,
+    scope: Scope = _SCOPE,
+    conn=_CONN,
+) -> dict:
+    _page(limit, offset)
+    filters = {"assignment_id": assignment_id, "student_id": student_id}
+    rows, total = me_repo.list_submissions(conn, scope, filters, limit, offset)
+    return _envelope(rows, total, limit, offset)
+
+
+@router.get("/lesson-logs")
+def list_lesson_logs(
+    limit: int = 100,
+    offset: int = 0,
+    schedule_id: UUID | None = None,
+    date_from: dt.date | None = None,
+    date_to: dt.date | None = None,
+    scope: Scope = _SCOPE,
+    conn=_CONN,
+) -> dict:
+    _page(limit, offset)
+    filters = {"schedule_id": schedule_id, "date_from": date_from, "date_to": date_to}
+    rows, total = me_repo.list_lesson_logs(conn, scope, filters, limit, offset)
+    return _envelope(rows, total, limit, offset)
+
+
+@router.get("/skill-progress")
+def list_skill_progress(
+    limit: int = 100,
+    offset: int = 0,
+    student_id: UUID | None = None,
+    subject: str | None = None,
+    scope: Scope = _SCOPE,
+    conn=_CONN,
+) -> dict:
+    _page(limit, offset)
+    rows, total = me_repo.list_skill_progress(conn, scope, {"student_id": student_id, "subject": subject}, limit, offset)
+    return _envelope(rows, total, limit, offset)

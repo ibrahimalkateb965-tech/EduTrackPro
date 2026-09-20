@@ -135,3 +135,116 @@ def mark_notification_read(conn, scope: Scope, notification_id: UUID) -> dict | 
         "WHERE id = %s AND user_id = %s AND deleted_at IS NULL RETURNING *",
         (notification_id, scope.user_id),
     ).fetchone()
+
+
+# ---- batch 2: attendance, evaluations, assignments, submissions, lesson-logs, skill-progress ----
+
+_LESSON_LOG_COLS = (
+    "l.id, l.branch_id, l.schedule_id, l.date, l.status, l.covered, l.homework, l.teacher_user_id, "
+    "l.created_at, l.updated_at, sc.room_id, sc.day, sc.start_time, sc.end_time, sc.subject, r.name AS room_name"
+)
+_LESSON_FROM = "lesson_logs l JOIN schedules sc ON sc.id = l.schedule_id JOIN rooms r ON r.id = sc.room_id"
+
+_SUBMISSION_FILES = (
+    "(SELECT COALESCE(json_agg(json_build_object('id', f.id, 'storage_key', f.storage_key, "
+    "'width', f.width, 'height', f.height) ORDER BY f.created_at, f.id), '[]'::json) "
+    "FROM submission_files f WHERE f.submission_id = sb.id AND f.deleted_at IS NULL) AS files"
+)
+
+# student ids linked to an assignment, intersected with the caller's scope
+_ASSIGNMENT_STUDENTS = (
+    "(SELECT COALESCE(array_agg(x.student_id ORDER BY x.student_id), '{}') FROM assignment_students x "
+    "WHERE x.assignment_id = a.id AND x.deleted_at IS NULL AND x.student_id = ANY(%(student_ids)s)) AS student_ids"
+)
+
+
+def list_attendance(conn, scope: Scope, filters: dict, limit: int, offset: int) -> Rows:
+    if not scope.student_ids:
+        return [], 0
+    where, params = _student_where(scope, "a")
+    _opt(where, params, filters, "student_id", "a.student_id = %(student_id)s")
+    _opt(where, params, filters, "date_from", "a.date >= %(date_from)s")
+    _opt(where, params, filters, "date_to", "a.date <= %(date_to)s")
+    sql = _select("a.*, s.name AS student_name", "student_attendance a JOIN students s ON s.id = a.student_id", where, "a.date DESC, a.id")
+    return _run(conn, sql, params, limit, offset)
+
+
+def list_evaluations(conn, scope: Scope, filters: dict, limit: int, offset: int) -> Rows:
+    if not scope.student_ids:
+        return [], 0
+    where, params = _student_where(scope, "e")
+    _opt(where, params, filters, "student_id", "e.student_id = %(student_id)s")
+    _opt(where, params, filters, "eval_type", "e.eval_type = %(eval_type)s")
+    _opt(where, params, filters, "date_from", "e.date >= %(date_from)s")
+    _opt(where, params, filters, "date_to", "e.date <= %(date_to)s")
+    sql = _select("e.*, s.name AS student_name", "evaluations e JOIN students s ON s.id = e.student_id", where, "e.date DESC, e.id")
+    return _run(conn, sql, params, limit, offset)
+
+
+def list_assignments(conn, scope: Scope, filters: dict, limit: int, offset: int) -> Rows:
+    if not scope.student_ids:
+        return [], 0
+    where = ["a.deleted_at IS NULL"]
+    params: dict = {"student_ids": list(scope.student_ids)}
+    narrow = ""
+    if filters.get("student_id") is not None:
+        narrow = " AND x.student_id = %(student_id)s"
+        params["student_id"] = filters["student_id"]
+    linked = (
+        "EXISTS (SELECT 1 FROM assignment_students x WHERE x.assignment_id = a.id AND x.deleted_at IS NULL "
+        f"AND x.student_id = ANY(%(student_ids)s){narrow})"
+    )
+    if scope.role == "teacher" and not narrow:
+        where.append(f"(a.teacher_user_id = %(user_id)s OR {linked})")
+        params["user_id"] = scope.user_id
+    else:
+        where.append(linked)
+    _opt(where, params, filters, "due_from", "a.due_date >= %(due_from)s")
+    _opt(where, params, filters, "due_to", "a.due_date <= %(due_to)s")
+    sql = _select(f"a.*, {_ASSIGNMENT_STUDENTS}", "assignments a", where, "a.due_date DESC, a.id")
+    return _run(conn, sql, params, limit, offset)
+
+
+def list_submissions(conn, scope: Scope, filters: dict, limit: int, offset: int) -> Rows:
+    if not scope.student_ids:
+        return [], 0
+    where, params = _student_where(scope, "sb")
+    _opt(where, params, filters, "assignment_id", "sb.assignment_id = %(assignment_id)s")
+    _opt(where, params, filters, "student_id", "sb.student_id = %(student_id)s")
+    sql = _select(
+        f"sb.*, a.title AS assignment_title, s.name AS student_name, {_SUBMISSION_FILES}",
+        "submissions sb JOIN assignments a ON a.id = sb.assignment_id JOIN students s ON s.id = sb.student_id",
+        where,
+        "sb.submitted_at DESC, sb.id",
+    )
+    return _run(conn, sql, params, limit, offset)
+
+
+def list_lesson_logs(conn, scope: Scope, filters: dict, limit: int, offset: int) -> Rows:
+    where = ["l.deleted_at IS NULL"]
+    if scope.role == "teacher":
+        if not scope.room_ids:
+            return [], 0
+        where.append("(l.teacher_user_id = %(user_id)s OR sc.room_id = ANY(%(room_ids)s))")
+        params: dict = {"user_id": scope.user_id, "room_ids": list(scope.room_ids)}
+        cols = _LESSON_LOG_COLS + ", l.notes"  # internal notes: teacher only (§3.4)
+    else:
+        if not scope.student_ids:
+            return [], 0
+        where.append(f"sc.room_id IN {_CHILD_ROOMS}")
+        params = {"student_ids": list(scope.student_ids)}
+        cols = _LESSON_LOG_COLS
+    _opt(where, params, filters, "schedule_id", "l.schedule_id = %(schedule_id)s")
+    _opt(where, params, filters, "date_from", "l.date >= %(date_from)s")
+    _opt(where, params, filters, "date_to", "l.date <= %(date_to)s")
+    return _run(conn, _select(cols, _LESSON_FROM, where, "l.date DESC, l.id"), params, limit, offset)
+
+
+def list_skill_progress(conn, scope: Scope, filters: dict, limit: int, offset: int) -> Rows:
+    if not scope.student_ids:
+        return [], 0
+    where, params = _student_where(scope, "sp")
+    _opt(where, params, filters, "student_id", "sp.student_id = %(student_id)s")
+    _opt(where, params, filters, "subject", "sp.subject = %(subject)s")
+    sql = _select("sp.*, s.name AS student_name", "skill_progress sp JOIN students s ON s.id = sp.student_id", where, "sp.date DESC, sp.id")
+    return _run(conn, sql, params, limit, offset)
