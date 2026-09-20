@@ -4,8 +4,8 @@
 > **Master Orchestrator**: `Claude Code CLI` (Opus Max / Sonnet 5)  
 > **Handoff Source**: `Antigravity IDE` (Interactive Cockpit & Visual Inspector)  
 > **Timestamp**: 2026-09-16T12:55:00+03:00  
-> **Last updated:** 2026-09-20 10:43 — pre-clear freeze (Hook 25) at `1945d95`, level with `origin/main`; Phase 4 (b) **[APPROVED]** (§5f), pushed and **deployed**: production `v=2.9` + `/api/v1/health` 200 verified by public `curl` (006 applied by `deploy.sh`; DB-side row check in §5f deploy note 4 still Ibrahim's to paste) — Claude Code CLI  
-> **VCS:** git at workspace root, branch `main`, HEAD `9d23862` — **level with `origin/main`, push pending: no**. Phase 1 = `fc071f6`, Phase 2 = `a28299b`, Phase 2.5 = `eabac22`, Phase 3 audit = `52ce581` + `6e2e434` + `469e280` (all [APPROVED]). **Working tree clean** (Ibrahim committed the §5d-approved tree at 08:22, superseding his earlier `keep`). Remote `origin` = https://github.com/ibrahimalkateb965-tech/EduTrackPro.git. Quarantine enforced by root `.gitignore` (Rule 8).  
+> **Last updated:** 2026-09-20 13:23 — pre-clear freeze (Hook 25) at `d7aad49`, level with `origin/main` (pushed by Ibrahim); Phase 4 (a) nightly backup **[APPROVED]** (§5g) committed as `f276ad6`; **VPS deploy of the backup timer not yet confirmed** (needs `push.sh` + `list-timers` paste-back) — Claude Code CLI  
+> **VCS:** git at workspace root, branch `main`, HEAD `d7aad49` — **level with `origin/main`, push pending: no**. Phase 4 (a) = `f276ad6`, Phase 4 (b) = `1945d95`. Phase 1 = `fc071f6`, Phase 2 = `a28299b`, Phase 2.5 = `eabac22`, Phase 3 audit = `52ce581` + `6e2e434` + `469e280` (all [APPROVED]). **Working tree clean** (Ibrahim committed the §5d-approved tree at 08:22, superseding his earlier `keep`). Remote `origin` = https://github.com/ibrahimalkateb965-tech/EduTrackPro.git. Quarantine enforced by root `.gitignore` (Rule 8).  
 
 ---
 
@@ -325,11 +325,11 @@ No web changes: `v=2.9` stays. First timer fire 2026-09-21 03:00 UTC. Monthly re
 
 ---
 
-## 6. THE ONE THING TO DO NEXT (updated 2026-09-20 12:20, Phase 4 (a) committed, awaiting push/deploy)
+## 6. THE ONE THING TO DO NEXT (updated 2026-09-20 13:23, Phase 4 (a) pushed, VPS deploy unconfirmed)
 
-HEAD is `f276ad6` on `main`, **[ahead 1] of `origin/main`** (Phase 4 (a) commit, not yet pushed), **working tree clean**. Production = **v=2.9, migrations 001–006**, backup timer NOT yet installed (needs `push.sh`, §5g). Phase 3 **[APPROVED]** (§5e), Phase 4 (b) **[APPROVED]** (§5f) and live, Phase 4 (a) **[APPROVED]** (§5g) awaiting deploy. Two lessons flushed to `.agents/MEMORY_STORE.md` (`users.staff_id` not unique → `UPDATE 2`; public `curl` allowed for post-deploy checks). Ibrahim picks Phase 4:
+HEAD is `d7aad49` on `main`, **level with `origin/main`** (pushed), **working tree clean**. Production = **v=2.9, migrations 001–006**; backup timer install **unconfirmed** — if `push.sh` has not run since `f276ad6`, that is the first action (§5g deploy notes), then paste back `systemctl list-timers edutrack-backup.timer`. Phase 3 **[APPROVED]** (§5e), Phase 4 (b) **[APPROVED]** (§5f) and live, Phase 4 (a) **[APPROVED]** (§5g) awaiting deploy. Two lessons flushed to `.agents/MEMORY_STORE.md` (`users.staff_id` not unique → `UPDATE 2`; public `curl` allowed for post-deploy checks). Ibrahim picks Phase 4:
 
-- **(a)** ✅ **DONE 2026-09-20 (§5g), commit `f276ad6`** — `deploy/backup.sh` + `edutrack-backup.{service,timer}` installed by `deploy.sh`; restore drill in `DEPLOY.md`. **Next action = Ibrahim: `git push` + `push.sh`, paste back `systemctl list-timers edutrack-backup.timer`.**
+- **(a)** ✅ **DONE 2026-09-20 (§5g), commit `f276ad6`, pushed** — `deploy/backup.sh` + `edutrack-backup.{service,timer}` installed by `deploy.sh`; restore drill in `DEPLOY.md`. Remaining: Ibrahim runs `push.sh` (if not done) and pastes back `systemctl list-timers edutrack-backup.timer` + `ls -lh /opt/edutrack/backups`; Claude re-checks `/api/v1/health` 200 publicly.
 - **(b)** ✅ **DONE 2026-09-20 (§5f)** — Settings-driven `academic_year` — `settings` table + `006` migration (OpenCode Worker B), `print.py` reads it instead of the hard-coded `1447-1448 هـ`, a settings-view field; Claude tests on embedded PG. Bundle the `users(staff_id)` partial unique index into 006.
 - **(c)** Pagination past `limit=100` — `fetchAll` helper in `api.js` (offset loop, ≤ 500 per page) and switch the views; Claude verifies with `node --check` + a seeded 150-student run.
 - **(e)** Print-template identity pass — bind `{{center_name}}`, `{{center_phone}}`, `{{center_address}}`, `{{manager_title}}`, `{{manager_name}}` in the 11 `web/print/templates/*.html` headers (payload already carries them since §5f); Cline Worker C edits templates in batches of 4, Claude runs `test_print.py` + a rendered-HTML grep for the hard-coded «مركز غراس» / «حوطة بني تميم».
