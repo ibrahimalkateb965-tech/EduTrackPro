@@ -4,7 +4,7 @@
 > **Master Orchestrator**: `Claude Code CLI` (Opus Max / Sonnet 5)  
 > **Handoff Source**: `Antigravity IDE` (Interactive Cockpit & Visual Inspector)  
 > **Timestamp**: 2026-09-16T12:55:00+03:00  
-> **Last updated:** 2026-09-20 — Phase 4 (b) settings-driven center identity + migration 006 **[APPROVED]** (§5f) and **committed** (`feat(settings)` on top of `877589c`), 006 hardened with the named stray soft-delete (§5f step 3a), pytest 52/52 re-run; production still v=2.8 / 005 until Ibrahim pushes + deploys — Claude Code CLI  
+> **Last updated:** 2026-09-20 10:43 — pre-clear freeze (Hook 25) at `1945d95`, level with `origin/main`; Phase 4 (b) **[APPROVED]** (§5f), pushed and **deployed**: production `v=2.9` + `/api/v1/health` 200 verified by public `curl` (006 applied by `deploy.sh`; DB-side row check in §5f deploy note 4 still Ibrahim's to paste) — Claude Code CLI  
 > **VCS:** git at workspace root, branch `main`, HEAD `9d23862` — **level with `origin/main`, push pending: no**. Phase 1 = `fc071f6`, Phase 2 = `a28299b`, Phase 2.5 = `eabac22`, Phase 3 audit = `52ce581` + `6e2e434` + `469e280` (all [APPROVED]). **Working tree clean** (Ibrahim committed the §5d-approved tree at 08:22, superseding his earlier `keep`). Remote `origin` = https://github.com/ibrahimalkateb965-tech/EduTrackPro.git. Quarantine enforced by root `.gitignore` (Rule 8).  
 
 ---
@@ -282,7 +282,11 @@ First run of **Cline CLI v3.0.62** as Worker C (`cline --auto-approve true -c <d
 
 ### Verdict: **[APPROVED]** — 8 modified + 4 new files, committed as `feat(settings): implement system settings, dynamic academic year, and staff deduplication`.
 
-### Deploy notes for Ibrahim (production SSH stays his action)
+### Deploy notes for Ibrahim (production SSH stays his action) — **executed 2026-09-20** (push + `push.sh`); Claude verified `v=2.9` and `/api/v1/health` 200 from the public side. Note 4 (DB row check) not yet pasted back.
+
+4. Optional evidence paste: `docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env exec -T db psql -U postgres -d gheras_edutrack -c "SELECT id, username, is_active, deleted_at FROM users WHERE staff_id = '20cf6983-c352-4f6f-86f5-611f5f725020' ORDER BY created_at;"` → expect one live row, `c0997630-…` retired.
+
+### Original deploy notes
 1. `print.py` changed → **full push** (`bash deploy/push.sh root@187.55.226.225 gheras.autovem.tech -i ~/.ssh/edutrack_deploy_key`), not a base64 hot-fix. `deploy.sh` applies 006 in the incremental loop.
 2. 006 soft-deletes the named stray `users` row `c0997630-1d40-43f2-8efa-be8b3c46d322` (`معلم ،1`) for `staff_id 20cf6983-…` by id (step 3a), then the generic dedupe guards any other pair. No pre-deploy SELECT needed unless the teacher actually logs in as `معلم ،1`.
 3. After deploy: `curl -s https://gheras.autovem.tech/web/dashboard/ | grep -o 'v=2\.[0-9]*'` → `v=2.9`; the manager sees the new card under «الإعدادات» and the guardian card prints the settings year.
@@ -293,13 +297,14 @@ First run of **Cline CLI v3.0.62** as Worker C (`cline --auto-approve true -c <d
 
 ---
 
-## 6. THE ONE THING TO DO NEXT (updated 2026-09-20, Phase 4 (b) done)
+## 6. THE ONE THING TO DO NEXT (updated 2026-09-20 10:43, Phase 4 (b) deployed)
 
-HEAD is the `feat(settings)` commit on `main`, **[ahead 1] of `origin/main`** (`877589c`), working tree clean after commit; Ibrahim pushes. Production = v=2.8, migrations 001–005 until the §5f deploy notes are executed (then v=2.9 / 006). Phase 3 **[APPROVED]** (§5e), Phase 4 (b) **[APPROVED]** (§5f). Two lessons flushed to `.agents/MEMORY_STORE.md` (`users.staff_id` not unique → `UPDATE 2`; public `curl` allowed for post-deploy checks). Ibrahim picks Phase 4:
+HEAD is `1945d95` on `main`, **level with `origin/main`** (pushed), **working tree clean**, no untracked project files. Production = **v=2.9, migrations 001–006** (`/api/v1/health` 200 at 10:43). Phase 3 **[APPROVED]** (§5e), Phase 4 (b) **[APPROVED]** (§5f) and live. Two lessons flushed to `.agents/MEMORY_STORE.md` (`users.staff_id` not unique → `UPDATE 2`; public `curl` allowed for post-deploy checks). Ibrahim picks Phase 4:
 
 - **(a)** Nightly `pg_dump` backup — `deploy/backup.sh` (`docker compose exec -T db pg_dump -Fc` → `/opt/edutrack/backups/`, 14-day rotation) + `deploy/edutrack-backup.timer`/`.service` installed by `deploy.sh`; restore drill documented in `DEPLOY.md`. Worker A writes the shell, Claude validates with `bash -n` + a restore into embedded PG.
 - **(b)** ✅ **DONE 2026-09-20 (§5f)** — Settings-driven `academic_year` — `settings` table + `006` migration (OpenCode Worker B), `print.py` reads it instead of the hard-coded `1447-1448 هـ`, a settings-view field; Claude tests on embedded PG. Bundle the `users(staff_id)` partial unique index into 006.
 - **(c)** Pagination past `limit=100` — `fetchAll` helper in `api.js` (offset loop, ≤ 500 per page) and switch the views; Claude verifies with `node --check` + a seeded 150-student run.
+- **(e)** Print-template identity pass — bind `{{center_name}}`, `{{center_phone}}`, `{{center_address}}`, `{{manager_title}}`, `{{manager_name}}` in the 11 `web/print/templates/*.html` headers (payload already carries them since §5f); Cline Worker C edits templates in batches of 4, Claude runs `test_print.py` + a rendered-HTML grep for the hard-coded «مركز غراس» / «حوطة بني تميم».
 - **(d)** ✅ folded into 006 step 3a (§5f) — the stray row `c0997630-…` is retired by id on deploy; no manual SQL.
 
 Pre-conditions unchanged: free ≥ 4 GB RAM before running the fleet (never with Docker Desktop up), one `opencode run` at a time with ≤ 4 files per batch, Codex via `-s workspace-write`, embedded PG booter must stay alive in the background while pytest runs (`TEST_DATABASE_URL` = superuser URI for fixtures, `DATABASE_URL` = `gheras_app` URI for the API). Production SSH/DB stays Ibrahim's action (auto-mode classifier).
