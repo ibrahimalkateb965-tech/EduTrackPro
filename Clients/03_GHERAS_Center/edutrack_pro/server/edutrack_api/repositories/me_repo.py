@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from uuid import UUID
 
+from edutrack_api.audit import write_audit
+from edutrack_api.errors import ApiError
 from edutrack_api.scope import Scope
 from edutrack_api.services.settings import load_settings
 
@@ -248,3 +250,85 @@ def list_skill_progress(conn, scope: Scope, filters: dict, limit: int, offset: i
     _opt(where, params, filters, "subject", "sp.subject = %(subject)s")
     sql = _select("sp.*, s.name AS student_name", "skill_progress sp JOIN students s ON s.id = sp.student_id", where, "sp.date DESC, sp.id")
     return _run(conn, sql, params, limit, offset)
+
+
+# ---- batch 3: installments, receipts, POST lesson-logs ----------------------
+
+MSG_ROOM_OUT_OF_SCOPE = "الحلقة خارج نطاق صلاحيتك"
+
+
+def list_installments(conn, scope: Scope, filters: dict, limit: int, offset: int) -> Rows:
+    if not scope.student_ids:
+        return [], 0
+    where = ["i.deleted_at IS NULL", "fp.deleted_at IS NULL", "fp.student_id = ANY(%(student_ids)s)"]
+    params: dict = {"student_ids": list(scope.student_ids)}
+    _opt(where, params, filters, "student_id", "fp.student_id = %(student_id)s")
+    _opt(where, params, filters, "status", "i.status = %(status)s")
+    cols = "i.*, fp.student_id, s.name AS student_name, fp.total_amount AS plan_total, fp.count AS plan_count"
+    from_ = "installments i JOIN fee_plans fp ON fp.id = i.fee_plan_id JOIN students s ON s.id = fp.student_id"
+    return _run(conn, _select(cols, from_, where, "i.due_date, i.id"), params, limit, offset)
+
+
+def list_receipts(conn, scope: Scope, filters: dict, limit: int, offset: int) -> Rows:
+    if not scope.student_ids:
+        return [], 0
+    where = ["rc.deleted_at IS NULL", "p.deleted_at IS NULL", "p.student_id = ANY(%(student_ids)s)"]
+    params: dict = {"student_ids": list(scope.student_ids)}
+    _opt(where, params, filters, "student_id", "p.student_id = %(student_id)s")
+    cols = "rc.*, p.student_id, p.installment_id, p.amount, p.method, p.paid_on, s.name AS student_name"
+    from_ = "receipts rc JOIN payments p ON p.id = rc.payment_id JOIN students s ON s.id = p.student_id"
+    return _run(conn, _select(cols, from_, where, "rc.issued_on DESC, rc.id"), params, limit, offset)
+
+
+def upsert_lesson_log(conn, scope: Scope, body: dict) -> dict:
+    """SELECT-then-write on (schedule_id, date); no unique index exists (§3.2).
+
+    Pre-existing duplicates are tolerated: the most recently updated open row wins.
+    """
+    sched = conn.execute(
+        "SELECT room_id, branch_id FROM schedules WHERE id = %s AND deleted_at IS NULL",
+        (body["schedule_id"],),
+    ).fetchone()
+    if sched is None:
+        raise ApiError(404, "not_found")
+    if sched["room_id"] not in scope.room_ids:
+        raise ApiError(403, "forbidden", MSG_ROOM_OUT_OF_SCOPE)
+
+    existing = conn.execute(
+        "SELECT id FROM lesson_logs WHERE schedule_id = %s AND date = %s AND deleted_at IS NULL "
+        "ORDER BY updated_at DESC, id LIMIT 1",
+        (body["schedule_id"], body["date"]),
+    ).fetchone()
+    params = {
+        "schedule_id": body["schedule_id"],
+        "date": body["date"],
+        "status": body["status"],
+        "covered": body.get("covered"),
+        "homework": body.get("homework"),
+        "notes": body.get("notes"),
+        "user_id": scope.user_id,
+        "branch_id": sched["branch_id"],
+    }
+    if existing:
+        row = conn.execute(
+            "UPDATE lesson_logs SET status = %(status)s, covered = %(covered)s, homework = %(homework)s, "
+            "notes = %(notes)s, teacher_user_id = %(user_id)s, updated_at = now() "
+            "WHERE id = %(id)s RETURNING *",
+            {**params, "id": existing["id"]},
+        ).fetchone()
+    else:
+        row = conn.execute(
+            "INSERT INTO lesson_logs (branch_id, schedule_id, date, status, covered, homework, notes, teacher_user_id) "
+            "VALUES (%(branch_id)s, %(schedule_id)s, %(date)s, %(status)s, %(covered)s, %(homework)s, %(notes)s, %(user_id)s) "
+            "RETURNING *",
+            params,
+        ).fetchone()
+    write_audit(
+        conn,
+        scope.user_id,
+        "update",
+        "lesson_logs",
+        row["id"],
+        {"schedule_id": str(body["schedule_id"]), "date": body["date"].isoformat(), "status": body["status"]},
+    )
+    return row

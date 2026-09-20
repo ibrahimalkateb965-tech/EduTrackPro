@@ -2,7 +2,7 @@
 
 - **Owner**: Autovem Master Architect (Claude Code CLI)
 - **Client**: Gheras Center (`Clients/03_GHERAS_Center`)
-- **Status**: **[DESIGN COMPLETE — Sections 1–4 APPROVED by Ibrahim 2026-09-20; awaiting Ibrahim's review of this file before `superpowers:writing-plans`]**
+- **Status**: **[IMPLEMENTED — batches 0–3 [APPROVED] 2026-09-20; commits `d136a4b` (0a scope.py), `1be6f01` (0b tests), `9ee3705` (batch 1), `650e171` (batch 2), batch 3 = the commit that carries this line; 100 tests green on embedded PG 16; deploy pending]**
 - **Baseline**: `af6afff` on `main` (Phase 4 closed in production, v=3.0, migrations 001–006)
 - **Process**: superpowers brainstorming, architectural path. Sections 1–4 approved; self-review done 2026-09-20. Next: Ibrahim reviews this file → `superpowers:writing-plans` → batches per §4.4 (routers to OpenCode Worker B, `scope.py` + tests by Claude Code only).
 

@@ -6,12 +6,12 @@ Manager/supervisor are rejected by require_scope (403); role mismatches per rout
 
 from __future__ import annotations
 
-import datetime as dt  # noqa: F401
-from typing import Literal  # noqa: F401
+import datetime as dt
+from typing import Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel  # noqa: F401
+from pydantic import BaseModel
 
 from edutrack_api.auth import current_user
 from edutrack_api.db import get_conn
@@ -187,3 +187,44 @@ def list_skill_progress(
     _page(limit, offset)
     rows, total = me_repo.list_skill_progress(conn, scope, {"student_id": student_id, "subject": subject}, limit, offset)
     return _envelope(rows, total, limit, offset)
+
+
+# ---- batch 3 ---------------------------------------------------------------
+
+
+class LessonLogIn(BaseModel):
+    schedule_id: UUID
+    date: dt.date
+    status: Literal["تمت", "مؤجلة", "ملغاة"]  # chk_lesson_logs_status
+    covered: str | None = None
+    homework: str | None = None
+    notes: str | None = None
+
+
+@router.get("/installments")
+def list_installments(
+    limit: int = 100,
+    offset: int = 0,
+    student_id: UUID | None = None,
+    status: str | None = None,
+    scope: Scope = _SCOPE,
+    conn=_CONN,
+) -> dict:
+    _only(scope, "guardian")
+    _page(limit, offset)
+    rows, total = me_repo.list_installments(conn, scope, {"student_id": student_id, "status": status}, limit, offset)
+    return _envelope(rows, total, limit, offset)
+
+
+@router.get("/receipts")
+def list_receipts(limit: int = 100, offset: int = 0, student_id: UUID | None = None, scope: Scope = _SCOPE, conn=_CONN) -> dict:
+    _only(scope, "guardian")
+    _page(limit, offset)
+    rows, total = me_repo.list_receipts(conn, scope, {"student_id": student_id}, limit, offset)
+    return _envelope(rows, total, limit, offset)
+
+
+@router.post("/lesson-logs")
+def post_lesson_log(body: LessonLogIn, scope: Scope = _SCOPE, conn=_CONN) -> dict:
+    _only(scope, "teacher")
+    return row_to_json(me_repo.upsert_lesson_log(conn, scope, body.model_dump()))
