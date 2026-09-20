@@ -4,8 +4,8 @@
 > **Master Orchestrator**: `Claude Code CLI` (Opus Max / Sonnet 5)  
 > **Handoff Source**: `Antigravity IDE` (Interactive Cockpit & Visual Inspector)  
 > **Timestamp**: 2026-09-16T12:55:00+03:00  
-> **Last updated:** 2026-09-20 23:35 — Phase 5 (b) IMPLEMENTED and [APPROVED] (`af3e782..01bb6ee`, 100 tests green, final review clean); hotfix `2a63c50` + Phase 5 (b) both awaiting one push + `push.sh` — Claude Code CLI
-> **VCS:** git at workspace root, branch `main`, HEAD `01bb6ee`+ — **`[ahead 18]` of `origin/main` (`ed82028` is pushed and deployed; unpushed = fix(auth) `2a63c50` + Phase 5 (b) `d136a4b` `1be6f01` `9ee3705` `650e171` `01bb6ee` + docs/state commits), push pending: yes** (Ibrahim). Phase 4 (e) = `ed82028`, Phase 4 (c) = `95216ba`, Phase 4 (a) = `f276ad6`, Phase 4 (b) = `1945d95`. Phase 1 = `fc071f6`, Phase 2 = `a28299b`, Phase 2.5 = `eabac22`, Phase 3 audit = `52ce581` + `6e2e434` + `469e280` (all [APPROVED]). **Working tree clean** (Ibrahim committed the §5d-approved tree at 08:22, superseding his earlier `keep`). Remote `origin` = https://github.com/ibrahimalkateb965-tech/EduTrackPro.git. Quarantine enforced by root `.gitignore` (Rule 8).  
+> **Last updated:** 2026-09-20 23:05 (+03:00 clock; session ran ~22:05 → 23:50) — strategic-clear handoff (Hook 25). Phase 5 (b) **LIVE**: Ibrahim pushed `41b45a4` and ran `deploy/push.sh`; hotfix `2a63c50` shipped in the same push — Claude Code CLI
+> **VCS:** git at workspace root, branch `main`, HEAD `41b45a4` — **in sync with `origin/main` (`main...origin/main`, pushed by Ibrahim 2026-09-20 ~23:00 and deployed), push pending: no** (Ibrahim). Phase 4 (e) = `ed82028`, Phase 4 (c) = `95216ba`, Phase 4 (a) = `f276ad6`, Phase 4 (b) = `1945d95`. Phase 1 = `fc071f6`, Phase 2 = `a28299b`, Phase 2.5 = `eabac22`, Phase 3 audit = `52ce581` + `6e2e434` + `469e280` (all [APPROVED]). **Working tree clean** (Ibrahim committed the §5d-approved tree at 08:22, superseding his earlier `keep`). Remote `origin` = https://github.com/ibrahimalkateb965-tech/EduTrackPro.git. Quarantine enforced by root `.gitignore` (Rule 8).  
 
 ---
 
@@ -471,21 +471,23 @@ Ibrahim chose (b) in fleet mode. Six commits on `main`, base `af3e782`:
 
 ### Phase 5 (b) verdict: **[APPROVED]** — `af3e782..01bb6ee`, 100 passed.
 
-### Deploy (Ibrahim) — API container rebuild, no migration, no `v=` bump (§Task 4 of the plan)
-1. `git push` (HEAD `01bb6ee`+, clears all commits ahead incl. hotfix `2a63c50`).
-2. `bash deploy/push.sh root@187.55.226.225 gheras.autovem.tech -i ~/.ssh/edutrack_deploy_key` — `deploy.sh` runs `up -d --build api` (~1 min of 502 on `/api/*`).
-3. Paste back: `curl -s -o /dev/null -w "%{http_code}\n" https://gheras.autovem.tech/api/v1/health` (expect 200) and `curl -s -o /dev/null -w "%{http_code}\n" https://gheras.autovem.tech/api/v1/me/profile` (expect **401** = router mounted). Claude re-checks publicly and marks Phase 5 (b) + B-5.1/B-5.2 live.
+### Deploy (Ibrahim) — **executed 2026-09-20 ~23:00** (Task 4 of the plan)
+1. `git push origin main` — clean at `41b45a4` (19 commits incl. hotfix `2a63c50` and Phase 5 (b) ×6).
+2. `bash deploy/push.sh root@187.55.226.225 gheras.autovem.tech -i ~/.ssh/edutrack_deploy_key` — API container rebuilt, no migration, no `v=` bump.
+3. Ibrahim's verification (pasted 23:03): `/api/v1/health` → **200**, `/api/v1/me/profile` → **401** (router mounted). Claude's own public `curl` re-check was declined by Ibrahim (auto-mode prompt rejected, `/strategic-clear` invoked instead) — **Phase 5 (b) and B-5.1/B-5.2 are marked LIVE on Ibrahim's evidence**; the next session may re-run the two public curls in 5 s if a second signature is wanted.
+
+**Production now = `41b45a4`** (API: `/api/v1/me/*` 15 routes + attendance teacher row-scope + `POST /attendance/staff` manager/supervisor only; web unchanged at v=3.0).
 
 ---
 
-## 6. THE ONE THING TO DO NEXT (updated 2026-09-20 23:35, after Phase 5 (b) [APPROVED])
+## 6. THE ONE THING TO DO NEXT (updated 2026-09-20 23:05, strategic-clear after Phase 5 (b) went live)
 
-HEAD `01bb6ee` + this state commit on `main`, **`[ahead 18]` of `origin/main`** (push pending: yes — Ibrahim). Production = **v=3.0, `ed82028`**; unpushed = hotfix `2a63c50` + Phase 5 (b) ×6 + docs/state commits. Phase 5 (b) code complete, **[APPROVED]**, not deployed.
+HEAD `41b45a4` on `main`, **in sync with `origin/main`** (push pending: no). Production = **`41b45a4`** (web v=3.0, API with `/api/v1/me/*` + hotfix). Phase 5 (b) closed: implemented, [APPROVED], deployed, verified by Ibrahim (200 / 401).
 
-**Next choices (Ibrahim decides):**
-- **(a) Deploy** — §5o steps 1–3 (push + `push.sh` + paste back two curls). Ships Phase 5 (b) and the B-5.1/B-5.2 hotfix together. **Recommended first.**
-- **(b) Android app module** — Compose over Room + `homework-core`, now targeting the shipped `/api/v1/me/*` contract (15 routes, envelope `{items,total,limit,offset}`, `PHASE5_SPEC.md` §2 role matrix). Start with `superpowers:brainstorming`.
-- **(c) Follow-ups from the final review** — `_run`/`generic.py` total-past-last-page (one small PR for both), `list_assignments` comments, optional `_page` message for non-numeric input.
-- **(d) Housekeeping** — dedupe the 12 per-view `toList()` copies into `api.js` (Cline Worker C); first monthly restore drill on the VPS per `deploy/DEPLOY.md` → Backups (Ibrahim, SSH).
+**Next choices (Ibrahim decides after `/clear`):**
+- **(a) Android app module** — Compose over Room + `homework-core`, targeting the live `/api/v1/me/*` contract (15 routes, envelope `{items,total,limit,offset}`, `PHASE5_SPEC.md` §2 role matrix). Start with `superpowers:brainstorming`, then `writing-plans`, then fleet mode as tonight.
+- **(b) Follow-ups from the final review** — `me_repo._run` + `generic.py:89-94` total=0 past the last page (one small PR for both), 2–3 comments in `list_assignments`, optional Arabic 422 for non-numeric `limit`/`offset`. Small, TDD, Claude-only or Worker B.
+- **(c) Housekeeping** — dedupe the 12 per-view `toList()` copies into `api.js` (Cline Worker C); first monthly restore drill on the VPS per `deploy/DEPLOY.md` → Backups (Ibrahim, SSH).
+- **(d) Mobile smoke test on prod** — a real teacher token against `/api/v1/me/profile` and `/me/students` (Ibrahim creates/uses a teacher user; Claude reads the pasted JSON) to see the scope envelope with live data before Android work starts.
 
-Pre-conditions unchanged: free ≥ 4 GB RAM before running the fleet (3.2 GB was enough tonight; never with Docker Desktop up), one `opencode run` at a time with ≤ 4 files per batch, embedded PG booter must stay alive in the background while pytest runs (booter at scratchpad `872795f8-9f7d-418d-9b09-861aabb7cde0/scratchpad/pg_boot.py` via `uv run --python 3.12 --with pgserver --with "psycopg[binary]"`; stopped cleanly tonight with `pg_ctl -m fast -w stop`). Production SSH/DB stays Ibrahim's action (auto-mode classifier).
+Pre-conditions unchanged: free ≥ 4 GB RAM before running the fleet (3.2 GB sufficed on 2026-09-20; never with Docker Desktop up), one `opencode run` at a time with ≤ 4 files per batch, embedded PG booter must stay alive in the background while pytest runs (booter at scratchpad `872795f8-9f7d-418d-9b09-861aabb7cde0/scratchpad/pg_boot.py` via `uv run --python 3.12 --with pgserver --with "psycopg[binary]"`; full suite = 100 tests / ~94 s). Production SSH/DB stays Ibrahim's action (auto-mode classifier).
