@@ -4,8 +4,8 @@
 > **Master Orchestrator**: `Claude Code CLI` (Opus Max / Sonnet 5)  
 > **Handoff Source**: `Antigravity IDE` (Interactive Cockpit & Visual Inspector)  
 > **Timestamp**: 2026-09-16T12:55:00+03:00  
-> **Last updated:** 2026-09-20 21:35 — strategic-clear handoff (Hook 25). Phase 5 (b) IMPLEMENTATION PLAN written and committed (`0feb66d`); spec approved by Ibrahim (chat, 21:00); hotfix `2a63c50` [APPROVED] still not deployed — Claude Code CLI
-> **VCS:** git at workspace root, branch `main`, HEAD `0feb66d`+ — **`[ahead 11]` of `origin/main` (`ed82028` is pushed and deployed; unpushed = chore(state) ×7 + docs(phase5) `da4b0aa` + `5f13675` + `0feb66d` + fix(auth) `2a63c50`), push pending: yes** (Ibrahim). Phase 4 (e) = `ed82028`, Phase 4 (c) = `95216ba`, Phase 4 (a) = `f276ad6`, Phase 4 (b) = `1945d95`. Phase 1 = `fc071f6`, Phase 2 = `a28299b`, Phase 2.5 = `eabac22`, Phase 3 audit = `52ce581` + `6e2e434` + `469e280` (all [APPROVED]). **Working tree clean** (Ibrahim committed the §5d-approved tree at 08:22, superseding his earlier `keep`). Remote `origin` = https://github.com/ibrahimalkateb965-tech/EduTrackPro.git. Quarantine enforced by root `.gitignore` (Rule 8).  
+> **Last updated:** 2026-09-20 23:35 — Phase 5 (b) IMPLEMENTED and [APPROVED] (`af3e782..01bb6ee`, 100 tests green, final review clean); hotfix `2a63c50` + Phase 5 (b) both awaiting one push + `push.sh` — Claude Code CLI
+> **VCS:** git at workspace root, branch `main`, HEAD `01bb6ee`+ — **`[ahead 18]` of `origin/main` (`ed82028` is pushed and deployed; unpushed = fix(auth) `2a63c50` + Phase 5 (b) `d136a4b` `1be6f01` `9ee3705` `650e171` `01bb6ee` + docs/state commits), push pending: yes** (Ibrahim). Phase 4 (e) = `ed82028`, Phase 4 (c) = `95216ba`, Phase 4 (a) = `f276ad6`, Phase 4 (b) = `1945d95`. Phase 1 = `fc071f6`, Phase 2 = `a28299b`, Phase 2.5 = `eabac22`, Phase 3 audit = `52ce581` + `6e2e434` + `469e280` (all [APPROVED]). **Working tree clean** (Ibrahim committed the §5d-approved tree at 08:22, superseding his earlier `keep`). Remote `origin` = https://github.com/ibrahimalkateb965-tech/EduTrackPro.git. Quarantine enforced by root `.gitignore` (Rule 8).  
 
 ---
 
@@ -449,16 +449,43 @@ Ibrahim approved `docs/PHASE5_SPEC.md` in chat (choice (b)). Commit **`0feb66d`*
 
 ---
 
-## 6. THE ONE THING TO DO NEXT (updated 2026-09-20 21:35, strategic-clear after Phase 5 (b) plan committed)
+## 5o. Phase 5 (b) — IMPLEMENTED via subagent-driven development (2026-09-20 ~22:05 → 23:30, Claude Code + OpenCode Worker B ×3, `superpowers:subagent-driven-development`)
 
-HEAD `0feb66d` + this freeze on `main`, **`[ahead 11]` of `origin/main`** (push pending: yes — Ibrahim). Production = **v=3.0, `ed82028`**; hotfix `2a63c50` is **committed, not deployed** (§5k steps). Phase 4 closed.
+Ibrahim chose (b) in fleet mode. Six commits on `main`, base `af3e782`:
 
-Active work = **Phase 5 (b) implementation**: spec approved, plan at `docs/superpowers/plans/2026-09-20-phase5b-mobile-role-scoping.md` (§5n). Nothing executed yet.
+| Commit | Batch | Implementer | Content |
+| :-- | :-- | :-- | :-- |
+| `a14690b` | — | Claude | `.gitignore` +`.superpowers/` (SDD workspace quarantine, Rule 8 class) |
+| `d136a4b` | 0-A | Claude, TDD | `scope.py` guardian branch + `user_id` + `require_scope` + 3 message constants; `_room/_student/_teacher` moved to `tests/conftest.py`, new `_guardian`; `test_me_scope.py` World fixture + 4 `b0` tests (RED = ImportError, GREEN 14) |
+| `1be6f01` | 0-B | Claude | 33 more tests (`b1` 16 / `b2` 7 / `b3` 10) observed RED (5 passed / 32 failed — `unknown_schedule_is_404` passes trivially while unmounted), regression 63 |
+| `9ee3705` | 1 | OpenCode Worker B | `repositories/me_repo.py` (helpers + profile/students/rooms/schedule/notifications), `routers/me.py` (`_page/_envelope/_only` + 6 handlers), `main.py` +2 lines — byte-identical to plan; b0+b1 20 passed |
+| `650e171` | 2 | OpenCode Worker B | attendance/evaluations/assignments/submissions/lesson-logs GET/skill-progress — pure append, identical; 27 passed |
+| `01bb6ee` | 3 | OpenCode Worker B | installments/receipts/`POST /me/lesson-logs` upsert + `LessonLogIn`; `PHASE5_SPEC.md` status → IMPLEMENTED; **full suite 100 passed** (94 s) |
 
-**Next choices (Ibrahim decides after `/clear`):**
-- **(a)** Deploy the hotfix: `git push` (clears all 11) + `deploy/push.sh` (API rebuild, no migration), paste back `/api/v1/health`; Claude re-checks publicly and marks B-5.1/B-5.2 live.
-- **(b)** Execute the Phase 5 plan: Ibrahim picks the mode (subagent-driven vs inline `executing-plans`) → Claude boots embedded PG → Task 0-A (scope.py TDD) → Task 0-B (37 tests RED) → dispatch Worker B for Task 1 → audit/`[APPROVED]` per batch → Tasks 2, 3. Needs ≥ 4 GB free RAM, no Docker Desktop.
-- **(c)** Android app module — Compose over Room + `homework-core`; better after (b) so the app targets the shipped `/me/*` contract.
-- **(d)** Housekeeping — dedupe the 12 per-view `toList()` copies into `api.js` (Cline Worker C); first monthly restore drill on the VPS per `deploy/DEPLOY.md` → Backups (Ibrahim, SSH).
+- **Gate (Claude exclusive):** every batch = `pytest -k bN` + regression `--deselect test_me_scope.py` (63) + `uvx ruff` delta (97 findings at HEAD = baseline classes B008/DTZ011 only, transient F401/RUF100 resolved by batch 3) + `file` LF/UTF-8 check + `diff <plan block> <file>` (all three batches empty modulo the sanctioned `# noqa: F401` add/remove).
+- **Final whole-branch review** (Claude subagent, sonnet, package `af3e782..01bb6ee`): **Ready to merge — 0 Critical / 0 Important / 3 Minor** (parked: `_run` total=0 past the last page — same as `generic.py:89-94`, follow-up for both; non-numeric `limit` gets FastAPI's generic 422 — in-spec; `list_assignments` wants 2–3 comments).
+- **Worker B behaviour:** 3 runs, each ~2 min, STATUS DONE, zero patches needed, obeyed closed file lists and "no tests" rule. Muse Spark handled append-only edits with exact blank-line discipline.
+- **Rulings made** (ledger in `.superpowers/sdd/…/progress.md`, git-ignored): work on `main` (project convention, no worktree); no per-task reviewer seat when `diff plan↔file` is empty and gate is green; `noqa` add-in-1/remove-in-3; final reviewer on sonnet (Opus budget directive).
+- **Plan deviations from the spec now shipped** (unchanged from §5n): `Scope.user_id`; empty-scope fast path keyed on the filtering set; `/me/installments` returns `plan_total` + `plan_count` (no `fee_plans.name`); 37 tests.
+- Zero prod changes. Hotfix `2a63c50` still **committed, not deployed**; it ships in the same push as Phase 5 (b).
 
-Pre-conditions unchanged: free ≥ 4 GB RAM before running the fleet (never with Docker Desktop up), one `opencode run` at a time with ≤ 4 files per batch, Codex via `-s workspace-write`, embedded PG booter must stay alive in the background while pytest runs (`TEST_DATABASE_URL` = superuser URI for fixtures, `DATABASE_URL` = `gheras_app` URI for the API; booter at scratchpad `872795f8-9f7d-418d-9b09-861aabb7cde0/scratchpad/pg_boot.py`, run via `uv run --python 3.12 --with pgserver --with "psycopg[binary]"`, cluster stopped cleanly with `pg_ctl -m fast stop`). Production SSH/DB stays Ibrahim's action (auto-mode classifier).
+### Phase 5 (b) verdict: **[APPROVED]** — `af3e782..01bb6ee`, 100 passed.
+
+### Deploy (Ibrahim) — API container rebuild, no migration, no `v=` bump (§Task 4 of the plan)
+1. `git push` (HEAD `01bb6ee`+, clears all commits ahead incl. hotfix `2a63c50`).
+2. `bash deploy/push.sh root@187.55.226.225 gheras.autovem.tech -i ~/.ssh/edutrack_deploy_key` — `deploy.sh` runs `up -d --build api` (~1 min of 502 on `/api/*`).
+3. Paste back: `curl -s -o /dev/null -w "%{http_code}\n" https://gheras.autovem.tech/api/v1/health` (expect 200) and `curl -s -o /dev/null -w "%{http_code}\n" https://gheras.autovem.tech/api/v1/me/profile` (expect **401** = router mounted). Claude re-checks publicly and marks Phase 5 (b) + B-5.1/B-5.2 live.
+
+---
+
+## 6. THE ONE THING TO DO NEXT (updated 2026-09-20 23:35, after Phase 5 (b) [APPROVED])
+
+HEAD `01bb6ee` + this state commit on `main`, **`[ahead 18]` of `origin/main`** (push pending: yes — Ibrahim). Production = **v=3.0, `ed82028`**; unpushed = hotfix `2a63c50` + Phase 5 (b) ×6 + docs/state commits. Phase 5 (b) code complete, **[APPROVED]**, not deployed.
+
+**Next choices (Ibrahim decides):**
+- **(a) Deploy** — §5o steps 1–3 (push + `push.sh` + paste back two curls). Ships Phase 5 (b) and the B-5.1/B-5.2 hotfix together. **Recommended first.**
+- **(b) Android app module** — Compose over Room + `homework-core`, now targeting the shipped `/api/v1/me/*` contract (15 routes, envelope `{items,total,limit,offset}`, `PHASE5_SPEC.md` §2 role matrix). Start with `superpowers:brainstorming`.
+- **(c) Follow-ups from the final review** — `_run`/`generic.py` total-past-last-page (one small PR for both), `list_assignments` comments, optional `_page` message for non-numeric input.
+- **(d) Housekeeping** — dedupe the 12 per-view `toList()` copies into `api.js` (Cline Worker C); first monthly restore drill on the VPS per `deploy/DEPLOY.md` → Backups (Ibrahim, SSH).
+
+Pre-conditions unchanged: free ≥ 4 GB RAM before running the fleet (3.2 GB was enough tonight; never with Docker Desktop up), one `opencode run` at a time with ≤ 4 files per batch, embedded PG booter must stay alive in the background while pytest runs (booter at scratchpad `872795f8-9f7d-418d-9b09-861aabb7cde0/scratchpad/pg_boot.py` via `uv run --python 3.12 --with pgserver --with "psycopg[binary]"`; stopped cleanly tonight with `pg_ctl -m fast -w stop`). Production SSH/DB stays Ibrahim's action (auto-mode classifier).
