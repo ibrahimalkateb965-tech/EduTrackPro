@@ -4,8 +4,8 @@
 > **Master Orchestrator**: `Claude Code CLI` (Opus Max / Sonnet 5)  
 > **Handoff Source**: `Antigravity IDE` (Interactive Cockpit & Visual Inspector)  
 > **Timestamp**: 2026-09-16T12:55:00+03:00  
-> **Last updated:** 2026-09-20 15:40 — Phase 4 (e) **verified live** from the public side (`receipt.html` 2 × `{{center_name}}`, `print.css` 1 × `sig-title`, health 200). Phase 4 closed in production; Phase 5 (b) mobile roles kicking off — Claude Code CLI  
-> **VCS:** git at workspace root, branch `main`, HEAD `4487298`+ — **`[ahead 2+]` of `origin/main` (chore(state) commits only; `ed82028` is pushed and deployed), push pending: yes** (Ibrahim). Phase 4 (e) = `ed82028`, Phase 4 (c) = `95216ba`, Phase 4 (a) = `f276ad6`, Phase 4 (b) = `1945d95`. Phase 1 = `fc071f6`, Phase 2 = `a28299b`, Phase 2.5 = `eabac22`, Phase 3 audit = `52ce581` + `6e2e434` + `469e280` (all [APPROVED]). **Working tree clean** (Ibrahim committed the §5d-approved tree at 08:22, superseding his earlier `keep`). Remote `origin` = https://github.com/ibrahimalkateb965-tech/EduTrackPro.git. Quarantine enforced by root `.gitignore` (Rule 8).  
+> **Last updated:** 2026-09-20 17:10 — strategic-clear handoff (Hook 25). Phase 4 closed in production; Phase 5 (b) mobile-roles **design** in progress: `docs/PHASE5_SPEC.md` Sections 1–2 approved, 3–4 pending — Claude Code CLI  
+> **VCS:** git at workspace root, branch `main`, HEAD `da4b0aa`+ — **`[ahead 5]` of `origin/main` (`ed82028` is pushed and deployed; unpushed = chore(state) ×4 + docs(phase5) `da4b0aa`), push pending: yes** (Ibrahim). Phase 4 (e) = `ed82028`, Phase 4 (c) = `95216ba`, Phase 4 (a) = `f276ad6`, Phase 4 (b) = `1945d95`. Phase 1 = `fc071f6`, Phase 2 = `a28299b`, Phase 2.5 = `eabac22`, Phase 3 audit = `52ce581` + `6e2e434` + `469e280` (all [APPROVED]). **Working tree clean** (Ibrahim committed the §5d-approved tree at 08:22, superseding his earlier `keep`). Remote `origin` = https://github.com/ibrahimalkateb965-tech/EduTrackPro.git. Quarantine enforced by root `.gitignore` (Rule 8).  
 
 ---
 
@@ -387,20 +387,30 @@ Embedded-PG note for the next session: pgserver's `pg_ctl -w` 10 s timeout fires
 
 ---
 
-## 6. THE ONE THING TO DO NEXT (updated 2026-09-20 14:59, strategic-clear after Phase 4 (e))
+## 5j. Phase 5 (b) — Mobile role scoping design session (2026-09-20 ~15:40 → 17:10, Claude Code only, no fleet)
 
-HEAD is `4487298`+ on `main`, **`[ahead 2+]` of `origin/main`** (only `chore(state)` commits; the feature commit `ed82028` is pushed **and deployed**), **working tree clean**. Production = **v=3.0, migrations 001–006, backup timer live, Phase 4 (e) templates live**. **Phase 4 is closed in production** — all five items done and verified:
+Brainstorming (superpowers, architectural path). Written to **`Clients/03_GHERAS_Center/edutrack_pro/docs/PHASE5_SPEC.md`** (commit `da4b0aa`) — that file is the truth for the design; this entry is the pointer.
 
-- **(a)** ✅ **DONE + VERIFIED LIVE 2026-09-20 (§5g, §5h pre-flight)** — timer active, first dump 172K.
-- **(b)** ✅ **DONE + LIVE (§5f)** — settings-driven identity, v=2.9.
-- **(c)** ✅ **DONE + VERIFIED LIVE 2026-09-20 (§5h)** — `api.fetchAll` + 55 call sites across 12 views, v=3.0, pytest 53/53.
-- **(e)** ✅ **DONE + VERIFIED LIVE 2026-09-20 15:40 (§5i)** — commit `ed82028`; Ibrahim ran `push.sh` after the 14:59 freeze; Claude confirmed publicly: `receipt.html` → 2 × `{{center_name}}`, `print.css` → 1 × `sig-title`, `/api/v1/health` 200.
-- **(d)** ✅ folded into 006 step 3a (§5f) — the stray row `c0997630-…` is retired by id on deploy; no manual SQL.
+- **Decisions D1–D4 (Ibrahim, chat):** scope = read + teacher's own writes; teacher's students = home room ∪ scheduled rooms; guardian sees installments + receipts read-only; **Approach A** = new `routers/me.py` + `scope.py` dependency, `crud.py` untouched.
+- **Section 1 (scope resolution) — APPROVED.** `Scope(role, room_ids, student_ids)`, `resolve_scope`, `require_scope` (manager/supervisor 403 on `/me/*`), empty-scope fast path, guards on the 3 teacher routes in `attendance.py`.
+- **Section 2 (endpoint contract) — APPROVED.** 15 routes under `/api/v1/me` (13 GET, `POST /me/notifications/{id}/read`, `POST /me/lesson-logs`), `crud.py` envelope, out-of-scope filter → empty 200.
+- **Sections 3–4 — NOT YET PRESENTED** (guardian projection allow-list, lesson-log write semantics, tests, delegation). Draft intent is in the spec, unapproved.
+- **Security defect found (pre-existing since Phase 2, not yet fixed):** `routers/attendance.py` admits `teacher` on `POST /attendance/students`, `GET /daily-evaluations`, `POST /evaluations/daily` (+ alias) with **no row scope** — any teacher account can read/write attendance and daily evaluations for any student. No teacher accounts are known to be active on production; the fix is Section 1 of the spec. Track as **Blocker B-5.1** until shipped.
+- **Schema note:** `lesson_logs` has no unique constraint on `(schedule_id, date)` — Section 3 must choose SELECT-then-write vs a 007 migration.
+- No code written, no tests run, no fleet dispatched. Zero prod changes.
 
-**Decision 2026-09-20 15:40 (Ibrahim): (a) closed → proceeding with (b) Phase 5 mobile roles.** Remaining from (a): Ibrahim `git push` the `chore(state)` commits.
-- **(a)** ✅ Phase 4 closed; only the state-commit push remains (Ibrahim).
-- **(b)** Phase 5 kickoff — mobile role scoping for `teacher` / `guardian` (currently 403 on all web CRUD; `TODO Phase 3` marker in `routers/crud.py`): spec the read-only endpoints first, then delegate routers to OpenCode Muse Spark.
-- **(c)** Android app module — Compose UI wiring the Room layer + `homework-core` (M3, 13/13), Room/KSP compile via `agcli`; Gradle needs `-Xmx400m` with the local 9.4.1 dist + JDK 17.
-- **(d)** Housekeeping — dedupe the 12 per-view `toList()` copies into `api.js` (Cline Worker C) and run the first monthly restore drill on the VPS per `deploy/DEPLOY.md` → Backups (Ibrahim, SSH).
+---
+
+## 6. THE ONE THING TO DO NEXT (updated 2026-09-20 17:10, strategic-clear mid-design of Phase 5 (b))
+
+HEAD is the `chore(state)` freeze on top of `da4b0aa` (spec commit) on `main`, **`[ahead 5]` of `origin/main`** (production already runs everything in `ed82028`), **working tree clean** after the freeze commit. Production = **v=3.0, migrations 001–006, backup timer live, Phase 4 (e) templates live** — Phase 4 closed (§5f–§5i, all verified publicly).
+
+Active work = **Phase 5 (b) design**, `docs/PHASE5_SPEC.md`: Sections 1–2 approved, Sections 3–4 pending. Open defect **B-5.1** (unscoped teacher routes in `attendance.py`, §5j).
+
+**Next choices (Ibrahim decides after `/clear`):**
+- **(a)** Continue Phase 5 (b) design: present Section 3 (guardian projection allow-list, `POST /me/lesson-logs` semantics incl. the `lesson_logs` uniqueness decision, exact `attendance.py` guards) then Section 4 (tests, delegation, deploy); spec self-review; Ibrahim reviews `PHASE5_SPEC.md`; then `superpowers:writing-plans`.
+- **(b)** Ship the B-5.1 hotfix first, standalone: `scope.py` + guards on the 3 `attendance.py` teacher routes + regression tests (Claude Code only, ~1 file + tests), deploy with API restart; resume design after.
+- **(c)** Android app module (unchanged from before) — Compose UI over the Room layer + `homework-core`; Gradle `-Xmx400m`, local 9.4.1 dist, JDK 17. Better done **after** (a) so the app targets the approved `/me/*` contract.
+- **(d)** Housekeeping — dedupe the 12 per-view `toList()` copies into `api.js` (Cline Worker C); first monthly restore drill on the VPS per `deploy/DEPLOY.md` → Backups (Ibrahim, SSH).
 
 Pre-conditions unchanged: free ≥ 4 GB RAM before running the fleet (never with Docker Desktop up), one `opencode run` at a time with ≤ 4 files per batch, Codex via `-s workspace-write`, embedded PG booter must stay alive in the background while pytest runs (`TEST_DATABASE_URL` = superuser URI for fixtures, `DATABASE_URL` = `gheras_app` URI for the API). Production SSH/DB stays Ibrahim's action (auto-mode classifier).
