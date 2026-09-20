@@ -10,9 +10,9 @@
   <div class="cert-frame">
     <div class="cert-inner">
       <header class="doc-header">
-        <img class="doc-logo" src="../gheras_logo.png" alt="مركز غراس">
+        <img class="doc-logo" src="../gheras_logo.png" alt="{{center_name}}">
         <div class="doc-header-center">
-          <div class="doc-center-name">مركز غراس</div>
+          <div class="doc-center-name">{{center_name}}</div>
           <div class="doc-tagline">من غراس تبدأ المعرفة وتصنع القمة</div>
           <div class="doc-title">{{title}}</div>
         </div>
@@ -23,7 +23,7 @@
       </header>
 
       <main class="cert-body">
-        <p class="cert-intro">تتقدم إدارة مركز غراس بأسمى آيات الشكر والتقدير إلى الطالب/الطالبة</p>
+        <p class="cert-intro">تتقدم إدارة {{center_name}} بأسمى آيات الشكر والتقدير إلى الطالب/الطالبة</p>
         <div class="cert-name">{{student_name}}</div>
         <p class="cert-reason">{{reason}}</p>
         <p class="cert-closing">مع أطيب التمنيات بمزيد من التفوق والنجاح</p>
@@ -33,12 +33,14 @@
         <div class="cert-date">التاريخ: {{date}}</div>
         <div class="signature">
           <div class="sig-line"></div>
-          <div class="sig-name">مدير المركز</div>
+          <div class="sig-name">{{manager_name}}</div>
+          <div class="sig-title">{{manager_title}}</div>
         </div>
       </div>
 
       <footer class="doc-footer">
-        <span>حوطة بني تميم</span>
+        <span>{{center_address}}</span>
+        <span>هاتف: {{center_phone}}</span>
         <span>صفحة 1 من 1</span>
       </footer>
     </div>

@@ -111,6 +111,7 @@ h4 {
   font-weight: 700;
   color: var(--g-teal-dark);
   line-height: 1.3;
+  overflow-wrap: anywhere;
 }
 
 .doc-tagline {
@@ -282,6 +283,11 @@ tr {
   font-size: 10pt;
   font-weight: 600;
   color: var(--g-text);
+}
+
+.signature .sig-title {
+  font-size: 8.5pt;
+  color: var(--g-muted);
 }
 
 .amount-words {

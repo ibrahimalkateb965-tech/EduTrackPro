@@ -2,7 +2,9 @@
 
 Field inventory for the 11 printable documents in `web/print/templates/`, for the Phase 2 server implementer of the `print/*` endpoints.
 
-Shared chrome (all templates): `<!doctype html>`, `lang="ar"`, `dir="rtl"`, `../print.css`, `../gheras_logo.png`, header center name «مركز غراس», tagline «من غراس تبدأ المعرفة وتصنع القمة», footer «حوطة بني تميم» + «صفحة 1 من 1». All user-facing numerals are Western digits (0-9). Dates and money amounts are pre-formatted strings filled by the server; the «ريال» unit lives in the template.
+Shared chrome (all templates): `<!doctype html>`, `lang="ar"`, `dir="rtl"`, `../print.css`, `../gheras_logo.png`, header center name `{{center_name}}` (also the logo `alt`), tagline «من غراس تبدأ المعرفة وتصنع القمة» (static), footer `{{center_address}}` + «هاتف: `{{center_phone}}`» + «صفحة 1 من 1». Manager signature blocks (`excellence_certificate`, `monthly_report`, `student_receipt`, `student_report`) render `{{manager_name}}` over `{{manager_title}}`.
+
+Shared scalars supplied under every `print/*` payload by `routers/print.py::_resp()` from `system_settings` (migration 006, constants fallback in `services/settings.py`): `center_name`, `center_phone`, `center_address`, `manager_title`, `manager_name`, `academic_year`. Endpoint-specific keys win on collision. `<title>` is not rendered by `print_engine.js` (body only), so it stays static. All user-facing numerals are Western digits (0-9). Dates and money amounts are pre-formatted strings filled by the server; the «ريال» unit lives in the template.
 
 Page geometries (body class):
 
