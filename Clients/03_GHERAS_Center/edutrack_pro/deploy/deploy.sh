@@ -27,7 +27,7 @@ die() { echo "error: $*" >&2; exit 1; }
 command -v docker >/dev/null || die "docker is not installed"
 docker compose version >/dev/null 2>&1 || die "docker compose v2 is required"
 command -v openssl >/dev/null || die "openssl is required"
-for f in db/postgres/001_schema.sql db/postgres/002_reference.sql db/postgres/003_phase2.sql db/postgres/004_phase3.sql \
+for f in db/postgres/001_schema.sql db/postgres/002_reference.sql db/postgres/003_phase2.sql db/postgres/004_phase3.sql db/postgres/005_saturday.sql \
          server/Dockerfile server/uv.lock web/dashboard/index.html assets/gheras_logo.png; do
   [[ -f "$ROOT/$f" ]] || die "missing $f — sync the full edutrack_pro tree first"
 done
@@ -65,23 +65,25 @@ for _ in $(seq 1 40); do
 done
 [[ "$status" == healthy ]] || die "database did not become healthy"
 
-# A reused volume skips the initdb scripts; apply 001->004 ourselves (003 and 004 are idempotent).
+# A reused volume skips the initdb scripts; apply 001->005 ourselves (003, 004 and 005 are idempotent).
 if [[ "$("${PSQL[@]}" -c "SELECT to_regclass('public.users') IS NOT NULL")" != "t" ]]; then
-  log "Empty database — applying migrations 001 -> 004"
-  for m in 001_schema.sql 002_reference.sql 003_phase2.sql 004_phase3.sql; do
+  log "Empty database — applying migrations 001 -> 005"
+  for m in 001_schema.sql 002_reference.sql 003_phase2.sql 004_phase3.sql 005_saturday.sql; do
     "${PSQL[@]}" -f "/docker-entrypoint-initdb.d/$m" >/dev/null
   done
 else
-  log "Applying incremental idempotent migrations (003 -> 004)"
-  for m in 003_phase2.sql 004_phase3.sql; do
+  log "Applying incremental idempotent migrations (003 -> 005)"
+  for m in 003_phase2.sql 004_phase3.sql 005_saturday.sql; do
     "${PSQL[@]}" -f "/docker-entrypoint-initdb.d/$m" >/dev/null || true
   done
 fi
 TABLES="$("${PSQL[@]}" -c "SELECT count(*) FROM pg_tables WHERE schemaname='public'")"
-ADMIN_ROWS="$("${PSQL[@]}" -c "SELECT count(*) FROM users WHERE username='admin' AND deleted_at IS NULL")"
+# The dashboard lets a manager delete the seeded "admin" account, so the invariant is
+# "at least one active manager", not "admin exists".
+MANAGER_ROWS="$("${PSQL[@]}" -c "SELECT count(*) FROM users WHERE role='manager' AND is_active AND deleted_at IS NULL")"
 [[ "$TABLES" -ge 43 ]] || die "expected >= 43 tables, found $TABLES"
-[[ "$ADMIN_ROWS" == 1 ]] || die "admin seed row missing (found $ADMIN_ROWS)"
-echo "schema ok: $TABLES tables, admin seed present"
+[[ "$MANAGER_ROWS" -ge 1 ]] || die "no active manager account (found $MANAGER_ROWS)"
+echo "schema ok: $TABLES tables, $MANAGER_ROWS active manager account(s)"
 
 log "Setting the gheras_app role password"
 "${PSQL[@]}" -c "ALTER ROLE gheras_app WITH LOGIN PASSWORD '$GHERAS_APP_PASSWORD'" >/dev/null
