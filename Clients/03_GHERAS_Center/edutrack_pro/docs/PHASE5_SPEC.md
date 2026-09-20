@@ -2,9 +2,9 @@
 
 - **Owner**: Autovem Master Architect (Claude Code CLI)
 - **Client**: Gheras Center (`Clients/03_GHERAS_Center`)
-- **Status**: **[DESIGN IN PROGRESS — Sections 1–2 APPROVED by Ibrahim 2026-09-20, Section 3 PRESENTED (awaiting approval, open decision 3.1), Section 4 PENDING]**
+- **Status**: **[DESIGN COMPLETE — Sections 1–4 APPROVED by Ibrahim 2026-09-20; awaiting Ibrahim's review of this file before `superpowers:writing-plans`]**
 - **Baseline**: `af6afff` on `main` (Phase 4 closed in production, v=3.0, migrations 001–006)
-- **Process**: superpowers brainstorming, architectural path. Next steps after Section 4 approval: spec self-review → Ibrahim reviews this file → `superpowers:writing-plans` → delegate routers to OpenCode Worker B (Muse Spark), tests by Claude Code only.
+- **Process**: superpowers brainstorming, architectural path. Sections 1–4 approved; self-review done 2026-09-20. Next: Ibrahim reviews this file → `superpowers:writing-plans` → batches per §4.4 (routers to OpenCode Worker B, `scope.py` + tests by Claude Code only).
 
 ---
 
@@ -85,7 +85,7 @@ Rules:
 
 ---
 
-## 3. Guardian projection, teacher writes & guards — **[PRESENTED 2026-09-20 18:40 — awaiting Ibrahim's approval; one open decision (3.1)]**
+## 3. Guardian projection, teacher writes & guards — **[APPROVED 2026-09-20]**
 
 Code facts behind this section: the dashboard writes lesson logs through the generic `POST /lesson-logs` (`crud.py:31`, no uniqueness), so duplicates on `(schedule_id, date)` may already exist in production; the mobile `LessonLogDao.getByScheduleAndDate(...) LIMIT 1` already treats the pair as unique. `attendance.py` guards shipped early as hotfix `2a63c50` (B-5.1 + B-5.2).
 
@@ -95,7 +95,7 @@ Code facts behind this section: the dashboard writes lesson logs through the gen
 | :--- | :--- | :--- |
 | `id, name, birth_date, nationality, gender, room_id, room_name, group_name, status, has_difficulties` | yes | yes |
 | `difficulty_notes, child_notes` (notes written for the teacher) | no | yes |
-| `guardian_phone, guardian_relation` (one contact number for the call/WhatsApp hook) | no | **yes — OPEN DECISION (Ibrahim): keep (recommended) or hide and route contact through the center** |
+| `guardian_phone, guardian_relation` (one contact number for the call/WhatsApp hook) | no | **yes** (decided by Ibrahim 2026-09-20: keep, so the teacher can call/WhatsApp the family directly) |
 | `national_id, father_*, mother_*, pickup_*, previous_*, education_notes, branch_id, timestamps` | no | no |
 
 Allow-list, not deny-list: a future column is hidden by default. The guardian already knows the child's ID and phones; excluding them limits the blast radius of a mis-linked account.
@@ -116,10 +116,85 @@ Allow-list, not deny-list: a future column is hidden by default. The guardian al
 - `/me/lesson-logs` for guardian drops `notes` (§2); `covered` and `homework` stay.
 - `/me/assignments` rows carry `student_ids` intersected with scope only; `/me/submissions` never returns another child's files.
 
-## 4. Errors, pagination, testing & delegation — **[PENDING — not yet presented]**
+## 4. Errors, pagination, testing & delivery — **[APPROVED 2026-09-20]**
 
-To cover (draft intent, not approved):
-- Error codes reuse `ApiError` conventions (`401 unauthorized`, `403 forbidden`, `404 not_found`, `422 validation_error`), Arabic messages.
-- Tests (Claude Code exclusive): new `tests/test_me_scope.py` — fixtures `teacher` (room A + schedule in room B), `guardian` (2 children, 1 dismissed), negative cases (cross-room student, guardian probing another child's id, manager on `/me/*`, teacher on `/me/installments`), regression tests for the 3 patched `attendance.py` routes; embedded PG 16 via `pgserver`, two DB URLs (`TEST_DATABASE_URL` superuser, `DATABASE_URL` `gheras_app`).
-- Delegation: `scope.py` + `attendance.py` guards = Claude Code (security boundary); `routers/me.py` reads = OpenCode Worker B (Muse Spark) in ≤ 4-file batches with a closed endpoint table; `POST /me/lesson-logs` = Worker B second batch; tests = Claude Code only.
-- Deploy: API restart required (`deploy/push.sh` + `docker compose restart api`), no migration, no cache bump.
+Code facts behind this section: `errors.py` provides `ApiError(status, code, message)` with Arabic `DEFAULT_MESSAGES` and `map_db_error`; `repositories/generic.py:79` paginates with a single `COUNT(*) OVER() AS _total` query and `ORDER BY <col>, id`; `db.get_conn` commits on success; `deploy/deploy.sh:94` runs `up -d --build api`; tests live in `server/tests/` with `conftest.make_user` / `login` and skip when `TEST_DATABASE_URL` is unset.
+
+### 4.1 Errors
+
+Reuse `ApiError` and `DEFAULT_MESSAGES`; no new error module.
+
+| Case | Status / code | Message |
+| :--- | :--- | :--- |
+| manager/supervisor on any `/me/*` | 403 `forbidden` | «هذه الواجهة مخصصة لتطبيق المعلم وولي الأمر» |
+| guardian with `users.guardian_id NULL` | 403 `forbidden` | «حساب ولي الأمر غير مرتبط بطالب — راجع إدارة المركز» |
+| teacher on `/me/installments`, `/me/receipts`; guardian on `/me/rooms`, `POST /me/lesson-logs` | 403 `forbidden` | default |
+| `schedule.room_id ∉ room_ids` on `POST /me/lesson-logs` | 403 `forbidden` | «الحلقة خارج نطاق صلاحيتك» (mirrors the `2a63c50` message «الطالب خارج نطاق صلاحيتك») |
+| schedule not found; notification not own | 404 `not_found` | default — no distinction between "not yours" and "does not exist" (anti-probing, same rule as §2) |
+| bad `limit`/`offset` | 422 `validation_error` | «قيم التصفح غير صحيحة» (same string as `crud.py:226`) |
+| bad ISO date, bad `status`, missing body field | 422 `validation_error` | «بيانات غير صالحة» (default) |
+| DB constraint violations | via `map_db_error` | — |
+
+Out-of-scope filter values (`student_id`, `schedule_id`, `assignment_id`) are **never** an error: they are intersected with the scope and yield an empty 200 (§2).
+
+### 4.2 Pagination, ordering & module layout
+
+- Envelope `{"items", "total", "limit", "offset"}`; `limit` 1–500, default 100; `total` from `COUNT(*) OVER() AS _total` in the same query (pattern of `generic.py:79`), popped from each row before serialisation.
+- **Fixed, deterministic order per table** so `offset` paging never skips or repeats rows — every ORDER BY ends with `, id`:
+
+| Table | ORDER BY |
+| :--- | :--- |
+| `student_attendance`, `evaluations`, `lesson_logs`, `skill_progress` | `date DESC, id` |
+| `assignments` | `due_date DESC, id` |
+| `submissions` | `submitted_at DESC, id` |
+| `schedules` | `day, start_time, id` (`day` is `text` — deterministic, not weekday-chronological; the app groups by weekday itself) |
+| `students`, `rooms` | `name, id` |
+| `notifications` | `created_at DESC, id` |
+| `installments` | `due_date, id` |
+| `receipts` | `issued_on DESC, id` |
+
+  Column names verified against `db/postgres/001_schema.sql` on 2026-09-20.
+- No `q` free-text search on `/me/*` — the app filters locally in Room.
+- **Module layout (decided):** `routers/me.py` = 15 thin handlers (auth dependency, query-param validation, repo call, `row_to_json`); `repositories/me_repo.py` = plain functions `(conn, scope, filters, limit, offset) -> (rows, total)` plus `upsert_lesson_log(conn, scope, user, body) -> row`; `scope.py` gains the guardian branch and `require_scope`. Expected sizes ≈ 250 / 350 / 90 lines.
+
+### 4.3 Tests (Claude Code exclusive, TDD)
+
+New `server/tests/test_me_scope.py`. Helpers `_room`, `_student`, `_teacher` move from `test_teacher_scope.py` into `conftest.py`; new `_guardian(db, client, username, child_ids)` inserts `guardians` + `student_guardians` and sets `users.guardian_id`.
+
+Fixture world: rooms A, B, C; teacher T with home room A and one schedule slot in B; students a1, a2 (room A), b1 (B), c1 (C, `status = 'dismissed'`); guardian G linked to a1 + c1; guardian G2 linked to b1; one notification per user.
+
+| Group | Tests (~26) |
+| :--- | :--- |
+| Boundary | manager 403 on `/me/profile`; teacher 403 on `/me/installments`; guardian 403 on `/me/rooms` and `POST /me/lesson-logs`; guardian with NULL `guardian_id` 403 |
+| Teacher scope | `/me/students` = {a1, a2, b1}, never c1; `/me/rooms` = {A, B}; teacher with no room and no schedule → empty 200 on every list; `student_id=c1` filter → empty 200; teacher projection includes `guardian_phone`, excludes `national_id` |
+| Guardian scope | `/me/students` = {a1, c1} (dismissed child visible), row has no `guardian_phone` / `difficulty_notes`; `/me/attendance?student_id=b1` → empty 200; `/me/lesson-logs` rows have no `notes` key; `/me/installments` only own children; G2 cannot see a1 submissions |
+| `POST /me/lesson-logs` | insert in room-B slot → 200, `teacher_user_id = T`, audit row; second POST on same `(schedule_id, date)` updates, count unchanged; pre-seeded duplicate pair → newest row updated, count unchanged; slot in room C → 403; unknown schedule → 404; bad `status` → 422 |
+| Notifications | `POST /me/notifications/{id}/read` own → 200 with `read_at`; another user's id → 404; `unread=true` filter |
+| Pagination | `limit=0` → 422; `limit=2&offset=2` on 5 attendance rows → rows 3–4, `total = 5` |
+
+Environment: embedded PG 16 via the scratchpad booter, `TEST_DATABASE_URL` (superuser, fixtures) + `DATABASE_URL` (`gheras_app`, API). Gate: full suite green (63 existing + new), `ruff` no new findings, then `[APPROVED]`.
+
+### 4.4 Delegation & deploy
+
+Sequential batches, single writer per file. The fleet never touches `scope.py` or any test file.
+
+| Batch | Who | Files (≤ 4) | Content |
+| :--- | :--- | :--- | :--- |
+| 0 | Claude Code (TDD) | `scope.py`, `tests/conftest.py`, `tests/test_me_scope.py`, `tests/test_teacher_scope.py` (helpers moved out) | guardian branch + `require_scope`; fixtures; all tests written and observed RED |
+| 1 | OpenCode Worker B (Muse Spark) | `routers/me.py`, `repositories/me_repo.py`, `main.py` | profile, students (both projections), rooms, schedule, notifications + read |
+| 2 | Worker B | `me.py`, `me_repo.py` | attendance, evaluations, assignments, submissions, lesson-logs GET, skill-progress |
+| 3 | Worker B | `me.py`, `me_repo.py` | installments, receipts, `POST /me/lesson-logs` |
+
+Each batch prompt carries the closed endpoint table with exact SQL and ordering from the implementation plan. After each batch Claude Code audits the diff and runs the suite; the next batch does not start until the previous one is `[APPROVED]`. Cline Worker D is **not** run in parallel (batches 1–3 share two files; a merge conflict costs more than the parallelism saves). Worker A / Worker C have no work in this phase (no UI, no shell scaffolding).
+
+Deploy (Ibrahim, production SSH): `git push` + `bash deploy/push.sh …` → `deploy.sh` runs `up -d --build api`, so the API rebuilds. **No migration, no dashboard cache bump** (`v=` unchanged — no `web/` file changes). Public check: `/api/v1/health` → 200 and `GET /api/v1/me/profile` without a token → 401 (proves the router is mounted). The mobile app (Phase 5 (c)) consumes this contract later; nothing on production depends on it shipping first.
+
+---
+
+## 5. Out of scope (Phase 5 (c)+ backlog)
+
+- Android Compose app wiring to `/me/*` (Phase 5 (c)).
+- Teacher-side homework camera upload (`POST /me/submissions` with files) — needs storage design.
+- Guardian push notifications / WhatsApp hooks — needs a messaging provider decision.
+- Partial unique index on `lesson_logs (schedule_id, date)` after a production dedupe pass.
+- Mada payments (Grand Slam later package).
