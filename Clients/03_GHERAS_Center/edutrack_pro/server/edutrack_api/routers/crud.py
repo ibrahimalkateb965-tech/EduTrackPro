@@ -30,6 +30,7 @@ RESOURCES = {
     "ledger-accounts": "ledger_accounts", "ledger-entries": "ledger_entries", "assignments": "assignments",
     "submissions": "submissions", "lesson-logs": "lesson_logs", "study-plans": "study_plans",
     "skill-progress": "skill_progress", "evaluations": "evaluations", "tasks": "tasks", "messages": "messages",
+    "message-templates": "message_templates",
     "certificates": "certificates", "dismissals": "dismissals", "branches": "branches", "month-closures": "month_closures",
 }
 

@@ -251,10 +251,11 @@ def test_supervisor_staff_salary_masking_and_write_guard(client, manager):
     assert patch_salary.status_code == 403
     assert patch_salary.json()["error"]["code"] == "forbidden"
 
-    # Updating other fields like phone succeeds
+    # Any staff write is manager-only since the strict RBAC pass (a82c071), even non-salary fields.
     patch_phone = client.patch(f"/api/v1/staff/{staff_id}", json={"phone": "0559998877"}, headers=sup)
-    assert patch_phone.status_code == 200
-    assert patch_phone.json()["phone"] == "0559998877"
+    assert patch_phone.status_code == 403
+    assert patch_phone.json()["error"]["code"] == "forbidden"
+    assert client.get(f"/api/v1/staff/{staff_id}", headers=manager).json()["phone"] == "0551234567"
 
 
 def test_supervisor_finance_guard_strict(client, manager):

@@ -106,7 +106,9 @@ def test_role_matrix_for_supervisor(client, supervisor):
     assert client.get(f"{API}/users", headers=supervisor).status_code == 200
     res = client.post(f"{API}/users", json={"username": "z", "password": "p", "role": "teacher"}, headers=supervisor)
     assert res.status_code == 403 and res.json()["error"]["code"] == "forbidden"
-    assert client.post(f"{API}/rooms", json={"name": "ح", "group_name": "المساء"}, headers=supervisor).status_code == 200
+    # Rooms/staff writes are manager-only since the strict RBAC pass (a82c071); supervisors may only read them.
+    rooms_res = client.post(f"{API}/rooms", json={"name": "ح", "group_name": "المساء"}, headers=supervisor)
+    assert rooms_res.status_code == 403 and rooms_res.json()["error"]["code"] == "forbidden"
 
 
 def test_finance_flow_fee_plan_payment_receipt_ledger_reports(db, client, manager):

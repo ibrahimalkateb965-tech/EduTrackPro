@@ -112,18 +112,20 @@ def guardian_card(
     )
     return _resp({
         "template": "guardian_card",
-        "card_no": s["id"],
+        "card_no": f"GHR-{str(s['id'])[:6].upper()}",
+        "academic_year": "1447-1448 هـ",
+        "national_id": s.get("national_id") or "—",
         "date": _today().isoformat(),
         "student_name": s["name"],
-        "group_name": s["group_name"] or "",
-        "room_name": s["room_name"] or "",
-        "father_phone": s["father_phone"] or "",
-        "mother_phone": s["mother_phone"] or "",
-        "guardian_phone": s["guardian_phone"] or "",
+        "group_name": s["group_name"] or "—",
+        "room_name": s["room_name"] or "—",
+        "father_phone": s["father_phone"] or "—",
+        "mother_phone": s["mother_phone"] or "—",
+        "guardian_phone": s["guardian_phone"] or "—",
         "pickup_type": s["pickup_type"] or "ولي الأمر",
-        "pickup_name": s["pickup_name"] or "",
-        "pickup_relation": s["pickup_relation"] or "",
-        "pickup_phone": s["pickup_phone"] or "",
+        "pickup_name": s["pickup_name"] or "—",
+        "pickup_relation": s["pickup_relation"] or "—",
+        "pickup_phone": s["pickup_phone"] or "—",
     })
 
 
@@ -320,13 +322,19 @@ def schedule(room: str | None = None, room_id: str | None = None, conn=Depends(g
     if not rid:
         raise ApiError(400, "validation_error", "معرف القاعة مطلوب")
     r = _one(conn, "SELECT * FROM rooms WHERE id=%s AND deleted_at IS NULL", (rid,), "القاعة غير موجودة")
-    rows = conn.execute("SELECT * FROM schedules WHERE room_id=%s AND deleted_at IS NULL ORDER BY start_time", (rid,)).fetchall()
+    rows = conn.execute(
+        "SELECT sc.*, COALESCE(st.name, u.username) AS teacher FROM schedules sc "
+        "LEFT JOIN users u ON u.id = sc.teacher_user_id "
+        "LEFT JOIN staff st ON st.id = u.staff_id "
+        "WHERE sc.room_id = %s AND sc.deleted_at IS NULL ORDER BY sc.start_time",
+        (rid,),
+    ).fetchall()
     periods = {}
     for x in rows:
         key = (str(x["start_time"]), str(x["end_time"]))
-        periods.setdefault(key, {"start_time": key[0], "end_time": key[1], "sun": "", "mon": "", "tue": "", "wed": "", "thu": ""})[
-            {"الأحد": "sun", "الاثنين": "mon", "الثلاثاء": "tue", "الأربعاء": "wed", "الخميس": "thu"}.get(x["day"], "sun")
-        ] = x["subject"]
+        periods.setdefault(key, {"start_time": key[0], "end_time": key[1], "sat": "", "sun": "", "mon": "", "tue": "", "wed": "", "thu": ""})[
+            {"السبت": "sat", "الأحد": "sun", "الاثنين": "mon", "الثلاثاء": "tue", "الأربعاء": "wed", "الخميس": "thu"}.get(x["day"], "sat")
+        ] = f"{x['subject']} — {x['teacher']}" if x["teacher"] else x["subject"]
     return _resp({"template": "schedule", "room": r["name"], "group": r["group_name"] or "—", "periods": list(periods.values())})
 
 
@@ -446,7 +454,7 @@ def lesson_log(
     if schedule:
         s = _one(
             conn,
-            "SELECT sc.*, r.name room, u.username teacher FROM schedules sc JOIN rooms r ON r.id=sc.room_id LEFT JOIN users u ON u.id=sc.teacher_user_id WHERE sc.id=%s AND sc.deleted_at IS NULL",
+            "SELECT sc.*, r.name room, coalesce(st.name, u.username) teacher FROM schedules sc JOIN rooms r ON r.id=sc.room_id LEFT JOIN users u ON u.id=sc.teacher_user_id LEFT JOIN staff st ON st.id=u.staff_id WHERE sc.id=%s AND sc.deleted_at IS NULL",
             (schedule,),
             "الحصة غير موجودة",
         )
