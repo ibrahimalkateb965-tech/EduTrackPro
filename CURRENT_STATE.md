@@ -4,8 +4,8 @@
 > **Master Orchestrator**: `Claude Code CLI` (Opus Max / Sonnet 5)  
 > **Handoff Source**: `Antigravity IDE` (Interactive Cockpit & Visual Inspector)  
 > **Timestamp**: 2026-09-16T12:55:00+03:00  
-> **Last updated:** 2026-09-20 18:35 — B-5.1/B-5.2 teacher-scope hotfix committed `2a63c50` [APPROVED], deploy pending (Ibrahim); next = Phase 5 (b) design Sections 3–4 — Claude Code CLI
-> **VCS:** git at workspace root, branch `main`, HEAD `2a63c50` — **`[ahead 6]` of `origin/main` (`ed82028` is pushed and deployed; unpushed = chore(state) ×4 + docs(phase5) `da4b0aa` + fix(auth) `2a63c50`), push pending: yes** (Ibrahim). Phase 4 (e) = `ed82028`, Phase 4 (c) = `95216ba`, Phase 4 (a) = `f276ad6`, Phase 4 (b) = `1945d95`. Phase 1 = `fc071f6`, Phase 2 = `a28299b`, Phase 2.5 = `eabac22`, Phase 3 audit = `52ce581` + `6e2e434` + `469e280` (all [APPROVED]). **Working tree clean** (Ibrahim committed the §5d-approved tree at 08:22, superseding his earlier `keep`). Remote `origin` = https://github.com/ibrahimalkateb965-tech/EduTrackPro.git. Quarantine enforced by root `.gitignore` (Rule 8).  
+> **Last updated:** 2026-09-20 18:50 — strategic-clear handoff (Hook 25). B-5.1/B-5.2 hotfix `2a63c50` [APPROVED], deploy pending (Ibrahim); Phase 5 (b) Section 3 presented in chat and written to the spec, awaiting approval — Claude Code CLI
+> **VCS:** git at workspace root, branch `main`, HEAD `c09f1a0`+ — **`[ahead 7]` of `origin/main` (`ed82028` is pushed and deployed; unpushed = chore(state) ×5 + docs(phase5) `da4b0aa` + fix(auth) `2a63c50`), push pending: yes** (Ibrahim). Phase 4 (e) = `ed82028`, Phase 4 (c) = `95216ba`, Phase 4 (a) = `f276ad6`, Phase 4 (b) = `1945d95`. Phase 1 = `fc071f6`, Phase 2 = `a28299b`, Phase 2.5 = `eabac22`, Phase 3 audit = `52ce581` + `6e2e434` + `469e280` (all [APPROVED]). **Working tree clean** (Ibrahim committed the §5d-approved tree at 08:22, superseding his earlier `keep`). Remote `origin` = https://github.com/ibrahimalkateb965-tech/EduTrackPro.git. Quarantine enforced by root `.gitignore` (Rule 8).  
 
 ---
 
@@ -420,12 +420,22 @@ Commit **`2a63c50`** `fix(auth): row-scope teacher access on attendance routes (
 
 ---
 
-## 6. THE ONE THING TO DO NEXT (updated 2026-09-20 18:35, after B-5.1/B-5.2 hotfix)
+## 5l. Phase 5 (b) — Section 3 presented (2026-09-20 ~18:40, Claude Code only, design, no code)
 
-HEAD `2a63c50` on `main`, **`[ahead 6]` of `origin/main`**, working tree clean (before the state commit). Production still = **v=3.0, `ed82028`** — the hotfix is **committed, not deployed** (§5k deploy steps, Ibrahim). Phase 4 closed.
+Section 3 written into `docs/PHASE5_SPEC.md` exactly as presented: 3.1 student projections (allow-lists for guardian/teacher), 3.2 `POST /me/lesson-logs` = SELECT-then-write, **no 007 migration** (dashboard's generic `POST /lesson-logs` may already have produced duplicates; a partial unique index would need a prod dedupe and would 409 the dashboard), 3.3 references the shipped `2a63c50` guards, 3.4 guardian read details. **Not yet approved.** One open decision for Ibrahim: keep `guardian_phone`/`guardian_relation` on the **teacher** projection (recommended) or hide it.
 
-**Now: (a) Phase 5 (b) design continues** — `docs/PHASE5_SPEC.md`: Sections 1–2 approved (§1 teacher branch is now real code in `scope.py`), present **Section 3** (guardian projection allow-list, `POST /me/lesson-logs` semantics incl. the `lesson_logs (schedule_id, date)` uniqueness decision) then **Section 4** (errors, pagination, tests, delegation, deploy); spec self-review; Ibrahim reviews the file; then `superpowers:writing-plans`.
+---
 
-After (a): **(c)** Android module against the approved `/me/*` contract; **(d)** housekeeping (12 `toList()` copies → `api.js` via Cline Worker C; first restore drill on the VPS by Ibrahim).
+## 6. THE ONE THING TO DO NEXT (updated 2026-09-20 18:50, strategic-clear mid-design of Phase 5 (b))
 
-Pre-conditions unchanged: free ≥ 4 GB RAM before running the fleet (never with Docker Desktop up), one `opencode run` at a time with ≤ 4 files per batch, Codex via `-s workspace-write`, embedded PG booter must stay alive in the background while pytest runs (`TEST_DATABASE_URL` = superuser URI for fixtures, `DATABASE_URL` = `gheras_app` URI for the API; this session's booter: scratchpad `872795f8-…/pg_boot.py`, stopped cleanly). Production SSH/DB stays Ibrahim's action (auto-mode classifier).
+HEAD `c09f1a0` + this freeze on `main`, **`[ahead 7]` of `origin/main`** (push pending: yes — Ibrahim). Production = **v=3.0, `ed82028`**; hotfix `2a63c50` is **committed, not deployed** (§5k steps). Phase 4 closed.
+
+Active work = **Phase 5 (b) design**, `docs/PHASE5_SPEC.md`: Sections 1–2 approved, **Section 3 presented and awaiting approval** (open decision 3.1 `guardian_phone` for teachers), Section 4 pending.
+
+**Next choices (Ibrahim decides after `/clear`):**
+- **(a)** Deploy the hotfix: `git push` + `deploy/push.sh` (API rebuild, no migration), paste back `/api/v1/health`; Claude re-checks publicly and marks B-5.1/B-5.2 live.
+- **(b)** Continue Phase 5 (b) design: Ibrahim answers 3.1 and approves Section 3 → present Section 4 (errors, pagination, tests, delegation, deploy) → spec self-review → Ibrahim reviews `PHASE5_SPEC.md` → `superpowers:writing-plans`.
+- **(c)** Android app module — Compose over Room + `homework-core` (Gradle `-Xmx400m`, local 9.4.1 dist, JDK 17); better after (b) so the app targets the approved `/me/*` contract.
+- **(d)** Housekeeping — dedupe the 12 per-view `toList()` copies into `api.js` (Cline Worker C); first monthly restore drill on the VPS per `deploy/DEPLOY.md` → Backups (Ibrahim, SSH).
+
+Pre-conditions unchanged: free ≥ 4 GB RAM before running the fleet (never with Docker Desktop up), one `opencode run` at a time with ≤ 4 files per batch, Codex via `-s workspace-write`, embedded PG booter must stay alive in the background while pytest runs (`TEST_DATABASE_URL` = superuser URI for fixtures, `DATABASE_URL` = `gheras_app` URI for the API; simplified booter at scratchpad `872795f8-9f7d-418d-9b09-861aabb7cde0/pg_boot.py`, cluster stopped cleanly with `pg_ctl -m fast stop`). Production SSH/DB stays Ibrahim's action (auto-mode classifier).

@@ -2,7 +2,7 @@
 
 - **Owner**: Autovem Master Architect (Claude Code CLI)
 - **Client**: Gheras Center (`Clients/03_GHERAS_Center`)
-- **Status**: **[DESIGN IN PROGRESS — Sections 1–2 APPROVED by Ibrahim 2026-09-20, Sections 3–4 PENDING]**
+- **Status**: **[DESIGN IN PROGRESS — Sections 1–2 APPROVED by Ibrahim 2026-09-20, Section 3 PRESENTED (awaiting approval, open decision 3.1), Section 4 PENDING]**
 - **Baseline**: `af6afff` on `main` (Phase 4 closed in production, v=3.0, migrations 001–006)
 - **Process**: superpowers brainstorming, architectural path. Next steps after Section 4 approval: spec self-review → Ibrahim reviews this file → `superpowers:writing-plans` → delegate routers to OpenCode Worker B (Muse Spark), tests by Claude Code only.
 
@@ -85,13 +85,36 @@ Rules:
 
 ---
 
-## 3. Guardian projection, teacher writes & guards — **[PENDING — not yet presented]**
+## 3. Guardian projection, teacher writes & guards — **[PRESENTED 2026-09-20 18:40 — awaiting Ibrahim's approval; one open decision (3.1)]**
 
-To cover (draft intent, not approved):
-- Guardian `students` projection allow-list: `id, name, birth_date, nationality, gender, room_id, room_name, group_name, status, has_difficulties` — **excluded**: `national_id`, `difficulty_notes`, `child_notes`, `father_*`, `mother_*`, `guardian_phone`, `pickup_*`, `previous_*`, `education_notes`, `branch_id`, timestamps.
-- Teacher `students` rows: full row minus `national_id`? (question for Ibrahim).
-- `POST /me/lesson-logs` validation (`status ∈ {'تمت','مؤجلة','ملغاة'}` per `chk_lesson_logs_status`, `date` ISO, `schedule_id` must exist and be in scope), audit action. **Note:** `lesson_logs` has **no** unique constraint on `(schedule_id, date)` (`001_schema.sql:503-521`) — upsert must be SELECT-then-INSERT/UPDATE like `save_daily_evaluations`, or add `uq_lesson_logs_schedule_date` in a 007 migration (decision for Section 3).
-- Exact guard placement in `attendance.py` (3 routes + alias) and 403 Arabic messages.
+Code facts behind this section: the dashboard writes lesson logs through the generic `POST /lesson-logs` (`crud.py:31`, no uniqueness), so duplicates on `(schedule_id, date)` may already exist in production; the mobile `LessonLogDao.getByScheduleAndDate(...) LIMIT 1` already treats the pair as unique. `attendance.py` guards shipped early as hotfix `2a63c50` (B-5.1 + B-5.2).
+
+### 3.1 Student projections (`GET /me/students` — both roles get a projected row, never `SELECT *`)
+
+| Column set | Guardian | Teacher |
+| :--- | :--- | :--- |
+| `id, name, birth_date, nationality, gender, room_id, room_name, group_name, status, has_difficulties` | yes | yes |
+| `difficulty_notes, child_notes` (notes written for the teacher) | no | yes |
+| `guardian_phone, guardian_relation` (one contact number for the call/WhatsApp hook) | no | **yes — OPEN DECISION (Ibrahim): keep (recommended) or hide and route contact through the center** |
+| `national_id, father_*, mother_*, pickup_*, previous_*, education_notes, branch_id, timestamps` | no | no |
+
+Allow-list, not deny-list: a future column is hidden by default. The guardian already knows the child's ID and phones; excluding them limits the blast radius of a mis-linked account.
+
+### 3.2 `POST /me/lesson-logs`
+
+- Body `{schedule_id, date, status, covered?, homework?, notes?}`; `status ∈ {'تمت','مؤجلة','ملغاة'}` (`chk_lesson_logs_status`), `date` ISO → otherwise 422 `validation_error`.
+- Scope: `SELECT room_id, branch_id FROM schedules WHERE id = %s AND deleted_at IS NULL`; no row → 404 `not_found`; `room_id ∉ scope.room_ids` → 403 `forbidden`. Covering a slot owned by another teacher is **allowed** (D2 is room-based).
+- **Uniqueness: SELECT-then-write, no 007 migration.** Match `WHERE schedule_id = %s AND date = %s AND deleted_at IS NULL ORDER BY updated_at DESC LIMIT 1` so pre-existing duplicates do not break the write. UPDATE = full replace of `status, covered, homework, notes` + `teacher_user_id = me, updated_at = now()` (mobile sends the whole entity). INSERT sets `teacher_user_id = me` and `branch_id` from the schedule. Rejected alternative: a partial unique index would need a production dedupe pass first and would turn the dashboard's generic `POST /lesson-logs` into 409s — a behaviour change outside this phase. Race window = one teacher on one slot; negligible. Same pattern as `save_daily_evaluations`.
+- Response: the row (200, as `crud.py` create) + `write_audit(actor, "update", "lesson_logs", row.id, {schedule_id, date, status})`.
+
+### 3.3 `attendance.py` guards — shipped (`2a63c50`)
+
+`_teacher_scope()` helper; whole-batch `scope.assert_students(...)` after `_validate` and before any write; `GET /daily-evaluations` appends `AND e.student_id = ANY(%s)` with an empty-scope short-circuit `{items: [], total: 0}`; `POST /attendance/staff` is manager/supervisor only (B-5.2: it writes `payroll_runs`; no teacher client exists). 403 message «الطالب خارج نطاق صلاحيتك». Tests: `tests/test_teacher_scope.py` (10). Nothing further to design.
+
+### 3.4 Guardian read details
+
+- `/me/lesson-logs` for guardian drops `notes` (§2); `covered` and `homework` stay.
+- `/me/assignments` rows carry `student_ids` intersected with scope only; `/me/submissions` never returns another child's files.
 
 ## 4. Errors, pagination, testing & delegation — **[PENDING — not yet presented]**
 
