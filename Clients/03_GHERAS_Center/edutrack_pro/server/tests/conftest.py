@@ -83,3 +83,45 @@ def manager(db, client):
 def supervisor(db, client):
     make_user(db, "super1", "supervisor")
     return login(client, "super1")
+
+
+# ---- Phase 5 helpers (shared by test_teacher_scope.py and test_me_scope.py) ----
+
+
+def _room(client, manager: dict, name: str) -> str:
+    res = client.post("/api/v1/rooms", json={"name": name, "group_name": "الصباح"}, headers=manager)
+    assert res.status_code == 200, res.text
+    return res.json()["id"]
+
+
+def _student(client, manager: dict, name: str, room_id: str | None) -> str:
+    res = client.post(
+        "/api/v1/students",
+        json={"name": name, "guardian_phone": "0500000000", "gender": "بنين", "room_id": room_id},
+        headers=manager,
+    )
+    assert res.status_code == 200, res.text
+    return res.json()["id"]
+
+
+def _teacher(db, client, username: str, room_id: str | None) -> tuple[str, dict]:
+    uid = make_user(db, username, "teacher")
+    if room_id:
+        db.execute("UPDATE users SET room_id = %s WHERE id = %s", (room_id, uid))
+        db.commit()
+    return str(uid), login(client, username)
+
+
+def _guardian(db, client, username: str, child_ids: list[str]) -> tuple[str, dict]:
+    """guardians row + student_guardians links + a guardian user pointing at it."""
+    phone = f"05{uuid.uuid4().int % 10**8:08d}"  # uq_guardians_phone
+    gid = db.execute(
+        "INSERT INTO guardians (name, phone, relation) VALUES (%s, %s, 'الأب') RETURNING id",
+        (username, phone),
+    ).fetchone()["id"]
+    for cid in child_ids:
+        db.execute("INSERT INTO student_guardians (student_id, guardian_id) VALUES (%s, %s)", (cid, gid))
+    uid = make_user(db, username, "guardian")  # commits
+    db.execute("UPDATE users SET guardian_id = %s WHERE id = %s", (gid, uid))
+    db.commit()
+    return str(uid), login(client, username)

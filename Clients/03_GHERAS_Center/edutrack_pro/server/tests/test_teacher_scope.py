@@ -9,33 +9,9 @@ from __future__ import annotations
 
 import datetime
 
-from tests.conftest import login, make_user
+from tests.conftest import _room, _student, _teacher
 
 TODAY = datetime.date.today().isoformat()
-
-
-def _room(client, manager, name: str) -> str:
-    res = client.post("/api/v1/rooms", json={"name": name, "group_name": "الصباح"}, headers=manager)
-    assert res.status_code == 200, res.text
-    return res.json()["id"]
-
-
-def _student(client, manager, name: str, room_id: str | None) -> str:
-    res = client.post(
-        "/api/v1/students",
-        json={"name": name, "guardian_phone": "0500000000", "gender": "بنين", "room_id": room_id},
-        headers=manager,
-    )
-    assert res.status_code == 200, res.text
-    return res.json()["id"]
-
-
-def _teacher(db, client, username: str, room_id: str | None) -> tuple[str, dict]:
-    uid = make_user(db, username, "teacher")
-    if room_id:
-        db.execute("UPDATE users SET room_id = %s WHERE id = %s", (room_id, uid))
-        db.commit()
-    return str(uid), login(client, username)
 
 
 def _att(student_id: str, status: str = "حاضر") -> list[dict]:
