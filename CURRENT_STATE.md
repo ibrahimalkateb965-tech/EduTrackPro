@@ -4,8 +4,8 @@
 > **Master Orchestrator**: `Claude Code CLI` (Opus Max / Sonnet 5)  
 > **Handoff Source**: `Antigravity IDE` (Interactive Cockpit & Visual Inspector)  
 > **Timestamp**: 2026-09-16T12:55:00+03:00  
-> **Last updated:** 2026-09-20 13:23 — pre-clear freeze (Hook 25) at `d7aad49`, level with `origin/main` (pushed by Ibrahim); Phase 4 (a) nightly backup **[APPROVED]** (§5g) committed as `f276ad6`; **VPS deploy of the backup timer not yet confirmed** (needs `push.sh` + `list-timers` paste-back) — Claude Code CLI  
-> **VCS:** git at workspace root, branch `main`, HEAD `d7aad49` — **level with `origin/main`, push pending: no**. Phase 4 (a) = `f276ad6`, Phase 4 (b) = `1945d95`. Phase 1 = `fc071f6`, Phase 2 = `a28299b`, Phase 2.5 = `eabac22`, Phase 3 audit = `52ce581` + `6e2e434` + `469e280` (all [APPROVED]). **Working tree clean** (Ibrahim committed the §5d-approved tree at 08:22, superseding his earlier `keep`). Remote `origin` = https://github.com/ibrahimalkateb965-tech/EduTrackPro.git. Quarantine enforced by root `.gitignore` (Rule 8).  
+> **Last updated:** 2026-09-20 ~15:10 — Phase 4 (a) **verified live on VPS** (timer active, first dump `edutrack_20260920_095055.dump` 172K); Phase 4 (c) pagination **[APPROVED]** (§5h) committed as `95216ba`, **push + `push.sh` pending** (v=3.0) — Claude Code CLI  
+> **VCS:** git at workspace root, branch `main`, HEAD `95216ba` — **1 ahead of `origin/main`, push pending: yes** (Ibrahim). Phase 4 (c) = `95216ba`, Phase 4 (a) = `f276ad6`, Phase 4 (b) = `1945d95`. Phase 1 = `fc071f6`, Phase 2 = `a28299b`, Phase 2.5 = `eabac22`, Phase 3 audit = `52ce581` + `6e2e434` + `469e280` (all [APPROVED]). **Working tree clean** (Ibrahim committed the §5d-approved tree at 08:22, superseding his earlier `keep`). Remote `origin` = https://github.com/ibrahimalkateb965-tech/EduTrackPro.git. Quarantine enforced by root `.gitignore` (Rule 8).  
 
 ---
 
@@ -325,13 +325,46 @@ No web changes: `v=2.9` stays. First timer fire 2026-09-21 03:00 UTC. Monthly re
 
 ---
 
-## 6. THE ONE THING TO DO NEXT (updated 2026-09-20 13:23, Phase 4 (a) pushed, VPS deploy unconfirmed)
+## 5h. Phase 4 (c) — Pagination past `limit=100` (2026-09-20 ~14:30 AST, dual-harness: OpenCode Worker A ∥ Cline Worker C)
 
-HEAD is `d7aad49` on `main`, **level with `origin/main`** (pushed), **working tree clean**. Production = **v=2.9, migrations 001–006**; backup timer install **unconfirmed** — if `push.sh` has not run since `f276ad6`, that is the first action (§5g deploy notes), then paste back `systemctl list-timers edutrack-backup.timer`. Phase 3 **[APPROVED]** (§5e), Phase 4 (b) **[APPROVED]** (§5f) and live, Phase 4 (a) **[APPROVED]** (§5g) awaiting deploy. Two lessons flushed to `.agents/MEMORY_STORE.md` (`users.staff_id` not unique → `UPDATE 2`; public `curl` allowed for post-deploy checks). Ibrahim picks Phase 4:
+Pre-flight: Phase 4 (a) confirmed live by Ibrahim's paste-back — `edutrack-backup.timer` active/enabled (NEXT Mon 2026-09-21 03:00 UTC), first dump `edutrack_20260920_095055.dump` (172K, 440 TOC entries), `/api/v1/health` 200, `web/dashboard/` 200 v=2.9. Free RAM was 2.1 GB → Ibrahim freed to 4.7 GB before dispatch.
 
-- **(a)** ✅ **DONE 2026-09-20 (§5g), commit `f276ad6`, pushed** — `deploy/backup.sh` + `edutrack-backup.{service,timer}` installed by `deploy.sh`; restore drill in `DEPLOY.md`. Remaining: Ibrahim runs `push.sh` (if not done) and pastes back `systemctl list-timers edutrack-backup.timer` + `ls -lh /opt/edutrack/backups`; Claude re-checks `/api/v1/health` 200 publicly.
-- **(b)** ✅ **DONE 2026-09-20 (§5f)** — Settings-driven `academic_year` — `settings` table + `006` migration (OpenCode Worker B), `print.py` reads it instead of the hard-coded `1447-1448 هـ`, a settings-view field; Claude tests on embedded PG. Bundle the `users(staff_id)` partial unique index into 006.
-- **(c)** Pagination past `limit=100` — `fetchAll` helper in `api.js` (offset loop, ≤ 500 per page) and switch the views; Claude verifies with `node --check` + a seeded 150-student run.
+| Deliverable | Agent | Status | Notes |
+| :--- | :--- | :--- | :--- |
+| `api.fetchAll(path)` in `web/dashboard/js/api.js` | Claude Code (inline, ~20 lines — the only piece carrying correctness risk) | ✅ committed | First page at `limit=500` reveals `total`; remaining pages fetched **in parallel** (`Promise.all`); `HARD_CAP=20000` guards a bogus `total`; array responses pass through unchanged; `?`/`&` chosen by `path.includes('?')`. Reuses `request()` → 401 logout + Arabic error text. |
+| Sweep `.get('<list>')` → `.fetchAll('<list>')` in `students/staff/rooms/payments.js` | OpenCode Worker A (`opencode-go/glm-5.3-flash`, batch 1) | ✅ audited | 15 pure substitutions, `reports/finance` left as `.get`. |
+| Sweep in `finance/communication/home/settings.js` | Cline Worker C (`z-ai/glm-5.3-flash`, parallel harness, 8 iterations) | ✅ audited | 31 pure substitutions; `me`, `settings`, `reports/*`, `params.get('tab')` untouched. |
+| Sweep in `accounts/attendance/expenses/reports.js` | OpenCode Worker A (batch 2) | ✅ audited | 9 pure substitutions; `evaluations/daily?date=` and `reports/attendance?…` left as `.get`. |
+| Cache-bust `v=2.9` → `v=3.0` in `index.html` **and** the two dynamic view imports in `app.js` | Claude Code (2 `sed` lines) | ✅ | Both pins moved together per the MEMORY_STORE cache-pin lesson. |
+| `test_students_pagination_past_100` in `server/tests/test_api.py` | Claude Code | ✅ | Seeds 150 students via `generate_series`; asserts `limit=100` → 100/`total=150`, `offset=100` → 50, `limit=500` → 150, ids of the two pages == the full page (gap-free stable walk), `limit=501` → 422. |
+
+Worker orders carried an explicit ALLOW list (16 resource names) and DENY list (`me`, `settings`, `auth/*`, `reports/*`, `evaluations/daily`, all writes) so no judgement was left to GLM Flash; each diff was audited with `git diff -U0` filtered to non-substitution lines → **zero stray lines across all 12 views, zero patches needed**. Server unchanged: `crud.py:222-246` already caps `1 ≤ limit ≤ 500` and `generic.py:84` orders `created_at DESC, id`, so offset walking is deterministic.
+
+### Verification (Claude exclusive)
+`node --check` 14/14 modules; **fetchAll Node unit test 5/5** (stubbed `fetch`: 150 rows → 1 call; 1 200 rows → 3 calls, order preserved; `schedules?room_id=abc` → `…&limit=500&offset=0`; array passthrough; empty set); repo-wide grep for bare list `.get(` calls in views → **0**; **pytest 53/53** (52 + 1) on embedded PG 16 with 001–006 (fixtures superuser, API `gheras_app`, 42 s); hygiene 16 files: 0 BOM, 0 CRLF, 0 Eastern digits.
+
+### Verdict: **[APPROVED]** — 16 modified files, committed as `95216ba` `feat(dashboard): paginate list fetches past limit=100 via api.fetchAll`.
+
+### Behaviour notes (not blockers)
+- The JSON backup export in `home.js` / `settings.js` previously dumped the raw `{items,total,limit,offset}` envelope per resource; it now exports the full arrays — the correct behaviour, but a shape change for anyone parsing old backups.
+- Payloads grow with the data (≤ 500 rows per request); `students`/`payments` at Gheras scale remain a single request each.
+- Each view still carries its own `toList()` copy (12 copies) — harmless (arrays pass `Array.isArray`), dedupe is optional backlog.
+
+### Deploy notes for Ibrahim (production SSH stays his action)
+1. `git push` (HEAD `95216ba`, 1 ahead).
+2. On the VPS: `deploy/push.sh` (static files only — no migration; the API does not need a restart).
+3. Paste back: `curl -s https://<host>/web/dashboard/ | grep -o 'v=3.0' | head -2` (expect 2 hits) and `curl -s https://<host>/api/v1/health` (expect 200 `{"status":"ok","version":"2.0.0"}`). Claude re-checks both publicly.
+4. Optional browser smoke: open الطلاب with a hard refresh (Ctrl+F5) and confirm the count matches `SELECT count(*) FROM students WHERE deleted_at IS NULL`.
+
+---
+
+## 6. THE ONE THING TO DO NEXT (updated 2026-09-20 ~15:10, Phase 4 (c) committed, push + deploy pending)
+
+HEAD is `95216ba` on `main`, **1 ahead of `origin/main`** (push is Ibrahim's action), **working tree clean**. Production = **v=2.9, migrations 001–006, backup timer live** (§5h pre-flight). First action: Ibrahim runs `git push` + `deploy/push.sh`, pastes back the two `curl` lines from §5h step 3; Claude verifies `v=3.0` publicly. Then Ibrahim picks the last Phase 4 item:
+
+- **(a)** ✅ **DONE + VERIFIED LIVE 2026-09-20 (§5g, §5h pre-flight)** — timer active, first dump 172K.
+- **(b)** ✅ **DONE + LIVE (§5f)** — settings-driven identity, v=2.9.
+- **(c)** ✅ **DONE 2026-09-20 (§5h), commit `95216ba`, push pending** — `api.fetchAll` + 55 call sites across 12 views, v=3.0, pytest 53/53.
 - **(e)** Print-template identity pass — bind `{{center_name}}`, `{{center_phone}}`, `{{center_address}}`, `{{manager_title}}`, `{{manager_name}}` in the 11 `web/print/templates/*.html` headers (payload already carries them since §5f); Cline Worker C edits templates in batches of 4, Claude runs `test_print.py` + a rendered-HTML grep for the hard-coded «مركز غراس» / «حوطة بني تميم».
 - **(d)** ✅ folded into 006 step 3a (§5f) — the stray row `c0997630-…` is retired by id on deploy; no manual SQL.
 
