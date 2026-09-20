@@ -292,16 +292,44 @@ First run of **Cline CLI v3.0.62** as Worker C (`cline --auto-approve true -c <d
 3. After deploy: `curl -s https://gheras.autovem.tech/web/dashboard/ | grep -o 'v=2\.[0-9]*'` → `v=2.9`; the manager sees the new card under «الإعدادات» and the guardian card prints the settings year.
 
 ### Not in scope (remaining Phase 4 backlog)
-- (a) nightly `pg_dump` backup; (c) pagination past `limit=100`.
+- (a) nightly `pg_dump` backup → done in §5g; (c) pagination past `limit=100`.
 - The 11 print templates still hard-code «مركز غراس» / «حوطة بني تميم» in their HTML headers; the payload now carries `center_name`, `center_phone`, `center_address`, `manager_title`, `manager_name`, so a template pass can bind `{{center_name}}` etc. without any further API work.
 
 ---
 
-## 6. THE ONE THING TO DO NEXT (updated 2026-09-20 10:43, Phase 4 (b) deployed)
+## 5g. Phase 4 (a) — Nightly `pg_dump` backup (2026-09-20 ~12:15 AST, dual-harness: OpenCode Worker A ∥ Cline Worker C)
 
-HEAD is `1945d95` on `main`, **level with `origin/main`** (pushed), **working tree clean**, no untracked project files. Production = **v=2.9, migrations 001–006** (`/api/v1/health` 200 at 10:43). Phase 3 **[APPROVED]** (§5e), Phase 4 (b) **[APPROVED]** (§5f) and live. Two lessons flushed to `.agents/MEMORY_STORE.md` (`users.staff_id` not unique → `UPDATE 2`; public `curl` allowed for post-deploy checks). Ibrahim picks Phase 4:
+Plan: `docs/superpowers/plans/2026-09-20-phase4a-nightly-backup.md` (gitignored). Commit `f276ad6`.
 
-- **(a)** Nightly `pg_dump` backup — `deploy/backup.sh` (`docker compose exec -T db pg_dump -Fc` → `/opt/edutrack/backups/`, 14-day rotation) + `deploy/edutrack-backup.timer`/`.service` installed by `deploy.sh`; restore drill documented in `DEPLOY.md`. Worker A writes the shell, Claude validates with `bash -n` + a restore into embedded PG.
+- **OpenCode Worker A** (`glm-5.3-flash`, ~4 min, two `lean-ctx` read timeouts then recovered) wrote `deploy/backup.sh`, `deploy/edutrack-backup.service`, `deploy/edutrack-backup.timer` from a 9-point contract — matched line-for-line.
+- **Cline Worker C** (`z-ai/glm-5.3-flash`, 30 s, $0.00, parallel) made exactly the 5 ordered edits to `deploy/DEPLOY.md` (Files table, verify bullet, day-2 line, `## Backups` with monthly restore drill + disaster restore, out-of-scope wording).
+- **Claude** edited `deploy/deploy.sh` (+17: preflight list, `backups` section between API health and admin seed — `install -d -m 700`, `__ROOT__` render, `systemd-analyze verify`, `enable --now` timer, synchronous `systemctl start edutrack-backup.service` smoke test that dies if no dump appears — and a summary line).
+
+### Design
+`pg_dump -Fc` through the same `COMPOSE` array as `deploy.sh` (socket trust inside the container, `.env` never sourced), atomic `.part` → `mv`, `pg_restore -l` TOC ≥ 40, `flock` single instance, 200 MiB free-space guard, `find -mtime +14 -delete` only after a successful dump. Dir `0700`, files `0600`, root. Timer `OnCalendar=*-*-* 03:00:00 UTC`, `Persistent=true`.
+
+### Verification (Claude exclusive)
+`bash -n` clean; unit static gates 4/4. Unmodified `backup.sh` run on embedded PG 16 (001–006) via a `docker` shim: dump 168 K / 438 TOC entries; rotation removed a 20-day file and kept a 5-day file; lock contention exit 2; `pg_dump` failure exit 1 with no `.part`. Restore by file and by stdin (as documented) identical to source: 45 tables | 6 settings | `uq_users_active_staff` | 43 triggers | 137 `gheras_app` grants. API suite **52 passed** (47 s). Windows-only shims used for `install -m`, `flock` (both standard on Ubuntu 24.04); `systemd-analyze verify` runs on the VPS inside `deploy.sh`.
+
+### Verdict: **[APPROVED]** — 2 modified + 3 new files under `deploy/`, committed as `f276ad6`.
+
+### Deploy notes for Ibrahim (production SSH stays his action)
+```bash
+git push
+cd "Clients/03_GHERAS_Center/edutrack_pro"
+bash deploy/push.sh root@187.55.226.225 gheras.autovem.tech -i ~/.ssh/edutrack_deploy_key
+# deploy.sh prints "backup ok: /opt/edutrack/backups/edutrack_….dump (…); next run: …". Then paste back:
+ssh -i ~/.ssh/edutrack_deploy_key root@187.55.226.225 'systemctl list-timers edutrack-backup.timer --no-pager; ls -lh /opt/edutrack/backups; journalctl -u edutrack-backup.service -n 3 --no-pager'
+```
+No web changes: `v=2.9` stays. First timer fire 2026-09-21 03:00 UTC. Monthly restore drill is in `DEPLOY.md` → Backups.
+
+---
+
+## 6. THE ONE THING TO DO NEXT (updated 2026-09-20 12:20, Phase 4 (a) committed, awaiting push/deploy)
+
+HEAD is `f276ad6` on `main`, **[ahead 1] of `origin/main`** (Phase 4 (a) commit, not yet pushed), **working tree clean**. Production = **v=2.9, migrations 001–006**, backup timer NOT yet installed (needs `push.sh`, §5g). Phase 3 **[APPROVED]** (§5e), Phase 4 (b) **[APPROVED]** (§5f) and live, Phase 4 (a) **[APPROVED]** (§5g) awaiting deploy. Two lessons flushed to `.agents/MEMORY_STORE.md` (`users.staff_id` not unique → `UPDATE 2`; public `curl` allowed for post-deploy checks). Ibrahim picks Phase 4:
+
+- **(a)** ✅ **DONE 2026-09-20 (§5g), commit `f276ad6`** — `deploy/backup.sh` + `edutrack-backup.{service,timer}` installed by `deploy.sh`; restore drill in `DEPLOY.md`. **Next action = Ibrahim: `git push` + `push.sh`, paste back `systemctl list-timers edutrack-backup.timer`.**
 - **(b)** ✅ **DONE 2026-09-20 (§5f)** — Settings-driven `academic_year` — `settings` table + `006` migration (OpenCode Worker B), `print.py` reads it instead of the hard-coded `1447-1448 هـ`, a settings-view field; Claude tests on embedded PG. Bundle the `users(staff_id)` partial unique index into 006.
 - **(c)** Pagination past `limit=100` — `fetchAll` helper in `api.js` (offset loop, ≤ 500 per page) and switch the views; Claude verifies with `node --check` + a seeded 150-student run.
 - **(e)** Print-template identity pass — bind `{{center_name}}`, `{{center_phone}}`, `{{center_address}}`, `{{manager_title}}`, `{{manager_name}}` in the 11 `web/print/templates/*.html` headers (payload already carries them since §5f); Cline Worker C edits templates in batches of 4, Claude runs `test_print.py` + a rendered-HTML grep for the hard-coded «مركز غراس» / «حوطة بني تميم».
