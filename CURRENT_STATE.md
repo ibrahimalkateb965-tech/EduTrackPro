@@ -4,8 +4,8 @@
 > **Master Orchestrator**: `Claude Code CLI` (Opus Max / Sonnet 5)  
 > **Handoff Source**: `Antigravity IDE` (Interactive Cockpit & Visual Inspector)  
 > **Timestamp**: 2026-09-16T12:55:00+03:00  
-> **Last updated:** 2026-09-20 18:50 — strategic-clear handoff (Hook 25). B-5.1/B-5.2 hotfix `2a63c50` [APPROVED], deploy pending (Ibrahim); Phase 5 (b) Section 3 presented in chat and written to the spec, awaiting approval — Claude Code CLI
-> **VCS:** git at workspace root, branch `main`, HEAD `c09f1a0`+ — **`[ahead 7]` of `origin/main` (`ed82028` is pushed and deployed; unpushed = chore(state) ×5 + docs(phase5) `da4b0aa` + fix(auth) `2a63c50`), push pending: yes** (Ibrahim). Phase 4 (e) = `ed82028`, Phase 4 (c) = `95216ba`, Phase 4 (a) = `f276ad6`, Phase 4 (b) = `1945d95`. Phase 1 = `fc071f6`, Phase 2 = `a28299b`, Phase 2.5 = `eabac22`, Phase 3 audit = `52ce581` + `6e2e434` + `469e280` (all [APPROVED]). **Working tree clean** (Ibrahim committed the §5d-approved tree at 08:22, superseding his earlier `keep`). Remote `origin` = https://github.com/ibrahimalkateb965-tech/EduTrackPro.git. Quarantine enforced by root `.gitignore` (Rule 8).  
+> **Last updated:** 2026-09-20 19:40 — strategic-clear handoff (Hook 25). Phase 5 (b) spec DESIGN COMPLETE (`5f13675`, Sections 1–4 approved, awaiting Ibrahim's file review); hotfix `2a63c50` [APPROVED] still not deployed — Claude Code CLI
+> **VCS:** git at workspace root, branch `main`, HEAD `5f13675`+ — **`[ahead 9]` of `origin/main` (`ed82028` is pushed and deployed; unpushed = chore(state) ×6 + docs(phase5) `da4b0aa` + `5f13675` + fix(auth) `2a63c50`), push pending: yes** (Ibrahim). Phase 4 (e) = `ed82028`, Phase 4 (c) = `95216ba`, Phase 4 (a) = `f276ad6`, Phase 4 (b) = `1945d95`. Phase 1 = `fc071f6`, Phase 2 = `a28299b`, Phase 2.5 = `eabac22`, Phase 3 audit = `52ce581` + `6e2e434` + `469e280` (all [APPROVED]). **Working tree clean** (Ibrahim committed the §5d-approved tree at 08:22, superseding his earlier `keep`). Remote `origin` = https://github.com/ibrahimalkateb965-tech/EduTrackPro.git. Quarantine enforced by root `.gitignore` (Rule 8).  
 
 ---
 
@@ -426,15 +426,27 @@ Section 3 written into `docs/PHASE5_SPEC.md` exactly as presented: 3.1 student p
 
 ---
 
-## 6. THE ONE THING TO DO NEXT (updated 2026-09-20 18:50, strategic-clear mid-design of Phase 5 (b))
+## 5m. Phase 5 (b) — Sections 3–4 approved, spec DESIGN COMPLETE (2026-09-20 ~19:00 → 19:35, Claude Code only, design, no code)
 
-HEAD `c09f1a0` + this freeze on `main`, **`[ahead 7]` of `origin/main`** (push pending: yes — Ibrahim). Production = **v=3.0, `ed82028`**; hotfix `2a63c50` is **committed, not deployed** (§5k steps). Phase 4 closed.
+Commit **`5f13675`** `docs(phase5): mobile role scoping spec — Sections 3-4 approved, design complete` — 1 file (`docs/PHASE5_SPEC.md`, 200 lines).
 
-Active work = **Phase 5 (b) design**, `docs/PHASE5_SPEC.md`: Sections 1–2 approved, **Section 3 presented and awaiting approval** (open decision 3.1 `guardian_phone` for teachers), Section 4 pending.
+- **Section 3 approved**; 3.1 decided by Ibrahim: **keep** `guardian_phone` / `guardian_relation` on the teacher projection.
+- **Section 4 presented, approved and written** (errors, pagination, testing & delivery): `ApiError` reuse with an Arabic message table; fixed per-table `ORDER BY … , id` verified against `db/postgres/001_schema.sql` (`receipts.issued_on`, `schedules.day` is `text`); module split **`routers/me.py` (thin handlers) + `repositories/me_repo.py` (SQL)** decided by Ibrahim; `tests/test_me_scope.py` ~26 tests in 6 groups with `_room`/`_student`/`_teacher` helpers moving from `test_teacher_scope.py` to `conftest.py` + new `_guardian`; **4 sequential batches** — batch 0 Claude Code (TDD: `scope.py` guardian branch + `require_scope`, fixtures, tests RED), batches 1–3 OpenCode Worker B (Muse Spark) on `me.py` + `me_repo.py` (+ `main.py` in batch 1), no Cline parallelism (shared files); deploy = API rebuild via `deploy/push.sh`, no migration, no `v=` bump, public probe = `/api/v1/health` 200 + `/api/v1/me/profile` unauthenticated 401.
+- **Section 5 added**: Phase 5 (c)+ backlog (Android wiring, homework upload, push/WhatsApp, `lesson_logs` unique index after dedupe, Mada).
+- Spec self-review done (placeholders, consistency, scope, ambiguity) — corrections folded in before commit. **Spec status: DESIGN COMPLETE, awaiting Ibrahim's review of the file** before `superpowers:writing-plans`.
+- No code written, no tests run, no fleet dispatched. Zero prod changes. Hotfix `2a63c50` remains **committed, not deployed** (§5k steps).
+
+---
+
+## 6. THE ONE THING TO DO NEXT (updated 2026-09-20 19:40, strategic-clear after Phase 5 (b) design complete)
+
+HEAD `5f13675` + this freeze on `main`, **`[ahead 9]` of `origin/main`** (push pending: yes — Ibrahim). Production = **v=3.0, `ed82028`**; hotfix `2a63c50` is **committed, not deployed** (§5k steps). Phase 4 closed.
+
+Active work = **Phase 5 (b)**: `docs/PHASE5_SPEC.md` is **DESIGN COMPLETE** (Sections 1–4 approved in chat, §5 backlog) and waits for Ibrahim's review of the file itself. No implementation plan exists yet.
 
 **Next choices (Ibrahim decides after `/clear`):**
 - **(a)** Deploy the hotfix: `git push` + `deploy/push.sh` (API rebuild, no migration), paste back `/api/v1/health`; Claude re-checks publicly and marks B-5.1/B-5.2 live.
-- **(b)** Continue Phase 5 (b) design: Ibrahim answers 3.1 and approves Section 3 → present Section 4 (errors, pagination, tests, delegation, deploy) → spec self-review → Ibrahim reviews `PHASE5_SPEC.md` → `superpowers:writing-plans`.
+- **(b)** Ibrahim reviews `docs/PHASE5_SPEC.md` → says "approved" (or lists changes) → Claude runs `superpowers:writing-plans` → implementation plan with the exact SQL per endpoint and the 4 batch prompts (§4.4) → then batch 0 (Claude Code TDD).
 - **(c)** Android app module — Compose over Room + `homework-core` (Gradle `-Xmx400m`, local 9.4.1 dist, JDK 17); better after (b) so the app targets the approved `/me/*` contract.
 - **(d)** Housekeeping — dedupe the 12 per-view `toList()` copies into `api.js` (Cline Worker C); first monthly restore drill on the VPS per `deploy/DEPLOY.md` → Backups (Ibrahim, SSH).
 
