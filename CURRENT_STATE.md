@@ -4,8 +4,8 @@
 > **Master Orchestrator**: `Claude Code CLI` (Opus Max / Sonnet 5)  
 > **Handoff Source**: `Antigravity IDE` (Interactive Cockpit & Visual Inspector)  
 > **Timestamp**: 2026-09-16T12:55:00+03:00  
-> **Last updated:** 2026-09-20 08:19 — Commit-hygiene audit (a) + Saturday migration 005 (b), frozen with `keep` — Claude Code CLI  
-> **VCS:** git at workspace root, branch `main`, HEAD `1ff5520` — **`[ahead 3]` of `origin/main`, push pending: yes** — Ibrahim runs `git push`. Phase 1 = `fc071f6`, Phase 2 = `a28299b`, Phase 2.5 = `eabac22` (all [APPROVED]). **Working tree is NOT clean by Ibrahim's explicit `keep` decision (2026-09-20 08:19) — every file in it is audited and [APPROVED] (§5d); the 3 commit commands are in §6.** Remote `origin` = https://github.com/ibrahimalkateb965-tech/EduTrackPro.git. Quarantine enforced by root `.gitignore` (Rule 8).  
+> **Last updated:** 2026-09-20 08:25 — Commit-hygiene audit (a) + Saturday migration 005 (b), committed by Ibrahim — Claude Code CLI  
+> **VCS:** git at workspace root, branch `main`, HEAD `469e280` — **`[ahead 6]` of `origin/main`, push pending: yes** — Ibrahim runs `git push`. Phase 1 = `fc071f6`, Phase 2 = `a28299b`, Phase 2.5 = `eabac22`, Phase 3 audit = `52ce581` + `6e2e434` + `469e280` (all [APPROVED]). **Working tree clean** (Ibrahim committed the §5d-approved tree at 08:22, superseding his earlier `keep`). Remote `origin` = https://github.com/ibrahimalkateb965-tech/EduTrackPro.git. Quarantine enforced by root `.gitignore` (Rule 8).  
 
 ---
 
@@ -239,33 +239,18 @@ Executed Ibrahim's combined (a)+(b) order. Tree hygiene: `models`, `changelog` (
 - All views fetch `students` / `messages` with the default `limit=100`; pre-existing pattern across the dashboard, will truncate beyond 100 rows.
 - `tests/test_supervisor_permissions.py:7` unused `make_user` import — pre-existing pyflakes note.
 
-## 6. THE ONE THING TO DO NEXT (frozen 2026-09-20 08:19)
+## 6. THE ONE THING TO DO NEXT (frozen 2026-09-20 08:25)
 
-HEAD is `1ff5520` on `main`, `[ahead 3]`. **Ibrahim chose `keep` in `/strategic-clear` (08:55):** the whole working tree — 19 modified tracked files + `db/postgres/005_saturday.sql` + `web/dashboard/js/views/communication.js` — survives `/clear` **uncommitted / untracked**. Unlike the 07:31 freeze, **everything in it is audited and [APPROVED]** (§5d, pytest 46/46). Nothing is in any commit yet. First action next session: `git status -sb` and confirm the tree still matches §5d (19 M + 2 ??); then Ibrahim picks:
+HEAD is `469e280` on `main`, `[ahead 6]`, **working tree clean**. The §5d-approved tree is in three commits by Ibrahim: `52ce581` (005 migration, deploy.sh, tree hygiene), `6e2e434` (print.py teacher names, RBAC test alignment), `469e280` (dashboard audit, Saturday UI, communication center). **Nothing is on the VPS yet** — production still serves v=2.7 without 005 and without the teacher-name join. First action next session: `git status -sb`; if still `[ahead 6]`, Ibrahim runs `git push`. Then Ibrahim picks:
 
-- **(a)** Commit + push now — Ibrahim runs the 3 prepared commits below, then `git push` (`[ahead 3]` → `[ahead 6]`); Claude verifies `git status -sb` is clean afterwards.
-- **(b)** Deploy first — Ibrahim runs `bash Clients/03_GHERAS_Center/edutrack_pro/deploy/push.sh root@187.55.226.225 gheras.autovem.tech -i ~/.ssh/edutrack_deploy_key` (applies 005 via the incremental loop, rebuilds `api`, serves v=2.8) + the teacher reactivation SQL (§5c) so Saturday periods and `م/آية هويدي` are live today; commits (a) follow.
-- **(c)** Next feature after (a) — pick from the §5d notes: settings-driven `academic_year` (needs a small settings table + 006 migration) or pagination past the `limit=100` default in the dashboard views.
-
-### Prepared commits (run from repo root, in order; Claude never runs these)
-```bash
-# 1/3
-git add Clients/03_GHERAS_Center/edutrack_pro/web/ Clients/03_GHERAS_Center/edutrack_pro/server/edutrack_api/
-git commit -m "feat(gheras): communication center, Saturday + multi-day schedules, manager accounts, teacher real names in print"
-# 2/3
-git add Clients/03_GHERAS_Center/edutrack_pro/db/postgres/005_saturday.sql Clients/03_GHERAS_Center/edutrack_pro/deploy/deploy.sh
-git commit -m "feat(db): allow Saturday in schedules (005) and relax deploy admin gate to >=1 active manager"
-# 3/3
-git add Clients/03_GHERAS_Center/edutrack_pro/server/tests/ .gitignore CURRENT_STATE.md
-git commit -m "test(gheras): align supervisor RBAC tests with strict rule from a82c071; chore: ignore tarballs, update state"
-git push
-```
+- **(a)** Deploy now — `bash Clients/03_GHERAS_Center/edutrack_pro/deploy/push.sh root@187.55.226.225 gheras.autovem.tech -i ~/.ssh/edutrack_deploy_key` (applies 005 via the incremental loop, rebuilds `api`, serves v=2.8) + the teacher reactivation SQL below; Claude verifies nothing, Ibrahim pastes the output (`UPDATE 1`, CHECK starting with `'السبت'`, `admin login: HTTP 200`).
+- **(b)** Settings-driven `academic_year` — small `settings` table + `006` migration (OpenCode Worker B), `print.py` reads it instead of the hard-coded `1447-1448 هـ`, a settings-view field; Claude tests on embedded PG.
+- **(c)** Pagination past `limit=100` — every dashboard view calls `students` / `messages` with the default limit; add a `fetchAll` helper in `api.js` (offset loop, ≤ 500 per page) and switch the views; Claude verifies with `node --check` + a seeded 150-student run.
 
 ### VPS one-shot (Ibrahim; the auto-mode classifier blocks Claude from production SSH)
 ```bash
 bash Clients/03_GHERAS_Center/edutrack_pro/deploy/push.sh root@187.55.226.225 gheras.autovem.tech -i ~/.ssh/edutrack_deploy_key
 ssh -i ~/.ssh/edutrack_deploy_key root@187.55.226.225 'cd /opt/edutrack && docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env exec -T db psql -U postgres -d gheras_edutrack -c "UPDATE users SET deleted_at = NULL, is_active = true WHERE staff_id = '"'"'20cf6983-c352-4f6f-86f5-611f5f725020'"'"';" -c "SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conname = '"'"'chk_schedules_day'"'"';"'
 ```
-Expected: `UPDATE 1` and a CHECK definition starting with `'السبت'`.
 
 Pre-conditions unchanged: free ≥ 4 GB RAM before running the fleet (never with Docker Desktop up), one `opencode run` at a time with ≤ 4 files per batch, Codex via `-s workspace-write`, embedded PG booter must stay alive in the background while pytest runs (`TEST_DATABASE_URL` = superuser URI for fixtures, `DATABASE_URL` = `gheras_app` URI for the API).
