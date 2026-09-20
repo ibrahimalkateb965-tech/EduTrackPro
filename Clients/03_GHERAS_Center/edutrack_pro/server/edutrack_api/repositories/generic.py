@@ -84,9 +84,13 @@ class GenericRepository:
         query += sql.SQL(" ORDER BY {} {}, id LIMIT %s OFFSET %s").format(
             sql.Identifier(order_by), direction
         )
-        params.extend([limit, offset])
-        rows = self.conn.execute(query, params).fetchall()
+        rows = self.conn.execute(query, [*params, limit, offset]).fetchall()
         if not rows:
+            # COUNT(*) OVER() rides on the returned rows: an offset past the last page
+            # yields none, so recover the true total from the first row instead.
+            if offset > 0:
+                first = self.conn.execute(query, [*params, 1, 0]).fetchone()
+                return ([], first["_total"] if first else 0)
             return ([], 0)
         total = rows[0].get("_total", 0)
         for row in rows:

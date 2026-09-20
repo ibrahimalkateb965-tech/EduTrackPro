@@ -44,6 +44,11 @@ def _select(cols: str, from_: str, where: list[str], order_by: str) -> str:
 def _run(conn, sql: str, params: dict, limit: int, offset: int) -> Rows:
     rows = conn.execute(sql, {**params, "limit": limit, "offset": offset}).fetchall()
     if not rows:
+        # COUNT(*) OVER() rides on the returned rows: an offset past the last page
+        # yields none, so recover the true total from the first row instead.
+        if offset > 0:
+            first = conn.execute(sql, {**params, "limit": 1, "offset": 0}).fetchone()
+            return [], first["_total"] if first else 0
         return [], 0
     total = rows[0]["_total"]
     for row in rows:
@@ -188,6 +193,8 @@ def list_assignments(conn, scope: Scope, filters: dict, limit: int, offset: int)
         return [], 0
     where = ["a.deleted_at IS NULL"]
     params: dict = {"student_ids": list(scope.student_ids)}
+    # `narrow` tightens the link subquery to one student; it is only ever applied on
+    # top of the scope set, so an out-of-scope student_id yields an empty page, not a leak.
     narrow = ""
     if filters.get("student_id") is not None:
         narrow = " AND x.student_id = %(student_id)s"
@@ -196,6 +203,10 @@ def list_assignments(conn, scope: Scope, filters: dict, limit: int, offset: int)
         "EXISTS (SELECT 1 FROM assignment_students x WHERE x.assignment_id = a.id AND x.deleted_at IS NULL "
         f"AND x.student_id = ANY(%(student_ids)s){narrow})"
     )
+    # Teacher sees own assignments (authored, even with no students linked yet) OR those
+    # linked to a scoped student. With a student_id filter the "own" branch drops out:
+    # the question becomes "what was assigned to this child", not "what did I author".
+    # Guardian only ever sees assignments linked to their children.
     if scope.role == "teacher" and not narrow:
         where.append(f"(a.teacher_user_id = %(user_id)s OR {linked})")
         params["user_id"] = scope.user_id

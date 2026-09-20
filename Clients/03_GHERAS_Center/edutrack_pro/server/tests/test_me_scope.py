@@ -288,6 +288,13 @@ def test_b1_bad_pagination_is_422(client, world):
     assert client.get(f"{ME}/students?limit=501", headers=world.teacher).status_code == 422
 
 
+def test_b1_page_past_the_end_keeps_true_total(client, world):
+    """Review follow-up: COUNT(*) OVER() rides on the rows, so an offset past the last page must not report total=0."""
+    res = client.get(f"{ME}/students?limit=2&offset=10", headers=world.teacher)
+    assert res.status_code == 200, res.text
+    assert res.json() == {"items": [], "total": 3, "limit": 2, "offset": 10}
+
+
 # =============================================================================
 # b2 — attendance, evaluations, assignments, submissions, lesson-logs GET, skill-progress
 # =============================================================================

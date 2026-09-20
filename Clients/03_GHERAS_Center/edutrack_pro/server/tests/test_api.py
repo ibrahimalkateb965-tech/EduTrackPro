@@ -299,3 +299,11 @@ def test_students_pagination_past_100(db, client, manager):
     ids = [row["id"] for row in default["items"]] + [row["id"] for row in tail["items"]]
     assert ids == [row["id"] for row in full["items"]], "offset walk must be stable and gap-free"
     assert client.get(f"{API}/students?limit=501", headers=manager).status_code == 422
+
+
+def test_generic_page_past_the_end_keeps_true_total(db, client, manager):
+    """Review follow-up: an offset past the last page returns no rows, so the windowed count must be recovered separately."""
+    db.execute("INSERT INTO students (name, group_name) SELECT 'طالب ' || g, 'الصباح' FROM generate_series(1, 3) g")
+    db.commit()
+    beyond = client.get(f"{API}/students?limit=2&offset=10", headers=manager).json()
+    assert beyond == {"items": [], "total": 3, "limit": 2, "offset": 10}
