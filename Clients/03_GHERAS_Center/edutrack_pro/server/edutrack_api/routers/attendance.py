@@ -6,10 +6,12 @@ from edutrack_api.audit import write_audit
 from edutrack_api.auth import require_roles
 from edutrack_api.db import get_conn
 from edutrack_api.errors import ApiError
+from edutrack_api.scope import Scope, resolve_scope
 from edutrack_api.serializers import row_to_json
 
 router = APIRouter()
 _ROLES = Depends(require_roles("manager", "supervisor", "teacher"))
+_STAFF_ROLES = Depends(require_roles("manager", "supervisor"))  # staff attendance drives payroll deductions
 _VALID_STATUSES = {"حاضر", "غائب", "متأخر", "مستأذن"}
 
 
@@ -25,8 +27,10 @@ def _validate(items: list[dict], key: str) -> date | None:
     return next(iter(dates)) if len(dates) == 1 else None
 
 
-def _save(conn, items: list[dict], key: str, table: str, actor: dict) -> dict:
+def _save(conn, items: list[dict], key: str, table: str, actor: dict, scope: Scope | None = None) -> dict:
     report_date = _validate(items, key)
+    if scope is not None:
+        scope.assert_students(item[key] for item in items)
     if not items:
         return {"saved": 0, "items": []}
     sql = f"""
@@ -44,15 +48,19 @@ def _save(conn, items: list[dict], key: str, table: str, actor: dict) -> dict:
     return {"saved": len(saved), "items": saved}
 
 
+def _teacher_scope(conn, user: dict) -> Scope | None:
+    return resolve_scope(conn, user) if user["role"] == "teacher" else None
+
+
 @router.post("/attendance/students")
 def save_students(items: list[dict], conn=Depends(get_conn), user: dict = _ROLES) -> dict:
     if user["role"] == "supervisor" and not user.get("permissions", {}).get("attendance", False):
         raise ApiError(403, "forbidden", "ليس لديك صلاحية تسجيل حضور الطلاب")
-    return _save(conn, items, "student_id", "student_attendance", user)
+    return _save(conn, items, "student_id", "student_attendance", user, scope=_teacher_scope(conn, user))
 
 
 @router.post("/attendance/staff")
-def save_staff(items: list[dict], conn=Depends(get_conn), user: dict = _ROLES) -> dict:
+def save_staff(items: list[dict], conn=Depends(get_conn), user: dict = _STAFF_ROLES) -> dict:
     if user["role"] == "supervisor" and not user.get("permissions", {}).get("attendance", False):
         raise ApiError(403, "forbidden", "ليس لديك صلاحية تسجيل حضور الموظفين")
     res = _save(conn, items, "staff_id", "staff_attendance", user)
@@ -100,6 +108,9 @@ def list_daily_evaluations(
 ) -> dict:
     if user["role"] == "supervisor" and not user.get("permissions", {}).get("daily_evaluation", False):
         raise ApiError(403, "forbidden", "ليس لديك صلاحية التقييم اليومي")
+    scope = _teacher_scope(conn, user)
+    if scope is not None and not scope.student_ids:
+        return {"items": [], "total": 0}
 
     query = """
         SELECT e.*, s.name as student_name, s.group_name
@@ -117,6 +128,9 @@ def list_daily_evaluations(
     if room_id:
         query += " AND s.room_id = %s"
         params.append(room_id)
+    if scope is not None:
+        query += " AND e.student_id = ANY(%s)"
+        params.append(list(scope.student_ids))
     query += " ORDER BY s.name ASC"
 
     rows = conn.execute(query, params).fetchall()
@@ -135,6 +149,9 @@ def save_daily_evaluations(
 
     if not items:
         return {"saved": 0, "items": []}
+    scope = _teacher_scope(conn, user)
+    if scope is not None:
+        scope.assert_students(item["student_id"] for item in items if item.get("student_id"))
 
     saved = []
 
