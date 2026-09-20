@@ -4,8 +4,8 @@
 > **Master Orchestrator**: `Claude Code CLI` (Opus Max / Sonnet 5)  
 > **Handoff Source**: `Antigravity IDE` (Interactive Cockpit & Visual Inspector)  
 > **Timestamp**: 2026-09-16T12:55:00+03:00  
-> **Last updated:** 2026-09-20 17:10 — strategic-clear handoff (Hook 25). Phase 4 closed in production; Phase 5 (b) mobile-roles **design** in progress: `docs/PHASE5_SPEC.md` Sections 1–2 approved, 3–4 pending — Claude Code CLI  
-> **VCS:** git at workspace root, branch `main`, HEAD `da4b0aa`+ — **`[ahead 5]` of `origin/main` (`ed82028` is pushed and deployed; unpushed = chore(state) ×4 + docs(phase5) `da4b0aa`), push pending: yes** (Ibrahim). Phase 4 (e) = `ed82028`, Phase 4 (c) = `95216ba`, Phase 4 (a) = `f276ad6`, Phase 4 (b) = `1945d95`. Phase 1 = `fc071f6`, Phase 2 = `a28299b`, Phase 2.5 = `eabac22`, Phase 3 audit = `52ce581` + `6e2e434` + `469e280` (all [APPROVED]). **Working tree clean** (Ibrahim committed the §5d-approved tree at 08:22, superseding his earlier `keep`). Remote `origin` = https://github.com/ibrahimalkateb965-tech/EduTrackPro.git. Quarantine enforced by root `.gitignore` (Rule 8).  
+> **Last updated:** 2026-09-20 18:35 — B-5.1/B-5.2 teacher-scope hotfix committed `2a63c50` [APPROVED], deploy pending (Ibrahim); next = Phase 5 (b) design Sections 3–4 — Claude Code CLI
+> **VCS:** git at workspace root, branch `main`, HEAD `2a63c50` — **`[ahead 6]` of `origin/main` (`ed82028` is pushed and deployed; unpushed = chore(state) ×4 + docs(phase5) `da4b0aa` + fix(auth) `2a63c50`), push pending: yes** (Ibrahim). Phase 4 (e) = `ed82028`, Phase 4 (c) = `95216ba`, Phase 4 (a) = `f276ad6`, Phase 4 (b) = `1945d95`. Phase 1 = `fc071f6`, Phase 2 = `a28299b`, Phase 2.5 = `eabac22`, Phase 3 audit = `52ce581` + `6e2e434` + `469e280` (all [APPROVED]). **Working tree clean** (Ibrahim committed the §5d-approved tree at 08:22, superseding his earlier `keep`). Remote `origin` = https://github.com/ibrahimalkateb965-tech/EduTrackPro.git. Quarantine enforced by root `.gitignore` (Rule 8).  
 
 ---
 
@@ -401,16 +401,31 @@ Brainstorming (superpowers, architectural path). Written to **`Clients/03_GHERAS
 
 ---
 
-## 6. THE ONE THING TO DO NEXT (updated 2026-09-20 17:10, strategic-clear mid-design of Phase 5 (b))
+## 5k. B-5.1 / B-5.2 hotfix — teacher row scope on attendance routes (2026-09-20 ~18:30 AST, Claude Code only, TDD, no fleet)
 
-HEAD is the `chore(state)` freeze on top of `da4b0aa` (spec commit) on `main`, **`[ahead 5]` of `origin/main`** (production already runs everything in `ed82028`), **working tree clean** after the freeze commit. Production = **v=3.0, migrations 001–006, backup timer live, Phase 4 (e) templates live** — Phase 4 closed (§5f–§5i, all verified publicly).
+Commit **`2a63c50`** `fix(auth): row-scope teacher access on attendance routes (B-5.1, B-5.2)` — 1 modified + 2 new files.
 
-Active work = **Phase 5 (b) design**, `docs/PHASE5_SPEC.md`: Sections 1–2 approved, Sections 3–4 pending. Open defect **B-5.1** (unscoped teacher routes in `attendance.py`, §5j).
+- `server/edutrack_api/scope.py` (new, PHASE5_SPEC §1 teacher branch): `Scope(role, room_ids, student_ids)`, `resolve_scope` = `users.room_id` ∪ `schedules.room_id WHERE teacher_user_id = me` → active non-deleted students; `assert_students` → 403 `forbidden`. Guardian branch + `require_scope` deliberately **not** written yet (no failing test; lands with `routers/me.py`).
+- `routers/attendance.py`: teacher path on `POST /attendance/students`, `GET /daily-evaluations` (+ alias), `POST /evaluations/daily` (+ alias) resolves scope; writes reject the **whole batch before any row is touched**; GET appends `e.student_id = ANY(scope)`, empty scope short-circuits to `{items: [], total: 0}`. Manager/supervisor paths byte-for-byte unchanged.
+- **B-5.2 (new finding, fixed in the same commit):** `POST /attendance/staff` was also teacher-reachable and writes `payroll_runs` deductions. Restricted to manager/supervisor — only `web/dashboard/js/views/staff.js:329` calls it; mobile has no staff-attendance DAO, so nothing breaks.
+- `tests/test_teacher_scope.py`: 10 tests, RED observed first (6 × `200 == 403` + leaked rows), then GREEN. **Full suite 63 passed** on embedded PG 16 (001–006), ~47 s. ruff: only the pre-existing `B008` FastAPI idiom + the repo's `date.today()` pattern; nothing new.
 
-**Next choices (Ibrahim decides after `/clear`):**
-- **(a)** Continue Phase 5 (b) design: present Section 3 (guardian projection allow-list, `POST /me/lesson-logs` semantics incl. the `lesson_logs` uniqueness decision, exact `attendance.py` guards) then Section 4 (tests, delegation, deploy); spec self-review; Ibrahim reviews `PHASE5_SPEC.md`; then `superpowers:writing-plans`.
-- **(b)** Ship the B-5.1 hotfix first, standalone: `scope.py` + guards on the 3 `attendance.py` teacher routes + regression tests (Claude Code only, ~1 file + tests), deploy with API restart; resume design after.
-- **(c)** Android app module (unchanged from before) — Compose UI over the Room layer + `homework-core`; Gradle `-Xmx400m`, local 9.4.1 dist, JDK 17. Better done **after** (a) so the app targets the approved `/me/*` contract.
-- **(d)** Housekeeping — dedupe the 12 per-view `toList()` copies into `api.js` (Cline Worker C); first monthly restore drill on the VPS per `deploy/DEPLOY.md` → Backups (Ibrahim, SSH).
+### Verdict: **[APPROVED]** — `2a63c50`.
 
-Pre-conditions unchanged: free ≥ 4 GB RAM before running the fleet (never with Docker Desktop up), one `opencode run` at a time with ≤ 4 files per batch, Codex via `-s workspace-write`, embedded PG booter must stay alive in the background while pytest runs (`TEST_DATABASE_URL` = superuser URI for fixtures, `DATABASE_URL` = `gheras_app` URI for the API). Production SSH/DB stays Ibrahim's action (auto-mode classifier).
+### Deploy (Ibrahim) — API container rebuild, no migration
+1. `git push` (HEAD `2a63c50`, 6 ahead).
+2. `bash deploy/push.sh root@187.55.226.225 gheras.autovem.tech -i ~/.ssh/edutrack_deploy_key` — `deploy.sh` runs `up -d --build api`, so the API restarts with the fix (~1 min of 502 on `/api/*` while it rebuilds).
+3. Paste back: `curl -s https://gheras.autovem.tech/api/v1/health` (expect 200). Claude re-checks publicly. There is no public probe for the scope itself (needs a teacher token); the 63-test run is the evidence.
+4. Optional: `SELECT username, room_id FROM users WHERE role = 'teacher' AND is_active AND deleted_at IS NULL;` — any teacher with `room_id NULL` and no schedule rows now sees empty lists on the mobile routes until a manager assigns their حلقة under الموظفون.
+
+---
+
+## 6. THE ONE THING TO DO NEXT (updated 2026-09-20 18:35, after B-5.1/B-5.2 hotfix)
+
+HEAD `2a63c50` on `main`, **`[ahead 6]` of `origin/main`**, working tree clean (before the state commit). Production still = **v=3.0, `ed82028`** — the hotfix is **committed, not deployed** (§5k deploy steps, Ibrahim). Phase 4 closed.
+
+**Now: (a) Phase 5 (b) design continues** — `docs/PHASE5_SPEC.md`: Sections 1–2 approved (§1 teacher branch is now real code in `scope.py`), present **Section 3** (guardian projection allow-list, `POST /me/lesson-logs` semantics incl. the `lesson_logs (schedule_id, date)` uniqueness decision) then **Section 4** (errors, pagination, tests, delegation, deploy); spec self-review; Ibrahim reviews the file; then `superpowers:writing-plans`.
+
+After (a): **(c)** Android module against the approved `/me/*` contract; **(d)** housekeeping (12 `toList()` copies → `api.js` via Cline Worker C; first restore drill on the VPS by Ibrahim).
+
+Pre-conditions unchanged: free ≥ 4 GB RAM before running the fleet (never with Docker Desktop up), one `opencode run` at a time with ≤ 4 files per batch, Codex via `-s workspace-write`, embedded PG booter must stay alive in the background while pytest runs (`TEST_DATABASE_URL` = superuser URI for fixtures, `DATABASE_URL` = `gheras_app` URI for the API; this session's booter: scratchpad `872795f8-…/pg_boot.py`, stopped cleanly). Production SSH/DB stays Ibrahim's action (auto-mode classifier).
