@@ -11,7 +11,7 @@ from edutrack_api import __version__
 from edutrack_api.config import Settings, get_settings
 from edutrack_api.db import introspect_columns, make_pool
 from edutrack_api.errors import register_handlers
-from edutrack_api.routers import attendance, auth, crud, importer, print, reports
+from edutrack_api.routers import attendance, auth, crud, importer, me, print, reports
 from edutrack_api.routers import settings as settings_router
 
 
@@ -53,6 +53,7 @@ def create_app() -> FastAPI:
     api.include_router(print.router)
     api.include_router(importer.router)
     api.include_router(settings_router.router)
+    api.include_router(me.router)
     api.include_router(crud.router)
 
     @api.get("/health")
