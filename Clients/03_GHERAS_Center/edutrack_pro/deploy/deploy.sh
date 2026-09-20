@@ -28,7 +28,8 @@ command -v docker >/dev/null || die "docker is not installed"
 docker compose version >/dev/null 2>&1 || die "docker compose v2 is required"
 command -v openssl >/dev/null || die "openssl is required"
 for f in db/postgres/001_schema.sql db/postgres/002_reference.sql db/postgres/003_phase2.sql db/postgres/004_phase3.sql db/postgres/005_saturday.sql db/postgres/006_settings.sql \
-         server/Dockerfile server/uv.lock web/dashboard/index.html assets/gheras_logo.png; do
+         server/Dockerfile server/uv.lock web/dashboard/index.html assets/gheras_logo.png \
+         deploy/backup.sh deploy/edutrack-backup.service deploy/edutrack-backup.timer; do
   [[ -f "$ROOT/$f" ]] || die "missing $f — sync the full edutrack_pro tree first"
 done
 
@@ -100,6 +101,20 @@ done
 [[ "$status" == healthy ]] || { "${COMPOSE[@]}" logs --tail 50 api; die "API did not become healthy"; }
 curl -fsS http://127.0.0.1:8000/api/v1/health; echo
 
+# ---------------------------------------------------------------- backups (nightly pg_dump)
+log "Installing the nightly backup timer"
+install -d -m 700 /opt/edutrack/backups
+chmod +x "$DEPLOY/backup.sh"
+sed -e "s|__ROOT__|$ROOT|g" "$DEPLOY/edutrack-backup.service" > /etc/systemd/system/edutrack-backup.service
+install -m 644 "$DEPLOY/edutrack-backup.timer" /etc/systemd/system/edutrack-backup.timer
+systemd-analyze verify /etc/systemd/system/edutrack-backup.service /etc/systemd/system/edutrack-backup.timer
+systemctl daemon-reload
+systemctl enable --now edutrack-backup.timer >/dev/null
+systemctl start edutrack-backup.service   # oneshot: blocks until backup.sh exits; a failed dump fails the deploy
+LATEST_DUMP="$(ls -1t /opt/edutrack/backups/edutrack_*.dump 2>/dev/null | head -1)"
+[[ -n "$LATEST_DUMP" ]] || die "backup smoke test produced no dump (journalctl -u edutrack-backup.service)"
+echo "backup ok: $LATEST_DUMP ($(du -h "$LATEST_DUMP" | cut -f1)); next run: $(systemctl show edutrack-backup.timer -p NextElapseUSecRealtime --value)"
+
 # ---------------------------------------------------------------- admin seed
 GENERATED_ADMIN=""
 if [[ -z "${EDUTRACK_ADMIN_PASSWORD:-}" && $FIRST_RUN -eq 1 ]]; then
@@ -166,6 +181,7 @@ echo "Dashboard     : https://$HOST/web/dashboard/"
 echo "API health    : https://$HOST/api/v1/health"
 echo "Edge          : $EDGE"
 echo "Secrets       : $ENV_FILE (600, root)"
+echo "Backups       : /opt/edutrack/backups (daily 03:00 UTC, 14-day rotation; systemctl list-timers edutrack-backup.timer)"
 echo "Admin user    : admin"
 if [[ -n "$GENERATED_ADMIN" ]]; then
   echo "Admin password: $GENERATED_ADMIN   <-- shown once; store it in the client's credential vault"

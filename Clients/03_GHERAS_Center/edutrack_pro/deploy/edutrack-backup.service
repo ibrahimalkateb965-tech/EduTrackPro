@@ -1,0 +1,12 @@
+[Unit]
+Description=EduTrack Pro nightly PostgreSQL dump
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=__ROOT__
+ExecStart=/usr/bin/bash __ROOT__/deploy/backup.sh
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
