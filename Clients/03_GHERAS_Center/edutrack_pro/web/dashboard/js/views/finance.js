@@ -641,39 +641,6 @@ function renderReceivables(api, container, reloadAll) {
   container.append(card);
 }
 
-function renderReportsTab(api, container) {
-  const fin = financeReport || {};
-  const monthInput = el('input', { type: 'month', value: currentMonth(), style: 'max-width:200px;' });
-  
-  const reportBody = el('div', { style: 'margin-top:16px;' });
-
-  const buildReportView = () => {
-    reportBody.replaceChildren(
-      el('div', { class: 'card' },
-        el('h3', { style: 'margin-top:0; color:var(--g-teal-dark);' }, `تقرير الإقفال والمطابقة المالية — شهر ${monthInput.value}`),
-        el('div', { class: 'kpis', style: 'margin-top:16px;' },
-          el('div', { class: 'kpi', style: 'border-right-color:var(--g-teal);' }, el('span', { class: 'muted' }, 'إجمالي الإيرادات المحصلة'), el('strong', {}, fmtSAR(fin.collected || 0))),
-          el('div', { class: 'kpi', style: 'border-right-color:var(--g-red);' }, el('span', { class: 'muted' }, 'إجمالي المصروفات'), el('strong', {}, fmtSAR(fin.expenses || 0))),
-          el('div', { class: 'kpi', style: 'border-right-color:#7851c9;' }, el('span', { class: 'muted' }, 'مسير الرواتب'), el('strong', {}, fmtSAR(fin.payroll || 0))),
-          el('div', { class: 'kpi', style: 'border-right-color:#10b981;' }, el('span', { class: 'muted' }, 'صافي الشهر'), el('strong', {}, fmtSAR(fin.net || 0)))
-        ),
-        el('div', { class: 'form-actions', style: 'margin-top:20px;' },
-          el('button', { class: 'button', type: 'button', onclick: () => window.print() }, '🖨️ طباعة التقرير المالي المعتمد'),
-          el('a', { class: 'button button-outline', href: `#/reports?tab=monthly`, style: 'text-decoration:none;' }, 'عرض التقارير الإدارية الشاملة')
-        )
-      )
-    );
-  };
-
-  monthInput.addEventListener('change', buildReportView);
-  buildReportView();
-
-  container.append(
-    el('div', { class: 'toolbar' }, el('label', { style: 'display:flex; align-items:center; gap:8px;' }, 'اختر الشهر:', monthInput)),
-    reportBody
-  );
-}
-
 // -------------------------------------------------------------
 // Main Render Entry
 // -------------------------------------------------------------
@@ -699,7 +666,10 @@ function renderContent() {
   else if (activeTab === 'accounts') renderAccounts(currentApi, subViewContainer, () => reloadAll(currentApi));
   else if (activeTab === 'payroll') renderPayroll(currentApi, subViewContainer, () => reloadAll(currentApi));
   else if (activeTab === 'receivables') renderReceivables(currentApi, subViewContainer, () => reloadAll(currentApi));
-  else if (activeTab === 'reports') renderReportsTab(currentApi, subViewContainer);
+  else {
+    activeTab = 'overview';
+    renderOverview(currentApi, subViewContainer, () => reloadAll(currentApi));
+  }
 }
 
 async function reloadAll(api) {
@@ -742,10 +712,13 @@ export async function render(container, api) {
   container.replaceChildren();
 
   const isManager = !api.currentUser || api.currentUser.role === 'manager';
+  const validTabs = ['overview', 'payments', 'expenses', 'accounts', 'receivables', ...(isManager ? ['payroll'] : [])];
 
   const requestedTab = getQueryTab();
-  if (requestedTab) {
+  if (requestedTab && validTabs.includes(requestedTab)) {
     activeTab = requestedTab;
+  } else {
+    activeTab = 'overview';
   }
 
   // Header
@@ -763,8 +736,7 @@ export async function render(container, api) {
     { id: 'expenses', label: '🔻 المصروفات', count: expenses.length },
     { id: 'accounts', label: '🏦 الخزائن والبنوك', count: accounts.length },
     { id: 'receivables', label: '📌 الذمم والمتأخرات' },
-    ...(isManager ? [{ id: 'payroll', label: '💼 مسير الرواتب' }] : []),
-    { id: 'reports', label: '📑 المطابقة والتقارير' }
+    ...(isManager ? [{ id: 'payroll', label: '💼 مسير الرواتب' }] : [])
   ];
 
   const tabsNav = el('div', { class: 'tabs-bar' },

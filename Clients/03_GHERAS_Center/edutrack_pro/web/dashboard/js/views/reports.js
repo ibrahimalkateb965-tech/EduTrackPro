@@ -1,23 +1,6 @@
-import { el, toast, fmtDate, fmtSAR } from '../ui.js';
+import { el, toast } from '../ui.js';
 
 const PRINT_BASE = '../print/templates/';
-
-const DAILY_LABELS = {
-  date: 'التاريخ',
-  day: 'التاريخ',
-  students_count: 'عدد الطلاب',
-  new_students: 'طلاب جدد',
-  rooms_count: 'عدد القاعات',
-  teachers_count: 'عدد المعلمين',
-  attendance_count: 'الحضور',
-  absence_count: 'الغياب',
-  lessons_count: 'عدد الحصص',
-  payments_count: 'عدد الدفعات',
-  payments_total: 'إجمالي المقبوضات',
-  expenses_count: 'عدد المصروفات',
-  expenses_total: 'إجمالي المصروفات',
-  net: 'الصافي'
-};
 
 const DOCS = [
   { file: 'receipt', title: 'سند قبض', description: 'طباعة سند قبض محدد برقم السند أو رقم الدفعة.', fields: [{ kind: 'number', query: 'payment', label: 'رقم السند' }] },
@@ -116,47 +99,25 @@ function auditRow(entry) {
   );
 }
 
-function statItems(data) {
-  const source = Array.isArray(data) ? data[0] : data;
-  if (!source || typeof source !== 'object') return [];
-  return Object.entries(source)
-    .filter(([, value]) => typeof value === 'number' || typeof value === 'string')
-    .map(([key, value]) => {
-      const label = DAILY_LABELS[key] || key;
-      let shown = String(value);
-      if (typeof value === 'number' && /total|amount|net|balance|revenue/.test(key)) shown = fmtSAR(value);
-      else if (key === 'date' || key === 'day') shown = fmtDate(value);
-      return [label, shown];
-    });
-}
-
-function renderDaily(daily) {
-  const items = statItems(daily);
-  const children = items.length
-    ? items.map(([label, value]) => el('div', { class: 'stat' }, el('dt', {}, label), el('dd', {}, value)))
-    : [el('div', { class: 'stat' }, el('dt', { class: 'muted' }, 'الملخص اليومي'), el('dd', { class: 'muted' }, 'لا توجد بيانات'))];
-  return el('dl', { class: 'stats' }, ...children);
-}
-
 export async function render(container, api) {
   students = [];
   rooms = [];
-  let daily = null;
   let audit = [];
 
   try { students = toList(await api.get('students')); } catch (error) { toast(error.message, true); }
   try { rooms = toList(await api.get('rooms')); } catch (error) { toast(error.message, true); }
-  try { daily = await api.get('reports/daily'); } catch (error) { toast(error.message, true); }
   try { audit = toList(await api.get('audit-log')); } catch (error) { toast(error.message, true); }
-
-  const dailySection = el('section', { class: 'panel' },
-    el('div', { class: 'panel-head' }, el('h2', {}, 'ملخص اليوم')),
-    renderDaily(daily)
-  );
 
   const isFinanceAllowed = !api.currentUser || api.currentUser.role === 'manager' || api.currentUser.permissions?.finance;
   const financeDocs = ['receipt', 'admin_report', 'monthly_report', 'student_receipt', 'statistics_report'];
   const allowedDocs = DOCS.filter(doc => isFinanceAllowed || !financeDocs.includes(doc.file));
+
+  const header = el('div', { class: 'view-header' },
+    el('div', {},
+      el('h1', {}, '📑 التقارير ومستندات الطباعة'),
+      el('p', { class: 'muted' }, 'طباعة السندات والشهادات والجداول الرسمية للمركز وسجل العمليات')
+    )
+  );
 
   const printSection = el('section', { class: 'panel' },
     el('div', { class: 'panel-head' }, el('h2', {}, 'مستندات الطباعة')),
@@ -180,5 +141,5 @@ export async function render(container, api) {
     )
   );
 
-  container.replaceChildren(dailySection, printSection, auditSection);
+  container.replaceChildren(header, printSection, auditSection);
 }

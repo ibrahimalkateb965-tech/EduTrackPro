@@ -4,8 +4,8 @@
 > **Master Orchestrator**: `Claude Code CLI` (Opus Max / Sonnet 5)  
 > **Handoff Source**: `Antigravity IDE` (Interactive Cockpit & Visual Inspector)  
 > **Timestamp**: 2026-09-16T12:55:00+03:00  
-> **Last updated:** 2026-09-17 — Phase 2.5 deployment-package session — Claude Code CLI  
-> **VCS:** git initialized 2026-09-16 at workspace root, branch `main`. Phase 1 = `fc071f6`, Phase 2 = `a28299b` (both [APPROVED], pushed). Phase 2.5 deployment package = `eabac22` [APPROVED] — **push pending: yes** — Ibrahim runs `git push`. Remote `origin` = https://github.com/ibrahimalkateb965-tech/EduTrackPro.git. Quarantine enforced by root `.gitignore` (Rule 8).  
+> **Last updated:** 2026-09-20 08:19 — Commit-hygiene audit (a) + Saturday migration 005 (b), frozen with `keep` — Claude Code CLI  
+> **VCS:** git at workspace root, branch `main`, HEAD `1ff5520` — **`[ahead 3]` of `origin/main`, push pending: yes** — Ibrahim runs `git push`. Phase 1 = `fc071f6`, Phase 2 = `a28299b`, Phase 2.5 = `eabac22` (all [APPROVED]). **Working tree is NOT clean by Ibrahim's explicit `keep` decision (2026-09-20 08:19) — every file in it is audited and [APPROVED] (§5d); the 3 commit commands are in §6.** Remote `origin` = https://github.com/ibrahimalkateb965-tech/EduTrackPro.git. Quarantine enforced by root `.gitignore` (Rule 8).  
 
 ---
 
@@ -160,21 +160,112 @@ Delivered under `Clients/03_GHERAS_Center/edutrack_pro/` (written by Claude Code
 
 ---
 
-## 6. THE ONE THING TO DO NEXT (frozen 2026-09-17 01:15)
+## 5c. Phase 3 — Dashboard hardening & live VPS (2026-09-17 → 2026-09-20)
 
-Phase 2.5 deployment package is **[APPROVED]** and committed on `main` as `eabac22`. **First action next session: `git status -sb` must show `[ahead 0]`; if not, Ibrahim runs `git push`.**
+Commits after the Phase 2.5 freeze (`git log eabac22..1ff5520`, subjects verbatim; verification is recorded only where the commit subject or this file says so):
 
-Then, once Ibrahim has cleared the three VPS blockers above (SSH key, DNS A-record, port 443), run from Git Bash:
+| Commit | Subject |
+| :--- | :--- |
+| `d11095e` | chore(state): record Phase 2.5 commit eabac22 and pending push in CURRENT_STATE.md |
+| `98b8c50` | fix(deploy): interpolate GHERAS_APP_PASSWORD directly in psql role alter statement |
+| `2c74f4b` | fix(deploy): use chown -R on /var/log/caddy for caddy log permissions |
+| `bcf4d21` | feat(gheras): Dashboard Phase 3 integration and UI fixes **[APPROVED]** |
+| `e6039b3` | feat(gheras): activate dashboard buttons, granular supervisor permissions, and audit fixes |
+| `9b6ea54` | fix(gheras): fix male name gender heuristic for Hamzah, route tab navigation, and add gender filter to attendance |
+| `fd63736` | feat(gheras): prominent gender selection in student form with english separation tabs |
+| `4f5f6c8` | fix(cache): append cache-busting v=1.1 to script imports |
+| `a82c071` | fix(rbac): restrict supervisor permissions strictly across backend and frontend |
+| `280ff16` | feat(edutrack): add JSON data import endpoint and user account deletion with live VPS deployment |
+| `bb7e069` | feat(gheras): consolidate financial management into unified tab and add customizable quick access shortcuts |
+| `1ff5520` | feat(gheras): add Enterprise Arabic DatePicker and fix student edit save button |
 
+VPS facts proven by the tree: `deploy/DEPLOY.md` documents the live host `187.55.226.225` with key `~/.ssh/edutrack_deploy_key`, the base64 hot-fix pattern for single JS/HTML files, and the cache-version bump rule (`index.html` + `app.js`). Migration `db/postgres/004_phase3.sql` exists and applies cleanly after 001–003 on embedded PG 16 (verified 2026-09-20, 44 tables).
+
+### Session 2026-09-20 — teacher real-name linking (Claude Code + OpenCode Worker B)
+
+Delegate order (Hook 22): staff member `م/آية هويدي` (staff `20cf6983-c352-4f6f-86f5-611f5f725020`) must appear by her Arabic name in schedule selection and print.
+
+| Step | Worker | Status | Verification (Claude Code exclusive) |
+| :--- | :--- | :--- | :--- |
+| `web/dashboard/js/views/rooms.js` — `Promise.all` fetch of `staff` + `users?role=teacher`; `teacherName()` resolves `user.staff_id → staff.name (role_title)`; `staff` reset on cleanup | OpenCode Muse Spark | ✅ uncommitted | `node --check` OK; worker touched only the 2 allowed files, ran no commands |
+| `server/edutrack_api/routers/print.py` — `/print/schedule` joins `users` + `staff`, `COALESCE(st.name, u.username) AS teacher`, cell = `المادة — المعلم` | OpenCode Muse Spark | ✅ uncommitted | `py_compile` OK; `pytest tests/test_print.py` **14/14** on embedded PG 16 (001–004); direct probe: staff-linked user → Arabic name, unlinked → username, NULL → subject only |
+| Cache bump `?v=2.7 → ?v=2.8` in `index.html` + `app.js` | Claude Code | ✅ uncommitted | `node --check app.js` OK |
+| VPS: `UPDATE users SET deleted_at = NULL, is_active = true WHERE staff_id = '20cf6983-c352-4f6f-86f5-611f5f725020'` via `docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env exec -T db psql -U postgres -d gheras_edutrack` | Ibrahim | ⏳ **not run** | Auto-mode classifier blocks production SSH for Claude ("Production Reads") |
+| VPS deploy `bash deploy/push.sh root@187.55.226.225 gheras.autovem.tech -i ~/.ssh/edutrack_deploy_key` | Ibrahim | ⏳ **not run** | `print.py` lives in the `api` container → full push + rebuild, not a base64 hot-fix |
+
+Code verdict for the two delegated files: **[APPROVED]**. Deployment and DB reactivation are Ibrahim's actions.
+
+### Uncommitted work kept by Ibrahim's explicit decision — `keep` (2026-09-20 07:31)
+
+Ibrahim chose `keep` in `/strategic-clear`: the following survive `/clear` **uncommitted / untracked** and must be reviewed and committed (or discarded) by the next session before any new feature work. **Nothing below is in any commit.**
+
+Tracked, modified (13 files, +767/−156, all under `Clients/03_GHERAS_Center/edutrack_pro/`):
+- This session (audited, tests green): `web/dashboard/js/views/rooms.js` (teacher-name part only), `server/edutrack_api/routers/print.py` (`schedule` endpoint only), `web/dashboard/index.html`, `web/dashboard/js/app.js` (v=2.8).
+- Earlier sessions, **not audited by Claude Code**: `rooms.js` (+500 lines: Saturday, multi-day period creation, schedule table), `server/edutrack_api/routers/crud.py` (+1), `web/dashboard/js/views/attendance.js`, `finance.js`, `home.js`, `reports.js`, `settings.js` (+140), `web/print/print.css` (+32), `web/print/templates/guardian_card.html` (card_no → academic_year, + national_id row; edited by another session on 2026-09-20 07:24 while OpenCode was running), `web/print/templates/schedule.html` (Saturday column).
+
+Untracked, not ignored:
+- `Clients/03_GHERAS_Center/edutrack_pro/web/dashboard/js/views/communication.js` — real project file, **unreviewed**.
+- Root `changelog` and `models` — **0-byte stray files** created 2026-09-18 (shell artefacts); recommend deleting.
+- Root `edutrack_update.tar.gz` — 14 MB deploy tarball from 2026-09-17; **must never be committed**; recommend deleting or adding `*.tar.gz` to `.gitignore`.
+
+### Blockers / known defects requiring the developer
+1. **Saturday is rejected by the database.** The uncommitted `rooms.js` / `print.py` / `schedule.html` add `السبت` to schedules, but `chk_schedules_day` (`db/postgres/001_schema.sql:185`) allows only Sun–Thu; any Saturday period insert fails with a check-constraint violation (reproduced on embedded PG 2026-09-20). Fix = new `db/postgres/005_saturday.sql`: `ALTER TABLE schedules DROP CONSTRAINT chk_schedules_day, ADD CONSTRAINT chk_schedules_day CHECK (day IN ('السبت','الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس'));` + apply on the VPS + extend the `deploy.sh` migration check.
+2. `git push` — `[ahead 3]` — Ibrahim's action.
+3. Production SSH/DB commands cannot be run by Claude Code in auto mode (classifier: "Production Reads"); hand the exact command to Ibrahim (`!` prefix in the session).
+4. The teacher-account reactivation SQL and the v=2.8 deploy (above) are still pending on the VPS.
+
+---
+
+## 5d. Session 2026-09-20 ~08:40 — Commit-hygiene audit (a) + Saturday migration (b) — Claude Code + OpenCode Worker B
+
+Executed Ibrahim's combined (a)+(b) order. Tree hygiene: `models`, `changelog` (0-byte) and `edutrack_update.tar.gz` (14 MB) deleted; `*.tar.gz` added to root `.gitignore`.
+
+| Item | Worker | Verification (Claude Code exclusive) |
+| :--- | :--- | :--- |
+| `db/postgres/005_saturday.sql` — `DROP CONSTRAINT IF EXISTS chk_schedules_day` + re-add with `السبت`; `deploy/deploy.sh` pre-flight list, empty-DB loop and incremental loop bumped to 005 | OpenCode Muse Spark | Embedded PG 16: 001→005 applied, **005 applied twice = no-op**, constraint exists exactly once, 44 tables; Saturday insert accepted, Friday still rejected. Claude patch: removed copied `Money: numeric` header line. |
+| `deploy/deploy.sh` admin gate | Claude Code | `username='admin'` check replaced by `role='manager' AND is_active AND deleted_at IS NULL >= 1` — the new settings UI lets a manager delete the seeded `admin`, which would have made every later deploy die at the old gate. `bash -n` OK. |
+| `rooms.js` (+536 audit) | Claude Code | Time-picker/multi-day/delete reviewed. Patches: unused `DAY_OPTIONS` removed; multi-day submit → `Promise.allSettled`, table reloads and failed days stay selected (retry no longer re-posts successful days). |
+| `settings.js` (+140 audit) | Claude Code | Manager create/delete UI. Backend confirmed: `users` writes manager-only, self-delete blocked → ≥1 manager always survives. No patch. |
+| `attendance.js`, `students.js` | Claude Code | Hard-coded `import('./communication.js?v=2.6')` (stale vs v=2.8, second module instance) → `${new URL(import.meta.url).search}` so the app.js cache version propagates. |
+| `communication.js` (656 lines, new) | Claude Code | `messages` payload matches schema (channel/status CHECKs). Patches: `api.get('student_attendance')` (not a CRUD resource → silent 404, absences always 0) → `reports/attendance?from=&to=` last 90 days via shared `loadAttendance()`; phone fallback adds `father_phone`/`mother_phone`. **Mandatory commit**: HEAD `app.js` already routes `#/communication`. |
+| `finance.js`, `reports.js`, `home.js`, `print.css`, `guardian_card.html`, `schedule.html`, `crud.py` (+`message-templates`), `print.py` | Claude Code | Reviewed, no patch. `print.py` supplies `sat`, `academic_year`, `national_id` (`SELECT s.*`). |
+| Tests | Claude Code | `node --check` 14/14 modules; `py_compile` OK; **pytest 46/46** (fixtures as superuser, API as `gheras_app`). Two failures were pre-existing at HEAD: `test_role_matrix_for_supervisor` and `test_supervisor_staff_salary_masking_and_write_guard` still asserted supervisor writes to `rooms`/`staff` = 200, contradicting the strict RBAC commit `a82c071`; assertions aligned to 403. Hygiene: 17 changed files, 0 BOM, 0 CRLF, 0 Eastern digits, 0 forbidden words (only pre-existing `gheras.autovem.tech` hostname in deploy.sh usage comment). |
+
+### Verdict: **[APPROVED]** for the whole working tree (20 modified + 2 new files).
+
+### Notes, not blockers
+- `guardian_card` `academic_year` is hard-coded `1447-1448 هـ` in `print.py:116` — no settings table exists; needs a manual bump each Hijri year (or a settings table later).
+- `communication.js` `getGuardianName()` reads `guardian_name`, which is not a students column → always falls back to «ولي الأمر المحترم». Cosmetic.
+- All views fetch `students` / `messages` with the default `limit=100`; pre-existing pattern across the dashboard, will truncate beyond 100 rows.
+- `tests/test_supervisor_permissions.py:7` unused `make_user` import — pre-existing pyflakes note.
+
+## 6. THE ONE THING TO DO NEXT (frozen 2026-09-20 08:19)
+
+HEAD is `1ff5520` on `main`, `[ahead 3]`. **Ibrahim chose `keep` in `/strategic-clear` (08:55):** the whole working tree — 19 modified tracked files + `db/postgres/005_saturday.sql` + `web/dashboard/js/views/communication.js` — survives `/clear` **uncommitted / untracked**. Unlike the 07:31 freeze, **everything in it is audited and [APPROVED]** (§5d, pytest 46/46). Nothing is in any commit yet. First action next session: `git status -sb` and confirm the tree still matches §5d (19 M + 2 ??); then Ibrahim picks:
+
+- **(a)** Commit + push now — Ibrahim runs the 3 prepared commits below, then `git push` (`[ahead 3]` → `[ahead 6]`); Claude verifies `git status -sb` is clean afterwards.
+- **(b)** Deploy first — Ibrahim runs `bash Clients/03_GHERAS_Center/edutrack_pro/deploy/push.sh root@187.55.226.225 gheras.autovem.tech -i ~/.ssh/edutrack_deploy_key` (applies 005 via the incremental loop, rebuilds `api`, serves v=2.8) + the teacher reactivation SQL (§5c) so Saturday periods and `م/آية هويدي` are live today; commits (a) follow.
+- **(c)** Next feature after (a) — pick from the §5d notes: settings-driven `academic_year` (needs a small settings table + 006 migration) or pagination past the `limit=100` default in the dashboard views.
+
+### Prepared commits (run from repo root, in order; Claude never runs these)
 ```bash
-cd "Clients/03_GHERAS_Center/edutrack_pro"
-export EDUTRACK_ADMIN_PASSWORD='<strong password>'     # optional — otherwise generated and printed once
-bash deploy/push.sh root@187.55.226.225 <public-hostname> -i ~/.ssh/vps_secure_key
+# 1/3
+git add Clients/03_GHERAS_Center/edutrack_pro/web/ Clients/03_GHERAS_Center/edutrack_pro/server/edutrack_api/
+git commit -m "feat(gheras): communication center, Saturday + multi-day schedules, manager accounts, teacher real names in print"
+# 2/3
+git add Clients/03_GHERAS_Center/edutrack_pro/db/postgres/005_saturday.sql Clients/03_GHERAS_Center/edutrack_pro/deploy/deploy.sh
+git commit -m "feat(db): allow Saturday in schedules (005) and relax deploy admin gate to >=1 active manager"
+# 3/3
+git add Clients/03_GHERAS_Center/edutrack_pro/server/tests/ .gitignore CURRENT_STATE.md
+git commit -m "test(gheras): align supervisor RBAC tests with strict rule from a82c071; chore: ignore tarballs, update state"
+git push
 ```
 
-`deploy.sh` ends with a summary; success = health JSON, `dashboard: HTTP 200`, `server/ blocked: HTTP 404`, `admin login: HTTP 200`. Record the hostname and the admin password location (never the password itself) here afterwards. After that, choose:
+### VPS one-shot (Ibrahim; the auto-mode classifier blocks Claude from production SSH)
+```bash
+bash Clients/03_GHERAS_Center/edutrack_pro/deploy/push.sh root@187.55.226.225 gheras.autovem.tech -i ~/.ssh/edutrack_deploy_key
+ssh -i ~/.ssh/edutrack_deploy_key root@187.55.226.225 'cd /opt/edutrack && docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env exec -T db psql -U postgres -d gheras_edutrack -c "UPDATE users SET deleted_at = NULL, is_active = true WHERE staff_id = '"'"'20cf6983-c352-4f6f-86f5-611f5f725020'"'"';" -c "SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conname = '"'"'chk_schedules_day'"'"';"'
+```
+Expected: `UPDATE 1` and a CHECK definition starting with `'السبت'`.
 
-- **(a)** Phase 3 — Android app module (Compose UI over Room + `homework-core`, teacher/guardian API scoping in `routers/crud.py`).
-- **(c)** Client checkpoint — dashboard screenshots against the live API + the 11 templates + Arabic acceptance note.
-
-Pre-conditions: free ≥ 4 GB RAM before running the fleet (never with Docker Desktop up), one `opencode run` at a time with ≤ 4 files per batch, Codex via `-s workspace-write`.
+Pre-conditions unchanged: free ≥ 4 GB RAM before running the fleet (never with Docker Desktop up), one `opencode run` at a time with ≤ 4 files per batch, Codex via `-s workspace-write`, embedded PG booter must stay alive in the background while pytest runs (`TEST_DATABASE_URL` = superuser URI for fixtures, `DATABASE_URL` = `gheras_app` URI for the API).

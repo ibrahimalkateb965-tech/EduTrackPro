@@ -17,6 +17,7 @@ let printLink = null;
 let tabsContainer = null;
 let toolbarContainer = null;
 let theadContainer = null;
+let currentApi = null;
 
 function getParams() {
   const hash = location.hash.replace(/^#\/?/, '');
@@ -52,19 +53,57 @@ function setEvalEntry(studentId, key, value) {
   evalEntries.set(studentId, entry);
 }
 
-function attendanceRow(student) {
+function attendanceRow(student, api) {
   const entry = entries.get(student.id) || { status: 'حاضر', note: '' };
   const status = el('select', { 'aria-label': `حالة ${student.name || ''}` });
   STATUSES.forEach(value => status.append(el('option', { value }, value)));
   status.value = entry.status || 'حاضر';
-  status.addEventListener('change', () => setEntry(student.id, 'status', status.value));
+
+  const commBtn = el('button', {
+    class: 'button button-outline',
+    type: 'button',
+    style: 'padding:4px 9px; font-size:11px; display:inline-flex; align-items:center; gap:4px;',
+    title: 'مراسلة ولي الأمر عبر واتساب'
+  }, '💬 مراسلة');
+
+  commBtn.onclick = async () => {
+    try {
+      const { openComposerModal } = await import(`./communication.js${new URL(import.meta.url).search}`); // inherit app.js cache version
+      const tmpl = status.value === 'غائب' ? 'attendance' : 'custom';
+      await openComposerModal(api, student.id, tmpl);
+    } catch (err) {
+      toast('تعذر فتح مركز التواصل', true);
+    }
+  };
+
+  function updateCommBtnStyle() {
+    if (status.value === 'غائب') {
+      commBtn.classList.remove('button-outline');
+      commBtn.style.background = '#e53935';
+      commBtn.style.color = '#fff';
+      commBtn.textContent = '⚠️ إشعار غياب';
+    } else {
+      commBtn.classList.add('button-outline');
+      commBtn.style.background = '';
+      commBtn.style.color = '';
+      commBtn.textContent = '💬 مراسلة';
+    }
+  }
+
+  status.addEventListener('change', () => {
+    setEntry(student.id, 'status', status.value);
+    updateCommBtnStyle();
+  });
+  updateCommBtnStyle();
+
   const note = el('input', { type: 'text', value: entry.note || '', placeholder: 'ملاحظة اختيارية', 'aria-label': `ملاحظة ${student.name || ''}` });
   note.addEventListener('input', () => setEntry(student.id, 'note', note.value));
   return el('tr', {},
     el('td', {}, student.name || '—'),
     el('td', {}, student.group_name ? (student.group_name + (student.gender ? ` (${student.gender})` : '')) : '—'),
     el('td', {}, status),
-    el('td', {}, note)
+    el('td', {}, note),
+    el('td', {}, commBtn)
   );
 }
 
@@ -104,9 +143,9 @@ function paint() {
     const emptyText = students.length ? 'لا يوجد طلاب في هذه المجموعة' : 'لا يوجد طلاب نشطون بعد';
     tbody.replaceChildren(...(rows.length ? rows : [el('tr', {}, el('td', { colspan: '4', class: 'muted', style: 'text-align:center;' }, emptyText))]));
   } else {
-    const rows = list.map(student => attendanceRow(student));
+    const rows = list.map(student => attendanceRow(student, currentApi));
     const emptyText = students.length ? 'لا يوجد طلاب في هذه المجموعة' : 'لا يوجد طلاب نشطون بعد';
-    tbody.replaceChildren(...(rows.length ? rows : [el('tr', {}, el('td', { colspan: '4', class: 'muted', style: 'text-align:center;' }, emptyText))]));
+    tbody.replaceChildren(...(rows.length ? rows : [el('tr', {}, el('td', { colspan: '5', class: 'muted', style: 'text-align:center;' }, emptyText))]));
   }
 }
 
@@ -178,6 +217,7 @@ async function saveEvaluations(api, button) {
 }
 
 export async function render(container, api) {
+  currentApi = api;
   students = [];
   entries = new Map();
   evalEntries = new Map();
@@ -281,7 +321,8 @@ export async function render(container, api) {
           el('th', {}, 'الطالب'),
           el('th', {}, 'المجموعة / القسم'),
           el('th', {}, 'الحالة'),
-          el('th', {}, 'ملاحظة')
+          el('th', {}, 'ملاحظة'),
+          el('th', {}, 'تواصل')
         )
       );
     }
@@ -302,5 +343,5 @@ export async function render(container, api) {
     toast(error.message, true);
   }
   await loadEntries(api);
-  paint();
+  paint(api);
 }

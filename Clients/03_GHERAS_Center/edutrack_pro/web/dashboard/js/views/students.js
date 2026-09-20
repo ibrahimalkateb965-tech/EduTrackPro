@@ -104,7 +104,7 @@ function studentRow(student, api) {
   }, '💬 مراسلة');
   commBtn.addEventListener('click', async () => {
     try {
-      const { openComposerModal } = await import('./communication.js?v=2.6');
+      const { openComposerModal } = await import(`./communication.js${new URL(import.meta.url).search}`); // inherit app.js cache version
       await openComposerModal(api, student.id);
     } catch (err) {
       toast('تعذر فتح مركز التواصل', true);

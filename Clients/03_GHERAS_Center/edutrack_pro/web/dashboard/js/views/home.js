@@ -8,7 +8,7 @@ const ALL_SHORTCUTS = [
   { id: 'accounts', category: 'الإدارة المالية', label: 'البنك والخزائن', desc: 'أرصدة الصناديق والتحويلات المالية', icon: '🏦', route: '#/finance?tab=accounts', perm: 'finance' },
   { id: 'receivables', category: 'الإدارة المالية', label: 'الذمم والمتأخرات', desc: 'متابعة المبالغ المعلقة وتذكير أولياء الأمور', icon: '📌', route: '#/finance?tab=receivables', perm: 'finance' },
   { id: 'payroll', category: 'الإدارة المالية', label: 'مسير الرواتب', desc: 'رواتب الموظفين والبدلات والخصومات', icon: '💼', route: '#/finance?tab=payroll', perm: 'manager_only' },
-  { id: 'financial_reports', category: 'الإدارة المالية', label: 'التقارير والمطابقة', desc: 'إقفال الشهر ومطابقة الحسابات', icon: '📑', route: '#/finance?tab=reports', perm: 'finance' },
+  { id: 'financial_reports', category: 'الإدارة المالية', label: 'التقارير والمطابقة', desc: 'إقفال الشهر ومطابقة الحسابات', icon: '📑', route: '#/reports', perm: 'finance' },
 
   // --- شؤون الطلاب والتعليم ---
   { id: 'students', category: 'شؤون الطلاب والتعليم', label: 'قائمة الطلاب', desc: 'إدارة بيانات وتسجيل الطلاب', icon: '♟', route: '#/students', perm: 'students' },
@@ -28,7 +28,7 @@ const ALL_SHORTCUTS = [
   { id: 'settings', category: 'الشؤون الإدارية والموظفون', label: 'الإعدادات وكلمة المرور', desc: 'تخصيص النظام وإدارة الحساب', icon: '⚙', route: '#/settings' },
 
   // --- أدوات وإجراءات سريعة ---
-  { id: 'contact_whatsapp', category: 'أدوات وإجراءات سريعة', label: 'مراسلة واتساب', desc: 'إرسال تواصل سريع لولي الأمر', icon: '💬', action: 'contact', perm: 'students' },
+  { id: 'contact_whatsapp', category: 'أدوات وإجراءات سريعة', label: 'مركز التواصل (واتساب)', desc: 'إرسال التنبيهات وسجل تواصل أولياء الأمور', icon: '💬', route: '#/communication', perm: 'students' },
   { id: 'notifications', category: 'أدوات وإجراءات سريعة', label: 'التنبيهات الذكية', desc: 'ملخص التنبيهات والغياب اليوم', icon: '🔔', action: 'notifications', perm: 'manager_only' },
   { id: 'backup', category: 'أدوات وإجراءات سريعة', label: 'تنزيل نسخة احتياطية', desc: 'تصدير نسخة كاملة من البيانات محلياً', icon: '🔐', action: 'backup', perm: 'manager_only' }
 ];

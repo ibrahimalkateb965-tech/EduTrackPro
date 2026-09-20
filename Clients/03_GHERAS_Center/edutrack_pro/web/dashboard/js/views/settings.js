@@ -75,7 +75,17 @@ export async function render(container, api) {
       el('tr', {}, el('td', { colspan: '5', class: 'muted', style: 'text-align:center;' }, 'جاري تحميل المستخدمين...'))
     );
 
-    const addSupervisorBtn = el('button', { class: 'button', type: 'button', style: 'margin-bottom:14px;' }, '➕ إضافة حساب مشرف جديد');
+    const addManagerBtn = el('button', {
+      class: 'button',
+      type: 'button',
+      style: 'background: #7c3aed; border-color: #6d28d9; color: #fff; margin-bottom: 14px;'
+    }, '👑 إضافة حساب مدير عام (أدمن)');
+
+    const addSupervisorBtn = el('button', {
+      class: 'button button-outline',
+      type: 'button',
+      style: 'margin-bottom: 14px;'
+    }, '➕ إضافة حساب مشرف جديد');
 
     function openPermissionsModal(user, onUpdated) {
       const perms = user.permissions || {};
@@ -120,6 +130,79 @@ export async function render(container, api) {
           if (onUpdated) onUpdated();
         } catch (err) {
           toast(err.message || 'فشل تحديث الصلاحيات', true);
+          modalSubmit.disabled = false;
+        }
+      };
+    }
+
+    function openCreateManagerModal(onCreated) {
+      const usernameInput = el('input', { type: 'text', required: 'required', autocomplete: 'off', placeholder: 'اسم المستخدم للمدير (مثال: admin_ahmed)' });
+      const pwdInput = el('input', { type: 'password', required: 'required', minlength: '8', placeholder: 'كلمة المرور (8 أحرف فأكثر)' });
+      const pwdConfirmInput = el('input', { type: 'password', required: 'required', minlength: '8', placeholder: 'تأكيد كلمة المرور' });
+
+      const modalSubmit = el('button', {
+        class: 'button',
+        type: 'submit',
+        style: 'background: #7c3aed; border-color: #6d28d9; color: #fff;'
+      }, 'تأكيد إنشاء حساب المدير');
+
+      const modalForm = el('form', { class: 'form-grid' },
+        el('label', { style: 'grid-column: 1 / -1;' }, el('span', {}, 'اسم المستخدم للمدير العام (أدمن)'), usernameInput),
+        el('label', { style: 'grid-column: 1 / -1;' }, el('span', {}, 'كلمة المرور المؤقتة'), pwdInput),
+        el('label', { style: 'grid-column: 1 / -1;' }, el('span', {}, 'تأكيد كلمة المرور'), pwdConfirmInput),
+        el('div', {
+          class: 'card',
+          style: 'grid-column: 1 / -1; background: #faf5ff; border: 1px solid #e9d5ff; padding: 12px; margin-top: 6px; border-radius: 8px;'
+        },
+          el('div', { style: 'color: #6b21a8; font-weight: 600; margin-bottom: 4px;' }, '👑 تنبيه أمني عالي الحساسية:'),
+          el('div', { style: 'color: #581c87; font-size: 13px; line-height: 1.6;' },
+            'حساب المدير العام (الأدمن) يمتلك وصولاً كاملاً وغير مقيد لكافة بيانات الطلاب، المعلمين، الحلقات، التقارير والعمليات المالية والرواتب، بالإضافة لصلاحية تعديل الإعدادات وإدارة الحسابات. يرجى منح هذا الدور فقط للأشخاص المخولين رسمياً.'
+          )
+        ),
+        el('div', { class: 'form-actions', style: 'grid-column: 1 / -1; margin-top: 14px;' }, modalSubmit)
+      );
+
+      const { close } = modal('👑 إنشاء حساب مدير عام (أدمن جديد)', modalForm);
+
+      modalForm.onsubmit = async ev => {
+        ev.preventDefault();
+        const username = usernameInput.value.trim();
+        const password = pwdInput.value;
+        const confirmPassword = pwdConfirmInput.value;
+
+        if (username.length < 3) {
+          toast('اسم المستخدم يجب ألا يقل عن 3 أحرف', true);
+          return;
+        }
+        if (password.length < 8) {
+          toast('كلمة المرور يجب ألا تقل عن 8 أحرف', true);
+          return;
+        }
+        if (password !== confirmPassword) {
+          toast('كلمتا المرور غير متطابقتين', true);
+          return;
+        }
+
+        modalSubmit.disabled = true;
+        try {
+          const payload = {
+            username,
+            password,
+            role: 'manager',
+            permissions: {
+              students: true,
+              attendance: true,
+              daily_evaluation: true,
+              monthly_evaluation: true,
+              finance: true
+            }
+          };
+          await api.post('users', payload);
+          toast('تم إنشاء حساب المدير العام (الأدمن) بنجاح');
+          close();
+          if (onCreated) onCreated();
+        } catch (err) {
+          toast(err.message || 'فشلت عملية إنشاء حساب المدير', true);
           modalSubmit.disabled = false;
         }
       };
@@ -188,10 +271,13 @@ export async function render(container, api) {
     userMgmtCard = el('div', { class: 'card', style: 'margin-top:20px;' },
       el('div', { style: 'display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:10px;' },
         el('div', {},
-          el('h2', { style: 'margin:0; font-size:18px;' }, '👥 إدارة حسابات النظام والمشرفين'),
-          el('p', { class: 'muted', style: 'margin:4px 0 0 0;' }, 'إنشاء حسابات المشرفين، تحديد الصلاحيات بدقة، وإعادة تعيين كلمات المرور')
+          el('h2', { style: 'margin:0; font-size:18px;' }, '👥 إدارة حسابات النظام والمدراء والمشرفين'),
+          el('p', { class: 'muted', style: 'margin:4px 0 0 0;' }, 'إنشاء حسابات المدراء والمشرفين، تحديد الصلاحيات بدقة، وإعادة تعيين كلمات المرور')
         ),
-        addSupervisorBtn
+        el('div', { style: 'display:flex; gap:8px; flex-wrap:wrap;' },
+          addManagerBtn,
+          addSupervisorBtn
+        )
       ),
       el('div', { class: 'table-wrap' },
         el('table', {},
@@ -225,7 +311,7 @@ export async function render(container, api) {
         }
 
         list.forEach(u => {
-          const roleLabels = { manager: 'مدير عام', supervisor: 'مشرف', teacher: 'معلم' };
+          const roleLabels = { manager: '👑 مدير عام (أدمن)', supervisor: 'مشرف', teacher: 'معلم' };
           const resetBtn = el('button', { class: 'button button-outline', type: 'button' }, 'كلمة المرور');
 
           resetBtn.onclick = () => {
@@ -260,7 +346,7 @@ export async function render(container, api) {
           // Permissions cell
           const permsCell = el('td');
           if (u.role === 'manager') {
-            permsCell.append(el('span', { class: 'badge', style: 'background:#dcfce7; color:#15803d;' }, 'كامل الصلاحيات'));
+            permsCell.append(el('span', { class: 'badge', style: 'background:#dcfce7; color:#15803d; font-weight:600;' }, '★ كامل الصلاحيات الإدارية والمالية'));
           } else if (u.role === 'supervisor') {
             const p = u.permissions || {};
             const activeTags = [];
@@ -289,32 +375,38 @@ export async function render(container, api) {
           }
           actionsCell.append(resetBtn);
 
-          if ((u.role === 'supervisor' || u.role === 'teacher') && u.id !== me?.id) {
+          if (u.id !== me?.id) {
+            const isManagerAccount = u.role === 'manager';
             const delBtn = el('button', {
               class: 'button button-outline',
               type: 'button',
-              style: 'color:#dc2626; border-color:#fca5a5; background:#fef2f2;'
-            }, '🗑 حذف الحساب');
+              style: isManagerAccount
+                ? 'color:#991b1b; border-color:#f87171; background:#fee2e2; font-weight:600;'
+                : 'color:#dc2626; border-color:#fca5a5; background:#fef2f2;'
+            }, isManagerAccount ? '🗑 حذف حساب المدير' : '🗑 حذف الحساب');
 
             delBtn.onclick = () => {
               const confirmSubmit = el('button', {
                 class: 'button',
                 type: 'submit',
                 style: 'background:#dc2626; border-color:#dc2626; color:#fff;'
-              }, 'نعم، حذف الحساب نهائياً');
+              }, isManagerAccount ? 'نعم، حذف حساب المدير نهائياً' : 'نعم، حذف الحساب نهائياً');
               const cancelBtn = el('button', { class: 'button button-outline', type: 'button' }, 'إلغاء');
+
+              const warningTitle = isManagerAccount ? '⚠️ تحذير أمني شديد الخطورة:' : '⚠️ تنبيه هام:';
+              const warningText = isManagerAccount
+                ? 'أنت على وشك حذف حساب مدير عام (أدمن). سيتم إلغاء كافة صلاحياته الإدارية والمالية فوراً. يرجى التأكد التام قبل المتابعة.'
+                : 'سيتم تعطيل وإلغاء وصول هذا المستخدم فوراً إلى المنظومة، مع الحفاظ على سلامة السجلات المرتبطة به في النظام.';
 
               const modalForm = el('form', {},
                 el('p', { style: 'line-height:1.7; font-size:15px; margin-top:0;' },
                   'هل أنت متأكد من رغبتك في حذف حساب ',
                   el('strong', { style: 'color:#dc2626;' }, u.username || 'المستخدم'),
-                  '؟'
+                  isManagerAccount ? ' (مدير عام أدمن)؟' : '؟'
                 ),
                 el('div', { class: 'card', style: 'background:#fff1f2; border:1px solid #fecdd3; padding:12px; margin-bottom:16px; border-radius:8px;' },
-                  el('div', { style: 'color:#9f1239; font-weight:600; margin-bottom:4px;' }, '⚠️ تنبيه هام:'),
-                  el('div', { style: 'color:#881337; font-size:13px; line-height:1.6;' },
-                    'سيتم تعطيل وإلغاء وصول هذا المستخدم فوراً إلى المنظومة، مع الحفاظ على سلامة السجلات المرتبطة به في النظام.'
-                  )
+                  el('div', { style: 'color:#9f1239; font-weight:600; margin-bottom:4px;' }, warningTitle),
+                  el('div', { style: 'color:#881337; font-size:13px; line-height:1.6;' }, warningText)
                 ),
                 el('div', { class: 'form-actions', style: 'display:flex; justify-content:flex-end; gap:8px;' },
                   cancelBtn,
@@ -343,10 +435,23 @@ export async function render(container, api) {
             actionsCell.append(delBtn);
           }
 
+          const isMe = me && u.id === me.id;
+          const usernameCell = el('td', {}, el('strong', {}, u.username || '—'));
+          if (isMe) {
+            usernameCell.append(el('span', { class: 'badge', style: 'margin-right:6px; background:#e0e7ff; color:#3730a3; font-size:11px;' }, 'حسابك الحالي'));
+          }
+
+          const roleCell = el('td', {});
+          if (u.role === 'manager') {
+            roleCell.append(el('span', { class: 'badge', style: 'background:#f3e8ff; color:#6b21a8; font-weight:600;' }, '👑 مدير عام (أدمن)'));
+          } else {
+            roleCell.append(roleLabels[u.role] || u.role || '—');
+          }
+
           usersTableBody.append(
             el('tr', {},
-              el('td', {}, el('strong', {}, u.username || '—')),
-              el('td', {}, roleLabels[u.role] || u.role || '—'),
+              usernameCell,
+              roleCell,
               permsCell,
               el('td', {}, u.is_active ? el('span', { class: 'badge' }, 'نشط') : el('span', { class: 'badge red' }, 'معطل')),
               actionsCell
@@ -361,6 +466,7 @@ export async function render(container, api) {
     }
 
     refreshUsersList = loadUsersList;
+    addManagerBtn.onclick = () => openCreateManagerModal(loadUsersList);
     addSupervisorBtn.onclick = () => openCreateSupervisorModal(loadUsersList);
     loadUsersList();
   }

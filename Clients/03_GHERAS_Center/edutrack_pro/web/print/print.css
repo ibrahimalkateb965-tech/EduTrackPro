@@ -143,6 +143,38 @@ h4 {
   color: var(--g-text);
 }
 
+/* Compact A5 Header Rules to prevent text collision */
+.page-a5 .doc-header {
+  gap: 2mm;
+  padding-bottom: 2mm;
+  margin-bottom: 3mm;
+}
+
+.page-a5 .doc-logo {
+  width: 90px;
+  height: 52px;
+}
+
+.page-a5 .doc-center-name {
+  font-size: 15pt;
+  line-height: 1.2;
+}
+
+.page-a5 .doc-tagline {
+  font-size: 7.5pt;
+}
+
+.page-a5 .doc-title {
+  font-size: 12pt;
+  margin-top: 1mm;
+}
+
+.page-a5 .doc-meta {
+  min-width: 28mm;
+  font-size: 8pt;
+  white-space: nowrap;
+}
+
 .doc-footer {
   display: flex;
   align-items: center;
