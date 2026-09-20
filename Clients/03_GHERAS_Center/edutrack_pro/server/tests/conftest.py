@@ -1,6 +1,6 @@
 """Shared fixtures: real PostgreSQL (TEST_DATABASE_URL), app under TestClient, seeded users.
 
-The reviewer runs these against an embedded PostgreSQL 16 with 001/002/003 applied.
+The reviewer runs these against an embedded PostgreSQL 16 with 001 through 006 applied.
 """
 
 from __future__ import annotations
@@ -26,7 +26,7 @@ from edutrack_api.auth import hash_password  # noqa: E402
 from edutrack_api.main import app  # noqa: E402
 
 MAIN_BRANCH = uuid.UUID("00000000-0000-0000-0000-000000000001")
-KEEP_TABLES = {"branches", "expense_categories", "message_templates"}
+KEEP_TABLES = {"branches", "expense_categories", "message_templates", "system_settings"}
 
 
 def _truncate_all(conn: psycopg.Connection) -> None:

@@ -4,7 +4,7 @@
 > **Master Orchestrator**: `Claude Code CLI` (Opus Max / Sonnet 5)  
 > **Handoff Source**: `Antigravity IDE` (Interactive Cockpit & Visual Inspector)  
 > **Timestamp**: 2026-09-16T12:55:00+03:00  
-> **Last updated:** 2026-09-20 08:57 — Phase 3 closed: v=2.8 + migration 005 live on the VPS, Phase 3 **[APPROVED]**; pre-clear freeze at `9d23862` — Claude Code CLI  
+> **Last updated:** 2026-09-20 — Phase 4 (b) settings-driven center identity + migration 006 **[APPROVED]** (§5f) and **committed** (`feat(settings)` on top of `877589c`), 006 hardened with the named stray soft-delete (§5f step 3a), pytest 52/52 re-run; production still v=2.8 / 005 until Ibrahim pushes + deploys — Claude Code CLI  
 > **VCS:** git at workspace root, branch `main`, HEAD `9d23862` — **level with `origin/main`, push pending: no**. Phase 1 = `fc071f6`, Phase 2 = `a28299b`, Phase 2.5 = `eabac22`, Phase 3 audit = `52ce581` + `6e2e434` + `469e280` (all [APPROVED]). **Working tree clean** (Ibrahim committed the §5d-approved tree at 08:22, superseding his earlier `keep`). Remote `origin` = https://github.com/ibrahimalkateb965-tech/EduTrackPro.git. Quarantine enforced by root `.gitignore` (Rule 8).  
 
 ---
@@ -259,13 +259,47 @@ Ibrahim ran the §6 one-shot after `git push` (7 commits, `main` now level with 
 
 ---
 
-## 6. THE ONE THING TO DO NEXT (frozen 2026-09-20 08:57)
+## 5f. Phase 4 (b) — Settings-driven center identity + `users(staff_id)` guard (2026-09-20, dual-harness: OpenCode Worker B ∥ Cline Worker C)
 
-HEAD is `9d23862` on `main`, level with `origin/main`, **working tree clean**. Production = v=2.8, migrations 001–005, Phase 3 **[APPROVED]** (§5e). Two lessons flushed to `.agents/MEMORY_STORE.md` (`users.staff_id` not unique → `UPDATE 2`; public `curl` allowed for post-deploy checks). Ibrahim picks Phase 4:
+First run of **Cline CLI v3.0.62** as Worker C (`cline --auto-approve true -c <dir> -m z-ai/glm-5.3-flash --thinking medium -t 500 --json "<order>" < /dev/null`, ~2 min, 2 files, no commands run) in parallel with OpenCode Worker B (`opencode run -m opencode-go/muse-spark-1.3-contributor`, 4 files, ~3 min). Both returned exactly the ordered files; zero patches needed on worker output.
+
+| Item | Worker | Verification (Claude Code exclusive) |
+| :--- | :--- | :--- |
+| `db/postgres/006_settings.sql` — `system_settings(key, value, description, updated_at)` + `set_updated_at` trigger + `GRANT` to `gheras_app`; 6 seeds `ON CONFLICT DO NOTHING`; **dedupe** (`row_number() OVER (PARTITION BY staff_id ORDER BY created_at, id)`, retire `rn > 1`) **then** `CREATE UNIQUE INDEX IF NOT EXISTS uq_users_active_staff ON users(staff_id) WHERE deleted_at IS NULL AND staff_id IS NOT NULL` | OpenCode Muse Spark | Embedded PG 16: 001→006 with a **reproduced prod duplicate** (2 active rows, same `staff_id`): oldest kept, newer soft-deleted, index created; 006 re-run ×2 = no-op; edited `center_phone` survives re-seed; trigger exists once; **45 tables**; `gheras_app` = INSERT/SELECT/UPDATE |
+| `deploy/deploy.sh` — pre-flight list, empty-DB loop, incremental loop → 006 | OpenCode Muse Spark | `bash -n` OK |
+| `server/edutrack_api/services/settings.py` — `DEFAULTS`, `SETTING_KEYS`, `load_settings(conn)` (DB → constants; `UndefinedTable` tolerated) | OpenCode Muse Spark | pyflakes clean |
+| `server/edutrack_api/routers/settings.py` — `GET /settings` (manager+supervisor), `PUT /settings` (manager; Pydantic `extra="forbid"`, trim, 1–200 chars, upsert, `audit_log` row) | OpenCode Muse Spark | pyflakes clean; 6 new tests |
+| `web/dashboard/js/api.js` (+`put`), `web/dashboard/js/views/settings.js` (+60: «🏛️ إعدادات المركز والعام الدراسي والمطبوعات» card, manager-only, 6 inputs, `PUT settings` + toast; `centerInfoCard` name now reads the live `center_name`) | Cline GLM Flash | `node --check` OK ×3 |
+| `routers/print.py` — `_resp(payload, conn)` merges `load_settings(conn)` under every print payload (endpoint keys win); hard-coded `1447-1448 هـ` removed from `guardian_card`; all 13 call sites wired | Claude Code | `py_compile` OK; `test_print.py` 14/14 unchanged |
+| `main.py` — router registered as `settings_router` (a bare `settings` import would be shadowed by the local `settings = get_settings()` in `create_app()`) | Claude Code | app boots under TestClient |
+| `tests/conftest.py` — `system_settings` added to `KEEP_TABLES` (seed rows must survive the per-test TRUNCATE) | Claude Code | — |
+| `tests/test_settings.py` (6) — seed defaults, supervisor 403, 422 matrix incl. unknown key, PUT → guardian-card/schedule payloads + audit rows, constants fallback when rows deleted, partial unique index behaviour | Claude Code | — |
+| Cache bump `v=2.8 → v=2.9` in `index.html` + `app.js` (4 tags) | Claude Code | `node --check` OK |
+
+**Tests: pytest 52/52** (46 + 6) on embedded PG 16 with 001–006, fixtures as superuser, API as `gheras_app`. Hygiene scan of the 9 touched files: 0 BOM, 0 CRLF, 0 Eastern digits, 0 forbidden words (the one `deploy.sh` hit is the pre-existing hostname in the usage line at HEAD).
+
+**Hardening (2026-09-20, second session, Claude Code inline — 3-line SQL):** 006 step **3a** retires the known stray row by id (`UPDATE users SET deleted_at = now(), is_active = false WHERE id = 'c0997630-1d40-43f2-8efa-be8b3c46d322' AND deleted_at IS NULL` — username `معلم ،1`, `staff_id 20cf6983-…`) *before* the generic `row_number()` dedupe, so the real account survives regardless of `created_at` ordering. Embedded PG probe: stray inserted as the **older** row → stray retired, newer real row kept; generic pair unchanged (oldest kept); 006 ×3 idempotent; 45 tables; pytest **52/52** re-run (46 s).
+
+### Verdict: **[APPROVED]** — 8 modified + 4 new files, committed as `feat(settings): implement system settings, dynamic academic year, and staff deduplication`.
+
+### Deploy notes for Ibrahim (production SSH stays his action)
+1. `print.py` changed → **full push** (`bash deploy/push.sh root@187.55.226.225 gheras.autovem.tech -i ~/.ssh/edutrack_deploy_key`), not a base64 hot-fix. `deploy.sh` applies 006 in the incremental loop.
+2. 006 soft-deletes the named stray `users` row `c0997630-1d40-43f2-8efa-be8b3c46d322` (`معلم ،1`) for `staff_id 20cf6983-…` by id (step 3a), then the generic dedupe guards any other pair. No pre-deploy SELECT needed unless the teacher actually logs in as `معلم ،1`.
+3. After deploy: `curl -s https://gheras.autovem.tech/web/dashboard/ | grep -o 'v=2\.[0-9]*'` → `v=2.9`; the manager sees the new card under «الإعدادات» and the guardian card prints the settings year.
+
+### Not in scope (remaining Phase 4 backlog)
+- (a) nightly `pg_dump` backup; (c) pagination past `limit=100`.
+- The 11 print templates still hard-code «مركز غراس» / «حوطة بني تميم» in their HTML headers; the payload now carries `center_name`, `center_phone`, `center_address`, `manager_title`, `manager_name`, so a template pass can bind `{{center_name}}` etc. without any further API work.
+
+---
+
+## 6. THE ONE THING TO DO NEXT (updated 2026-09-20, Phase 4 (b) done)
+
+HEAD is the `feat(settings)` commit on `main`, **[ahead 1] of `origin/main`** (`877589c`), working tree clean after commit; Ibrahim pushes. Production = v=2.8, migrations 001–005 until the §5f deploy notes are executed (then v=2.9 / 006). Phase 3 **[APPROVED]** (§5e), Phase 4 (b) **[APPROVED]** (§5f). Two lessons flushed to `.agents/MEMORY_STORE.md` (`users.staff_id` not unique → `UPDATE 2`; public `curl` allowed for post-deploy checks). Ibrahim picks Phase 4:
 
 - **(a)** Nightly `pg_dump` backup — `deploy/backup.sh` (`docker compose exec -T db pg_dump -Fc` → `/opt/edutrack/backups/`, 14-day rotation) + `deploy/edutrack-backup.timer`/`.service` installed by `deploy.sh`; restore drill documented in `DEPLOY.md`. Worker A writes the shell, Claude validates with `bash -n` + a restore into embedded PG.
-- **(b)** Settings-driven `academic_year` — `settings` table + `006` migration (OpenCode Worker B), `print.py` reads it instead of the hard-coded `1447-1448 هـ`, a settings-view field; Claude tests on embedded PG. Bundle the `users(staff_id)` partial unique index into 006.
+- **(b)** ✅ **DONE 2026-09-20 (§5f)** — Settings-driven `academic_year` — `settings` table + `006` migration (OpenCode Worker B), `print.py` reads it instead of the hard-coded `1447-1448 هـ`, a settings-view field; Claude tests on embedded PG. Bundle the `users(staff_id)` partial unique index into 006.
 - **(c)** Pagination past `limit=100` — `fetchAll` helper in `api.js` (offset loop, ≤ 500 per page) and switch the views; Claude verifies with `node --check` + a seeded 150-student run.
-- **(d)** Duplicate-user cleanup only (10 minutes) — Ibrahim pastes the SELECT above, Claude names the stray row, Ibrahim runs the soft-delete.
+- **(d)** ✅ folded into 006 step 3a (§5f) — the stray row `c0997630-…` is retired by id on deploy; no manual SQL.
 
 Pre-conditions unchanged: free ≥ 4 GB RAM before running the fleet (never with Docker Desktop up), one `opencode run` at a time with ≤ 4 files per batch, Codex via `-s workspace-write`, embedded PG booter must stay alive in the background while pytest runs (`TEST_DATABASE_URL` = superuser URI for fixtures, `DATABASE_URL` = `gheras_app` URI for the API). Production SSH/DB stays Ibrahim's action (auto-mode classifier).

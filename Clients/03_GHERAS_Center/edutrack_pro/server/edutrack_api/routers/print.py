@@ -8,6 +8,7 @@ from edutrack_api.auth import require_roles
 from edutrack_api.db import get_conn
 from edutrack_api.errors import ApiError
 from edutrack_api.serializers import _convert, row_to_json
+from edutrack_api.services.settings import load_settings
 from edutrack_api.services.words import arabic_amount_words
 
 router = APIRouter()
@@ -32,7 +33,11 @@ def _one(conn, sql: str, args: tuple, message: str):
     return row_to_json(row)
 
 
-def _resp(payload: dict) -> dict:
+def _resp(payload: dict, conn=None) -> dict:
+    # Center identity + academic year from system_settings (006), constants as fallback;
+    # endpoint-specific keys win over the shared block.
+    if conn is not None:
+        payload = {**load_settings(conn), **payload}
     return _convert(payload)
 
 
@@ -88,7 +93,7 @@ def receipt(
         "installment_ref": item["seq_no"] or "—",
         "remaining_balance": item["balance"] or 0,
         "amount_words": arabic_amount_words(Decimal(str(item["amount"]))),
-    })
+    }, conn)
 
 
 @router.get("/print/guardian-card")
@@ -113,7 +118,6 @@ def guardian_card(
     return _resp({
         "template": "guardian_card",
         "card_no": f"GHR-{str(s['id'])[:6].upper()}",
-        "academic_year": "1447-1448 هـ",
         "national_id": s.get("national_id") or "—",
         "date": _today().isoformat(),
         "student_name": s["name"],
@@ -126,7 +130,7 @@ def guardian_card(
         "pickup_name": s["pickup_name"] or "—",
         "pickup_relation": s["pickup_relation"] or "—",
         "pickup_phone": s["pickup_phone"] or "—",
-    })
+    }, conn)
 
 
 @router.get("/print/certificate")
@@ -156,7 +160,7 @@ def certificate(
                 "date": _date(c["issued_on"]),
                 "student_name": c["student_name"],
                 "reason": c["reason"] or reason,
-            })
+            }, conn)
         if not sid:
             raise ApiError(404, "not_found", "الشهادة غير موجودة")
     if sid:
@@ -169,7 +173,7 @@ def certificate(
             "date": _today().isoformat(),
             "student_name": s["name"],
             "reason": reason or "التفوق والتميز الدراسي",
-        })
+        }, conn)
     raise ApiError(400, "validation_error", "معرف الشهادة أو الطالب مطلوب")
 
 
@@ -240,7 +244,7 @@ def student_report(
         "evaluations": ev,
         "skills": skills,
         "plans": plans,
-    })
+    }, conn)
 
 
 @router.get("/print/admin-report")
@@ -278,7 +282,7 @@ def admin_report(from_: str = Query(alias="from"), to: str = Query(), conn=Depen
                 "SELECT e.*, c.name category FROM expenses e JOIN expense_categories c ON c.id=e.category_id WHERE e.deleted_at IS NULL ORDER BY paid_on DESC LIMIT 10"
             ).fetchall()
         ],
-    })
+    }, conn)
 
 
 @router.get("/print/monthly-report")
@@ -313,7 +317,7 @@ def monthly_report(month: str, conn=Depends(get_conn), user: dict = _ROLES) -> d
                 (start, end),
             ).fetchall()
         ],
-    })
+    }, conn)
 
 
 @router.get("/print/schedule")
@@ -335,7 +339,7 @@ def schedule(room: str | None = None, room_id: str | None = None, conn=Depends(g
         periods.setdefault(key, {"start_time": key[0], "end_time": key[1], "sat": "", "sun": "", "mon": "", "tue": "", "wed": "", "thu": ""})[
             {"السبت": "sat", "الأحد": "sun", "الاثنين": "mon", "الثلاثاء": "tue", "الأربعاء": "wed", "الخميس": "thu"}.get(x["day"], "sat")
         ] = f"{x['subject']} — {x['teacher']}" if x["teacher"] else x["subject"]
-    return _resp({"template": "schedule", "room": r["name"], "group": r["group_name"] or "—", "periods": list(periods.values())})
+    return _resp({"template": "schedule", "room": r["name"], "group": r["group_name"] or "—", "periods": list(periods.values())}, conn)
 
 
 @router.get("/print/attendance-report")
@@ -355,7 +359,7 @@ def attendance_report(from_: str = Query(alias="from"), to: str = Query(), conn=
             "absent_count": sum(c["symbol"] == "✗" for c in cells),
             "cells": cells,
         })
-    return _resp({"template": "attendance_report", "from": from_, "to": to, "date": _today().isoformat(), "dates": [{"date": _date(d)} for d in dates], "rows": output})
+    return _resp({"template": "attendance_report", "from": from_, "to": to, "date": _today().isoformat(), "dates": [{"date": _date(d)} for d in dates], "rows": output}, conn)
 
 
 @router.get("/print/student-receipt")
@@ -413,7 +417,7 @@ def student_receipt(
                 (sid,),
             ).fetchall()
         ],
-    })
+    }, conn)
 
 
 @router.get("/print/lesson-log")
@@ -450,7 +454,7 @@ def lesson_log(
             "to": to,
             "date": _today().isoformat(),
             "logs": logs,
-        })
+        }, conn)
     if schedule:
         s = _one(
             conn,
@@ -474,7 +478,7 @@ def lesson_log(
             "to": to,
             "date": _today().isoformat(),
             "logs": logs,
-        })
+        }, conn)
     raise ApiError(400, "validation_error", "معرف القاعة أو الحصة مطلوب")
 
 
@@ -506,5 +510,5 @@ def statistics(from_: str = Query(alias="from"), to: str = Query(), conn=Depends
         "girls_pct": round(girls * 100 / total, 2) if total else 0,
         "notes": "",
         "by_group": [{"group": x["group_label"] or "عام", "students": x["students"], "pct": round(x["students"] * 100 / total, 2) if total else 0} for x in group],
-    })
+    }, conn)
 

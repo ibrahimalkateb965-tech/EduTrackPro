@@ -609,16 +609,74 @@ export async function render(container, api) {
 
   importBtn.onclick = () => fileInput.click();
 
+  const SETTING_FIELDS = [
+    { key: 'academic_year',  label: 'العام الدراسي (يُطبع على الكروت والتقارير)', placeholder: '1447-1448 هـ' },
+    { key: 'center_name',    label: 'اسم المركز الرسمي',                          placeholder: 'مركز غراس للرعاية النهارية والتعليم الذكي' },
+    { key: 'center_phone',   label: 'هاتف المركز',                                placeholder: '05xxxxxxxx' },
+    { key: 'center_address', label: 'عنوان المركز',                               placeholder: 'حوطة بني تميم' },
+    { key: 'manager_title',  label: 'المسمى الوظيفي للمدير في المطبوعات',         placeholder: 'مدير عام المركز' },
+    { key: 'manager_name',   label: 'اسم المدير في المطبوعات',                    placeholder: 'إدارة المركز' },
+  ];
+
+  const settingInputs = {};
+  SETTING_FIELDS.forEach(field => {
+    settingInputs[field.key] = el('input', field.key === 'center_phone'
+      ? { type: 'text', name: field.key, maxlength: '200', placeholder: field.placeholder, required: 'required', inputmode: 'tel', dir: 'ltr' }
+      : { type: 'text', name: field.key, maxlength: '200', placeholder: field.placeholder, required: 'required' });
+  });
+
+  if (me?.role === 'manager') {
+    try {
+      const res = await api.get('settings');
+      const current = res?.settings || {};
+      SETTING_FIELDS.forEach(field => { settingInputs[field.key].value = current[field.key] || ''; });
+    } catch (error) {
+      toast(error.message || 'تعذر تحميل إعدادات المركز', true);
+    }
+  }
+
+  const saveSettingsBtn = el('button', { class: 'button', type: 'submit' }, 'حفظ إعدادات المركز');
+
+  const centerSettingsCard = el('form', { class: 'card', style: 'margin-top:20px;' },
+    el('h2', { style: 'margin-top:0; font-size:18px;' }, '🏛️ إعدادات المركز والعام الدراسي والمطبوعات'),
+    el('p', { class: 'muted', style: 'margin-bottom:14px;' }, 'تظهر هذه البيانات في كرت ولي الأمر والتقارير المطبوعة. التعديل يسري فوراً على المطبوعات الجديدة.'),
+    el('div', { class: 'form-grid' },
+      ...SETTING_FIELDS.map(field => el('label', {}, field.label, settingInputs[field.key]))
+    ),
+    el('div', { class: 'form-actions' }, saveSettingsBtn)
+  );
+
+  centerSettingsCard.addEventListener('submit', async event => {
+    event.preventDefault();
+    const payload = {};
+    SETTING_FIELDS.forEach(field => { payload[field.key] = settingInputs[field.key].value.trim(); });
+    if (SETTING_FIELDS.some(field => !payload[field.key])) {
+      toast('جميع حقول إعدادات المركز مطلوبة', true);
+      return;
+    }
+    saveSettingsBtn.disabled = true;
+    try {
+      const res = await api.put('settings', payload);
+      const saved = res?.settings || payload;
+      SETTING_FIELDS.forEach(field => { settingInputs[field.key].value = saved[field.key] || ''; });
+      toast('تم حفظ إعدادات المركز بنجاح');
+    } catch (error) {
+      toast(error.message || 'تعذر حفظ إعدادات المركز', true);
+    } finally {
+      saveSettingsBtn.disabled = false;
+    }
+  });
+
   const centerInfoCard = el('div', { class: 'card', style: 'margin-top:20px;' },
     el('h2', { style: 'margin-top:0; font-size:18px;' }, '🏛️ بيانات المنظومة والنسخ الاحتياطي'),
     el('div', { style: 'line-height:1.8; margin-bottom:14px;' },
-      el('div', {}, el('strong', {}, 'المنشأة: '), 'مركز غراس للرعاية النهارية والتعليم الذكي'),
+      el('div', {}, el('strong', {}, 'المنشأة: '), settingInputs.center_name.value || 'مركز غراس للرعاية النهارية والتعليم الذكي'),
       el('div', {}, el('strong', {}, 'الإصدار البرمجي: '), 'EduTrack Pro v2.5 (Clean VPS Architecture)'),
       el('div', {}, el('strong', {}, 'المستخدم الحالي: '), `${me?.name || me?.username || 'الإدارة'} (${me?.role || 'manager'})`)
     ),
     el('div', { class: 'form-actions', style: 'display:flex; gap:10px; flex-wrap:wrap;' }, backupBtn, importBtn, fileInput)
   );
 
-  const cards = [header, pwdForm, userMgmtCard, me?.role === 'manager' ? centerInfoCard : null].filter(Boolean);
+  const cards = [header, pwdForm, userMgmtCard, me?.role === 'manager' ? centerSettingsCard : null, me?.role === 'manager' ? centerInfoCard : null].filter(Boolean);
   container.append(...cards);
 }

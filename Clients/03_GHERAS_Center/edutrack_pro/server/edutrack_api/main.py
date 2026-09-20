@@ -12,6 +12,7 @@ from edutrack_api.config import Settings, get_settings
 from edutrack_api.db import introspect_columns, make_pool
 from edutrack_api.errors import register_handlers
 from edutrack_api.routers import attendance, auth, crud, importer, print, reports
+from edutrack_api.routers import settings as settings_router
 
 
 @asynccontextmanager
@@ -51,6 +52,7 @@ def create_app() -> FastAPI:
     api.include_router(reports.router)
     api.include_router(print.router)
     api.include_router(importer.router)
+    api.include_router(settings_router.router)
     api.include_router(crud.router)
 
     @api.get("/health")
