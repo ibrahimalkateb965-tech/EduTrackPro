@@ -4,8 +4,8 @@
 > **Master Orchestrator**: `Claude Code CLI` (Opus Max / Sonnet 5)  
 > **Handoff Source**: `Antigravity IDE` (Interactive Cockpit & Visual Inspector)  
 > **Timestamp**: 2026-09-16T12:55:00+03:00  
-> **Last updated:** 2026-09-20 ~15:10 — Phase 4 (a) **verified live on VPS** (timer active, first dump `edutrack_20260920_095055.dump` 172K); Phase 4 (c) pagination **[APPROVED]** (§5h) committed as `95216ba`, **push + `push.sh` pending** (v=3.0) — Claude Code CLI  
-> **VCS:** git at workspace root, branch `main`, HEAD `95216ba` — **1 ahead of `origin/main`, push pending: yes** (Ibrahim). Phase 4 (c) = `95216ba`, Phase 4 (a) = `f276ad6`, Phase 4 (b) = `1945d95`. Phase 1 = `fc071f6`, Phase 2 = `a28299b`, Phase 2.5 = `eabac22`, Phase 3 audit = `52ce581` + `6e2e434` + `469e280` (all [APPROVED]). **Working tree clean** (Ibrahim committed the §5d-approved tree at 08:22, superseding his earlier `keep`). Remote `origin` = https://github.com/ibrahimalkateb965-tech/EduTrackPro.git. Quarantine enforced by root `.gitignore` (Rule 8).  
+> **Last updated:** 2026-09-20 ~15:00 AST — Phase 4 (c) **verified live** (v=3.0 ×2, health 200, `edutrack_20260920_112251.dump` 172K); Phase 4 (e) print-template identity pass **[APPROVED]** (§5i) committed as `ed82028`, **push + `push.sh` pending** — Claude Code CLI  
+> **VCS:** git at workspace root, branch `main`, HEAD `ed82028` — **1 ahead of `origin/main`, push pending: yes** (Ibrahim). Phase 4 (e) = `ed82028`, Phase 4 (c) = `95216ba`, Phase 4 (a) = `f276ad6`, Phase 4 (b) = `1945d95`. Phase 1 = `fc071f6`, Phase 2 = `a28299b`, Phase 2.5 = `eabac22`, Phase 3 audit = `52ce581` + `6e2e434` + `469e280` (all [APPROVED]). **Working tree clean** (Ibrahim committed the §5d-approved tree at 08:22, superseding his earlier `keep`). Remote `origin` = https://github.com/ibrahimalkateb965-tech/EduTrackPro.git. Quarantine enforced by root `.gitignore` (Rule 8).  
 
 ---
 
@@ -358,14 +358,43 @@ Worker orders carried an explicit ALLOW list (16 resource names) and DENY list (
 
 ---
 
-## 6. THE ONE THING TO DO NEXT (updated 2026-09-20 ~15:10, Phase 4 (c) committed, push + deploy pending)
+## 5i. Phase 4 (e) — Print-template identity pass (2026-09-20 ~14:50 AST, dual-harness: Cline Worker C ∥ OpenCode Worker A)
 
-HEAD is `95216ba` on `main`, **1 ahead of `origin/main`** (push is Ibrahim's action), **working tree clean**. Production = **v=2.9, migrations 001–006, backup timer live** (§5h pre-flight). First action: Ibrahim runs `git push` + `deploy/push.sh`, pastes back the two `curl` lines from §5h step 3; Claude verifies `v=3.0` publicly. Then Ibrahim picks the last Phase 4 item:
+Pre-flight: Phase 4 (c) confirmed live by Ibrahim's paste-back (v=3.0 ×2, health 200, backup `edutrack_20260920_112251.dump` 172K). Free RAM 4.9 GB, Docker Desktop off, tree clean at `68e1a9a`.
+
+Design (bounded, approved in chat): bind the 5 settings scalars the `print/*` payload already carries (§5f) via 5 exact substitutions — S1 logo `alt`, S2 `.doc-center-name`, S3 footer `{{center_address}}` + «هاتف: `{{center_phone}}`», S4 manager signature `{{manager_name}}` over new `.sig-title {{manager_title}}`, S5 certificate prose. `<title>` and the tagline stay static (`print_engine.js:195` renders `document.body.innerHTML` only). Long default `center_name` binds verbatim (Ibrahim's call) with an `overflow-wrap: anywhere` guard.
+
+| Item | Worker | Verification (Claude Code exclusive) |
+| :--- | :--- | :--- |
+| Batch 1 `receipt`, `guardian_card`, `schedule`, `attendance_report` (S1–S3) | Cline Worker C (`z-ai/glm-5.3-flash`, 24 s) | `git diff -U0` filtered to non-substitution lines → **empty**; 4+/3− per file |
+| Batch 2 `lesson_log`, `statistics_report`, `admin_report`, `monthly_report` (+S4) | OpenCode Worker A (`glm-5.3-flash`, parallel harness) | same filter → **empty**; no stray files |
+| Batch 3 `student_receipt`, `student_report`, `excellence_certificate` (+S4, S5) | Cline Worker C | same filter → **empty** |
+| `print.css` (+6: `.sig-title`, `overflow-wrap`), `NOTES.md` shared-chrome paragraph | Claude Code | — |
+
+Gates: (1) placeholder-set delta vs HEAD per file = exactly the settings keys, nothing removed (11/11); (2) hard-coded grep → only `excellence_certificate.html:5` `<title>` remains (overridden at runtime by `data.title`) + 11 tagline lines; (3) HTML tag balance 11/11; (4) Node harness lifting `renderMustache` from `print_engine.js` with a NOTES-derived fixture → **ALL 11 PASS** (0 `{{…}}` leaks; name ×2 / cert ×3, phone ×1, addr ×1, mgr ×1 in the 4 signature docs); (5) `pytest tests/test_print.py tests/test_settings.py` → **20 passed** (14.7 s, embedded PG 16 001–006); (6) headless-Chrome renders of `receipt` (A5, long name wraps to 2 lines cleanly) and `excellence_certificate` (signature stack + footer) visually verified.
+
+Worker orders: `fleet_orders/phase4e/` (quarantined). Zero patches on worker output across all 3 batches.
+
+### Verdict: **[APPROVED]** — 13 files (+62/−39), committed as `ed82028` `feat(print): bind center identity settings across 11 templates`.
+
+### Deploy (Ibrahim)
+1. `git push` (HEAD `ed82028`).
+2. `bash deploy/push.sh root@187.55.226.225 gheras.autovem.tech -i ~/.ssh/edutrack_deploy_key` — static files only, no migration, no API restart needed. Caddy serves `/web/*` with `no-cache, must-revalidate` (`Caddyfile.gheras:30`) so no cache tag bump.
+3. Paste back: `curl -s https://gheras.autovem.tech/web/print/templates/receipt.html | grep -c '{{center_name}}'` (expect **2**) and `curl -s https://gheras.autovem.tech/web/print/print.css | grep -c 'sig-title'` (expect **1**). Claude re-checks both publicly.
+4. Browser smoke: print any receipt from المالية — header shows the settings `center_name`, footer shows address + phone. Change «اسم المركز» under الإعدادات and reprint to confirm it is live.
+
+Embedded-PG note for the next session: pgserver's `pg_ctl -w` 10 s timeout fires if the cluster needs crash recovery (17 s today) — the postmaster still comes up; connect to the port in `pgdata/postmaster.pid` instead of re-running the booter. Stopped cleanly afterwards with `pg_ctl -m fast stop`.
+
+---
+
+## 6. THE ONE THING TO DO NEXT (updated 2026-09-20 ~15:00 AST, Phase 4 (e) committed, push + deploy pending)
+
+HEAD is `ed82028` on `main`, **1 ahead of `origin/main`** (push is Ibrahim's action), **working tree clean**. Production = **v=3.0, migrations 001–006, backup timer live** (§5i pre-flight). First action: Ibrahim runs `git push` + `deploy/push.sh`, pastes back the two `curl` lines from §5i step 3; Claude verifies publicly. **Phase 4 is then complete** — all five items done:
 
 - **(a)** ✅ **DONE + VERIFIED LIVE 2026-09-20 (§5g, §5h pre-flight)** — timer active, first dump 172K.
 - **(b)** ✅ **DONE + LIVE (§5f)** — settings-driven identity, v=2.9.
-- **(c)** ✅ **DONE 2026-09-20 (§5h), commit `95216ba`, push pending** — `api.fetchAll` + 55 call sites across 12 views, v=3.0, pytest 53/53.
-- **(e)** Print-template identity pass — bind `{{center_name}}`, `{{center_phone}}`, `{{center_address}}`, `{{manager_title}}`, `{{manager_name}}` in the 11 `web/print/templates/*.html` headers (payload already carries them since §5f); Cline Worker C edits templates in batches of 4, Claude runs `test_print.py` + a rendered-HTML grep for the hard-coded «مركز غراس» / «حوطة بني تميم».
+- **(c)** ✅ **DONE + VERIFIED LIVE 2026-09-20 (§5h)** — `api.fetchAll` + 55 call sites across 12 views, v=3.0, pytest 53/53.
+- **(e)** ✅ **DONE 2026-09-20 (§5i), commit `ed82028`, push pending** — 5 settings scalars bound across all 11 templates, `.sig-title`, pytest 20/20, headless renders verified.
 - **(d)** ✅ folded into 006 step 3a (§5f) — the stray row `c0997630-…` is retired by id on deploy; no manual SQL.
 
 Pre-conditions unchanged: free ≥ 4 GB RAM before running the fleet (never with Docker Desktop up), one `opencode run` at a time with ≤ 4 files per batch, Codex via `-s workspace-write`, embedded PG booter must stay alive in the background while pytest runs (`TEST_DATABASE_URL` = superuser URI for fixtures, `DATABASE_URL` = `gheras_app` URI for the API). Production SSH/DB stays Ibrahim's action (auto-mode classifier).
