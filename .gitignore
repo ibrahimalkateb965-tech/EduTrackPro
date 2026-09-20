@@ -23,6 +23,7 @@ Visa/
 # --- AI fleet internals & orchestration state ---
 .agents/
 .claude/
+.superpowers/
 fleet_orders/
 fleet_templates/
 fleet_proposal.json
