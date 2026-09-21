@@ -23,6 +23,8 @@ class Settings:
     mobile_jwt_ttl_minutes: int = 43200  # 30 days — teacher/guardian tokens (Phase 5 (c) D4)
     cors_origins: list[str] = field(default_factory=list)
     main_branch_id: uuid.UUID = uuid.UUID("00000000-0000-0000-0000-000000000001")
+    whatsapp_api_url: str | None = None
+    whatsapp_api_token: str | None = None
 
 
 @lru_cache
@@ -57,4 +59,6 @@ def get_settings() -> Settings:
         mobile_jwt_ttl_minutes=mobile_jwt_ttl_minutes,
         cors_origins=cors_origins,
         main_branch_id=main_branch_id,
+        whatsapp_api_url=os.environ.get("WHATSAPP_API_URL") or os.environ.get("WHATSAPP_GATEWAY_URL"),
+        whatsapp_api_token=os.environ.get("WHATSAPP_API_TOKEN"),
     )

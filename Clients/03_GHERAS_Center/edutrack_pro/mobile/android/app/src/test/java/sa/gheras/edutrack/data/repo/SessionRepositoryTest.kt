@@ -115,4 +115,24 @@ class SessionRepositoryTest {
         repo.discardExpiredSession()
         assertEquals(SessionState.SignedOut, repo.state.value)
     }
+
+    @Test
+    fun testRequestOtp_success() = runTest {
+        val result = repo.requestOtp("1055555555", Role.GUARDIAN)
+        assertTrue(result.isSuccess)
+        val resp = result.getOrThrow()
+        assertEquals("fake-session-123", resp.sessionId)
+        assertEquals("******0543", resp.phoneMasked)
+    }
+
+    @Test
+    fun testVerifyOtp_success_setsActiveStateAndRequestsPull() = runTest {
+        fakeAuth.loginUserRole = "guardian"
+        val result = repo.verifyOtp("fake-session-123", "4321", Role.GUARDIAN)
+        assertTrue(result.isSuccess)
+        val user = result.getOrThrow()
+        assertEquals(Role.GUARDIAN, user.role)
+        assertTrue(repo.state.value is SessionState.Active)
+        assertTrue("Full pull must be requested after successful OTP login", pullRequested)
+    }
 }

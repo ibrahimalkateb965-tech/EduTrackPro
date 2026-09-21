@@ -12,6 +12,9 @@ import sa.gheras.edutrack.data.remote.AuthApi
 import sa.gheras.edutrack.data.remote.MeApi
 import sa.gheras.edutrack.data.remote.dto.ChangePasswordBody
 import sa.gheras.edutrack.data.remote.dto.LoginBody
+import sa.gheras.edutrack.data.remote.dto.RequestOtpBody
+import sa.gheras.edutrack.data.remote.dto.RequestOtpResponse
+import sa.gheras.edutrack.data.remote.dto.VerifyOtpBody
 import java.time.Instant
 
 sealed interface SessionState {
@@ -62,6 +65,62 @@ class SessionRepository(
     suspend fun login(username: String, password: String, roleHint: Role? = null): Result<SessionUser> {
         return try {
             val response = authApi.login(LoginBody(username, password, roleHint?.name?.lowercase()))
+            val role = when (response.user.role.lowercase()) {
+                "teacher" -> Role.TEACHER
+                "guardian" -> Role.GUARDIAN
+                "student" -> Role.STUDENT
+                else -> {
+                    try { authApi.logout() } catch (_: Exception) {}
+                    return Result.failure(IllegalStateException("هذا التطبيق مخصص للطلاب وأولياء الأمور والمعلمين — استخدم لوحة التحكم على الويب"))
+                }
+            }
+            val user = SessionUser(
+                id = response.user.id,
+                username = response.user.username,
+                role = role,
+                name = response.user.name
+            )
+
+            // Identity gate: wipe local database if different user logs in
+            if (store.lastUserId != null && store.lastUserId != user.id) {
+                db.clearAllTables()
+            }
+
+            store.saveLogin(response.token, user)
+
+            // Profile check
+            try {
+                val profile = meApi.profile()
+                store.saveProfile(profile)
+            } catch (e: Exception) {
+                if (e is retrofit2.HttpException && e.code() == 403) {
+                    store.clear()
+                    db.clearAllTables()
+                    _state.value = SessionState.SignedOut
+                    return Result.failure(e)
+                }
+            }
+
+            _state.value = SessionState.Active(role, user)
+            onFullPullRequested()
+            Result.success(user)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun requestOtp(nationalId: String, role: Role): Result<RequestOtpResponse> {
+        return try {
+            val res = authApi.requestOtp(RequestOtpBody(nationalId, role.name.lowercase()))
+            Result.success(res)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun verifyOtp(sessionId: String, otpCode: String, roleHint: Role? = null): Result<SessionUser> {
+        return try {
+            val response = authApi.verifyOtp(VerifyOtpBody(sessionId, otpCode, roleHint?.name?.lowercase()))
             val role = when (response.user.role.lowercase()) {
                 "teacher" -> Role.TEACHER
                 "guardian" -> Role.GUARDIAN

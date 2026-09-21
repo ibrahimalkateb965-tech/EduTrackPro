@@ -169,6 +169,22 @@ def _create_hook(conn, repo, table: str, data: dict, actor: dict) -> tuple[dict,
         permissions = data.pop("permissions", None)
         if password:
             data["password_hash"] = hash_password(password)
+        # Auto-inherit phone and national_id if not explicitly provided
+        if not data.get("phone"):
+            if data.get("staff_id"):
+                s = conn.execute("SELECT phone FROM staff WHERE id = %s", (data["staff_id"],)).fetchone()
+                if s and s["phone"]:
+                    data["phone"] = s["phone"]
+            elif data.get("guardian_id"):
+                g = conn.execute("SELECT phone FROM guardians WHERE id = %s", (data["guardian_id"],)).fetchone()
+                if g and g["phone"]:
+                    data["phone"] = g["phone"]
+            elif data.get("student_id"):
+                st = conn.execute("SELECT national_id, guardian_phone, father_phone, mother_phone FROM students WHERE id = %s", (data["student_id"],)).fetchone()
+                if st:
+                    data["phone"] = st["guardian_phone"] or st["father_phone"] or st["mother_phone"]
+                    if not data.get("national_id") and st["national_id"]:
+                        data["national_id"] = st["national_id"]
         row = repo.create(data)
         if permissions is not None:
             _permissions(conn, row["id"], row["branch_id"], permissions)
