@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Gheras Identity Colors -->
+    <color name="gheras_green_primary">#1B5E20</color>
+    <color name="gheras_green_secondary">#2E7D32</color>
+    <color name="gheras_green_light">#E8F5E9</color>
+    <color name="gheras_sand_accent">#C5A059</color>
+    <color name="gheras_sand_light">#F9F6F0</color>
+
+    <!-- Neutral & Backgrounds -->
+    <color name="gheras_surface">#FFFFFF</color>
+    <color name="gheras_background">#F8F9FA</color>
+    <color name="gheras_text_primary">#1A1C1E</color>
+    <color name="gheras_text_secondary">#74777F</color>
+    <color name="gheras_outline">#C4C7C5</color>
+
+    <!-- Status Colors -->
+    <color name="gheras_error">#BA1A1A</color>
+    <color name="gheras_warning">#E65100</color>
+    <color name="gheras_info">#0288D1</color>
+</resources>

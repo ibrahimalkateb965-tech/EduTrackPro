@@ -5,6 +5,7 @@ import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 import sa.gheras.edutrack.data.entity.NotificationEntity
@@ -46,6 +47,21 @@ interface NotificationDao {
     @Query("UPDATE notifications SET read_at = :readAt, updated_at = :updatedAt WHERE user_id = :userId AND read_at IS NULL")
     suspend fun markAllReadByUser(userId: String, readAt: Instant, updatedAt: Instant)
 
+    @Query("DELETE FROM notifications WHERE user_id = :userId")
+    suspend fun clearByUser(userId: String)
+
     @Query("DELETE FROM notifications")
     suspend fun clear()
+
+    @Transaction
+    suspend fun replaceScope(userId: String, items: List<NotificationEntity>) {
+        clearByUser(userId)
+        upsertAll(items)
+    }
+
+    @Transaction
+    suspend fun replaceScopeAll(items: List<NotificationEntity>) {
+        clear()
+        upsertAll(items)
+    }
 }

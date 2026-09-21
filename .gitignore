@@ -71,3 +71,7 @@ desktop.ini
 
 # Deploy tarballs (never commit)
 *.tar.gz
+
+# Scratch
+scratch/
+**/scratch/

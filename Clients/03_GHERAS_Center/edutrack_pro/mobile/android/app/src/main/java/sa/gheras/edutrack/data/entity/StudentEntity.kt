@@ -27,6 +27,7 @@ data class StudentEntity(
     @ColumnInfo(name = "national_id") val nationalId: String?,
     @ColumnInfo(name = "birth_date") val birthDate: LocalDate?,
     val nationality: String?,
+    val gender: String? = null,
     @ColumnInfo(name = "has_difficulties", defaultValue = "0") val hasDifficulties: Boolean = false,
     @ColumnInfo(name = "difficulty_notes") val difficultyNotes: String?,
     @ColumnInfo(name = "child_notes") val childNotes: String?,

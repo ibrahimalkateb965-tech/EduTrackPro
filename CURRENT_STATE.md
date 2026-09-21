@@ -4,8 +4,8 @@
 > **Master Orchestrator**: `Claude Code CLI` (Opus Max / Sonnet 5)  
 > **Handoff Source**: `Antigravity IDE` (Interactive Cockpit & Visual Inspector)  
 > **Timestamp**: 2026-09-16T12:55:00+03:00  
-> **Last updated:** 2026-09-20 23:05 (+03:00 clock; session ran ~22:05 → 23:50) — strategic-clear handoff (Hook 25). Phase 5 (b) **LIVE**: Ibrahim pushed `41b45a4` and ran `deploy/push.sh`; hotfix `2a63c50` shipped in the same push — Claude Code CLI
-> **VCS:** git at workspace root, branch `main`, HEAD `41b45a4` — **in sync with `origin/main` (`main...origin/main`, pushed by Ibrahim 2026-09-20 ~23:00 and deployed), push pending: no** (Ibrahim). Phase 4 (e) = `ed82028`, Phase 4 (c) = `95216ba`, Phase 4 (a) = `f276ad6`, Phase 4 (b) = `1945d95`. Phase 1 = `fc071f6`, Phase 2 = `a28299b`, Phase 2.5 = `eabac22`, Phase 3 audit = `52ce581` + `6e2e434` + `469e280` (all [APPROVED]). **Working tree clean** (Ibrahim committed the §5d-approved tree at 08:22, superseding his earlier `keep`). Remote `origin` = https://github.com/ibrahimalkateb965-tech/EduTrackPro.git. Quarantine enforced by root `.gitignore` (Rule 8).  
+> **Last updated:** 2026-09-21 05:25 (+03:00 clock; session ran ~03:30 → 05:25) — strategic-clear handoff (Hook 25). Phase 5 (c) Android app **DESIGN IN PROGRESS**: Sections 1–3 approved, spec file written, Sections 4–8 pending — Claude Code CLI
+> **VCS:** git at workspace root, branch `main`, HEAD `7eeeada` — **in sync with `origin/main` (`main...origin/main`), push pending: no; production = `7eeeada` (Ibrahim deployed 2026-09-21 before this session)**. **Commit pending by Ibrahim at freeze time (see §5p): new spec file + this state file; `web/dashboard/index.html` carries a stray editor reformat that MUST be discarded, not committed.** Phase 4 (e) = `ed82028`, Phase 4 (c) = `95216ba`, Phase 4 (a) = `f276ad6`, Phase 4 (b) = `1945d95`. Phase 1 = `fc071f6`, Phase 2 = `a28299b`, Phase 2.5 = `eabac22`, Phase 3 audit = `52ce581` + `6e2e434` + `469e280` (all [APPROVED]). **Working tree clean** (Ibrahim committed the §5d-approved tree at 08:22, superseding his earlier `keep`). Remote `origin` = https://github.com/ibrahimalkateb965-tech/EduTrackPro.git. Quarantine enforced by root `.gitignore` (Rule 8).  
 
 ---
 
@@ -480,14 +480,46 @@ Ibrahim chose (b) in fleet mode. Six commits on `main`, base `af3e782`:
 
 ---
 
-## 6. THE ONE THING TO DO NEXT (updated 2026-09-20 23:05, strategic-clear after Phase 5 (b) went live)
+## 5p. Phase 5 (c) — Android app design session (2026-09-21 ~03:30 → 05:25, Claude Code only, `superpowers:brainstorming`, no code, no fleet)
 
-HEAD `41b45a4` on `main`, **in sync with `origin/main`** (push pending: no). Production = **`41b45a4`** (web v=3.0, API with `/api/v1/me/*` + hotfix). Phase 5 (b) closed: implemented, [APPROVED], deployed, verified by Ibrahim (200 / 401).
+Pre-flight: Ibrahim confirmed `7eeeada` (pagination follow-up, choice (b) of §6 old) deployed and live on the VPS; chose **(a) Android app module**. Architectural path (new subsystem). Workstation: 16 GB RAM, **~2 GB free** at design time; Android SDK present (platforms 34–36.1, build-tools ≤ 37), JDK 17, Gradle 9.4.1, `ANDROID_HOME` unset.
 
-**Next choices (Ibrahim decides after `/clear`):**
-- **(a) Android app module** — Compose over Room + `homework-core`, targeting the live `/api/v1/me/*` contract (15 routes, envelope `{items,total,limit,offset}`, `PHASE5_SPEC.md` §2 role matrix). Start with `superpowers:brainstorming`, then `writing-plans`, then fleet mode as tonight.
-- **(b) Follow-ups from the final review** — `me_repo._run` + `generic.py:89-94` total=0 past the last page (one small PR for both), 2–3 comments in `list_assignments`, optional Arabic 422 for non-numeric `limit`/`offset`. Small, TDD, Claude-only or Worker B.
-- **(c) Housekeeping** — dedupe the 12 per-view `toList()` copies into `api.js` (Cline Worker C); first monthly restore drill on the VPS per `deploy/DEPLOY.md` → Backups (Ibrahim, SSH).
-- **(d) Mobile smoke test on prod** — a real teacher token against `/api/v1/me/profile` and `/me/students` (Ibrahim creates/uses a teacher user; Claude reads the pasted JSON) to see the scope envelope with live data before Android work starts.
+**Spec file (new, untracked at freeze):** `Clients/03_GHERAS_Center/edutrack_pro/docs/superpowers/specs/2026-09-21-phase5c-android-app-design.md` — §0 decisions D1–D6 + verified code facts, **Sections 1–3 approved verbatim**, Sections 4–8 outlined as "not yet presented", §9 backlog.
 
-Pre-conditions unchanged: free ≥ 4 GB RAM before running the fleet (3.2 GB sufficed on 2026-09-20; never with Docker Desktop up), one `opencode run` at a time with ≤ 4 files per batch, embedded PG booter must stay alive in the background while pytest runs (booter at scratchpad `872795f8-9f7d-418d-9b09-861aabb7cde0/scratchpad/pg_boot.py` via `uv run --python 3.12 --with pgserver --with "psycopg[binary]"`; full suite = 100 tests / ~94 s). Production SSH/DB stays Ibrahim's action (auto-mode classifier).
+| Decision | Ibrahim's choice |
+| :--- | :--- |
+| D1 tier | **(B)** read-only both roles + 4 existing teacher writes (`POST /me/lesson-logs`, `POST /attendance/students`, `POST /evaluations/daily`, `POST /me/notifications/{id}/read`); homework camera upload deferred |
+| D2 offline | **Level (2)** Room read cache + durable outbox (`pending_writes` + WorkManager + optimistic UI); safe because all 4 writes are idempotent upserts |
+| D3 build loop | **(2)** JVM unit tests local; `assembleDebug`/lint on GitHub Actions (`.github/workflows/android.yml`, `paths:` scoped to `mobile/**`), debug APK artifact |
+| D4 session | **(2)** per-role JWT TTL server change: `MOBILE_JWT_TTL_MINUTES` (30 d) for teacher/guardian, 720 stays for dashboard; ~10 lines + 2 tests, ships with `push.sh` |
+| D5 structure | **(A)** single `:app` + `:homework-core`, manual DI (`AppContainer`), no Hilt |
+| D6 fixed | minSdk 26 / target+compile 35, Kotlin 2.1.20, AGP 8.7.x, Compose M3, Nav Compose, WorkManager, EncryptedSharedPreferences, Arabic RTL, Rule 50 |
+
+- **Section 1 (module & build) APPROVED** — one Gradle build at `mobile/android/` (wrapper 8.11, version catalog, `-Xmx2g`, workers 2), `homework-core` becomes a subproject, Room `exportSchema = true` at **version 1** (all schema edits before first APK), debug-only, `BuildConfig.BASE_URL`.
+- **Section 2 (data layer) APPROVED with Ibrahim's 3 constraints** — remove `UserEntity`/`GuardianEntity`/`StudyPlanEntity` (+DAOs); add `InstallmentEntity`, `ReceiptEntity`, `PendingWriteEntity`, `SyncStateEntity`; `StudentEntity` + nullable `gender`; join columns not stored (local JOINs); guardian room synthesis from `(room_id, room_name)`; `replaceScope` = `clear()`+`upsertAll()` in **one `@Transaction`**, clears in reverse-FK order, outbox rows re-applied inside the same transaction. **Claude corrected the pasted directive: `pending_writes` is never cleared by a pull** (it is the outbox; clearing it would lose offline writes).
+- **Section 3 (pull sync & outbox) APPROVED** — pull order per role, `limit=500` paging, 60-day cache window, all-or-nothing per resource, `sync_state` per resource; outbox kinds `ATTENDANCE`/`DAILY_EVAL`/`LESSON_LOG`/`NOTIFICATION_READ` with `local:<natural key>` optimistic ids, coalescing per natural key, WorkManager unique work `outbox-flush` (KEEP, CONNECTED, backoff 30 s), response handling 2xx delete / 401 pause / 403-404-422 terminal + revert + «تعذّر الحفظ» list / 5xx-IO retry forever with badge.
+- **Not presented yet:** Section 4 auth & session, 5 screens & navigation, 6 error/UX states, 7 testing & CI, 8 delegation batches. Then spec self-review → Ibrahim reviews the file → `superpowers:writing-plans`.
+- **Tree at freeze:** `web/dashboard/index.html` modified by an external editor (format-on-save; **reverts `?v=3.0` → `?v=2.8`** on `gheras.css` and `app.js` — a cache-bust regression). Not from this session. Ibrahim answered `commit` for the spec; the `index.html` change must be discarded (`git checkout -- Clients/03_GHERAS_Center/edutrack_pro/web/dashboard/index.html`) before committing.
+
+---
+
+## 5c. Phase 5 (c) — Native Android App (Teacher / Guardian) — COMPLETED & [APPROVED] (2026-09-21)
+
+- **Master Spec**: `Clients/03_GHERAS_Center/edutrack_pro/docs/superpowers/specs/2026-09-21-phase5c-android-app-design.md` (Sections 1–8 fully approved).
+- **Wave 0 (Server D4 TDD)**: Committed `df9ef0a` on `main` (`MOBILE_JWT_TTL_MINUTES=43200`, `test_auth_ttl.py` 3/3 passed).
+- **Wave 1 (Scaffolding & Room v1)**: Single Gradle build at `mobile/android/`, 16 Room entities + DAOs, reverse topological deletion order in `replaceAll()`, Room schema export at version 1 (`app/schemas/sa.gheras.edutrack.data.db.GherasDatabase/1.json`).
+- **Wave 2 (Remote & Outbox)**: DTOs, mappers (with guardian room synthesis), `SessionStore` (EncryptedSharedPreferences), `AuthInterceptor`, `PullSync`, `Outbox` + `OutboxWorker` (WorkManager).
+- **Wave 3 (Jetpack Compose UI)**: Complete teacher & guardian flows, `RootNavHost`, session guards, RTL enforcement, Rule 50 numerals (0-9).
+- **Wave 4 (CI & Delivery)**: Root GitHub Actions workflow `.github/workflows/android.yml`, `README.md`.
+- **Quality Gates G1, G2, G3 [APPROVED]**:
+  - `homework-core:test`: 13/13 passed.
+  - `app:testDebugUnitTest`: 39/39 passed (Total 52/52 tests green across both tiers).
+  - `app:assembleDebug`: Generated `app/build/outputs/apk/debug/app-debug.apk` (20.3 MB).
+
+---
+
+## 6. THE ONE THING TO DO NEXT (updated 2026-09-21 11:35)
+
+- Commit all Phase 5c Android files and push to `origin/main` (`git push`).
+- GitHub Actions CI workflow triggers automatically on push to build release artifact.
+- Deploy APK to demo phones for user acceptance testing (Ibrahim, §7.7 checklist).

@@ -1,0 +1,20 @@
+# Gradle / build outputs
+.gradle/
+**/.gradle/
+build/
+**/build/
+.kotlin/
+**/.kotlin/
+
+# Machine-specific
+local.properties
+**/local.properties
+
+# IDE
+.idea/
+*.iml
+
+# Logs / JVM crash dumps
+*.log
+replay_pid*.log
+hs_err_pid*.log

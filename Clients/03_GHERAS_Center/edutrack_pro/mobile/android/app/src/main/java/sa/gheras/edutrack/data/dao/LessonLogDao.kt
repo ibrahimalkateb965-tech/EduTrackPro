@@ -5,6 +5,7 @@ import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 import sa.gheras.edutrack.data.entity.LessonLogEntity
@@ -47,6 +48,21 @@ interface LessonLogDao {
     @Query("SELECT * FROM lesson_logs WHERE deleted_at IS NULL AND date BETWEEN :from AND :to ORDER BY date")
     fun observeBetween(from: LocalDate, to: LocalDate): Flow<List<LessonLogEntity>>
 
+    @Query("DELETE FROM lesson_logs WHERE date BETWEEN :from AND :to")
+    suspend fun clearWindow(from: LocalDate, to: LocalDate)
+
     @Query("DELETE FROM lesson_logs")
     suspend fun clear()
+
+    @Transaction
+    suspend fun replaceScope(from: LocalDate, to: LocalDate, items: List<LessonLogEntity>) {
+        clearWindow(from, to)
+        upsertAll(items)
+    }
+
+    @Transaction
+    suspend fun replaceScopeAll(items: List<LessonLogEntity>) {
+        clear()
+        upsertAll(items)
+    }
 }

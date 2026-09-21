@@ -5,6 +5,7 @@ import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 import sa.gheras.edutrack.data.entity.AssignmentStudentEntity
@@ -51,4 +52,10 @@ interface AssignmentStudentDao {
 
     @Query("DELETE FROM assignment_students")
     suspend fun clear()
+
+    @Transaction
+    suspend fun replaceScope(links: List<AssignmentStudentEntity>) {
+        clear()
+        upsertAll(links)
+    }
 }

@@ -2,21 +2,15 @@ package sa.gheras.edutrack.data.entity
 
 import androidx.room.ColumnInfo
 import androidx.room.Entity
-import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
 import java.time.Instant
 
+/**
+ * Notifications are FK-free (UserEntity is not stored in local Room cache).
+ */
 @Entity(
     tableName = "notifications",
-    foreignKeys = [
-        ForeignKey(
-            entity = UserEntity::class,
-            parentColumns = ["id"],
-            childColumns = ["user_id"],
-            onDelete = ForeignKey.RESTRICT
-        )
-    ],
     indices = [Index("user_id")]
 )
 data class NotificationEntity(

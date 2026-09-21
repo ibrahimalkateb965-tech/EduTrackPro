@@ -5,6 +5,7 @@ import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 import sa.gheras.edutrack.data.entity.RoomEntity
@@ -18,6 +19,9 @@ interface RoomDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertAll(rooms: List<RoomEntity>): List<Long>
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun upsertMinimal(rooms: List<RoomEntity>): List<Long>
 
     @Update
     suspend fun update(room: RoomEntity)
@@ -42,4 +46,10 @@ interface RoomDao {
 
     @Query("DELETE FROM rooms")
     suspend fun clear()
+
+    @Transaction
+    suspend fun replaceScope(rooms: List<RoomEntity>) {
+        clear()
+        upsertAll(rooms)
+    }
 }

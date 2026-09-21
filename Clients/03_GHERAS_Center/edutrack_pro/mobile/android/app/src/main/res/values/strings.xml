@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">مركز غراس التعليمي</string>
+    <string name="login_title">تسجيل الدخول</string>
+    <string name="username">اسم المستخدم</string>
+    <string name="password">كلمة المرور</string>
+    <string name="login_action">دخول</string>
+    <string name="logging_in">جاري الدخول…</string>
+    <string name="logout_action">تسجيل الخروج</string>
+    <string name="logout_confirm">هل أنت متأكد من تسجيل الخروج؟</string>
+    <string name="change_password">تغيير كلمة المرور</string>
+    <string name="current_password">كلمة المرور الحالية</string>
+    <string name="new_password">كلمة المرور الجديدة</string>
+    <string name="confirm_new_password">تأكيد كلمة المرور الجديدة</string>
+    <string name="save_action">حفظ</string>
+    <string name="cancel_action">إلغاء</string>
+    <string name="retry_action">إعادة المحاولة</string>
+    <string name="error_generic">حدث خطأ غير متوقع</string>
+    <string name="error_network">تعذر الاتصال بالشبكة</string>
+    <string name="error_unauthorized">انتهت الجلسة، يرجى إعادة تسجيل الدخول</string>
+    <string name="offline_banner">أنت تعمل بدون اتصال بالإنترنت</string>
+    <string name="sync_pending_badge">بانتظار المزامنة: %1$d</string>
+    <string name="last_synced_format">آخر تحديث: قبل %1$s دقيقة</string>
+    <string name="failed_writes_title">تعذّر حفظ بعض العمليات</string>
+    <string name="dismiss_action">تجاهل</string>
+    <string name="empty_scope_teacher">لم تُسند لك حلقة بعد — راجع الإدارة</string>
+    <string name="empty_scope_guardian">لا يوجد طلاب مرتبطون بحسابك حالياً</string>
+</resources>

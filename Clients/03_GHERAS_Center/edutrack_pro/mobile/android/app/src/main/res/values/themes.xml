@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Platform theme only: Compose owns the UI, so no AppCompat/MDC parent is needed.
+         Colors mirror the Gheras palette in colors.xml; MaterialTheme applies the full scheme in-app. -->
+    <style name="Theme.GherasEduTrack" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:colorPrimary">@color/gheras_green_primary</item>
+        <item name="android:colorPrimaryDark">@color/gheras_green_primary</item>
+        <item name="android:colorAccent">@color/gheras_sand_accent</item>
+        <item name="android:statusBarColor">@color/gheras_green_primary</item>
+        <item name="android:navigationBarColor">@color/gheras_surface</item>
+        <item name="android:windowLightNavigationBar">true</item>
+        <item name="android:windowBackground">@color/gheras_background</item>
+    </style>
+</resources>

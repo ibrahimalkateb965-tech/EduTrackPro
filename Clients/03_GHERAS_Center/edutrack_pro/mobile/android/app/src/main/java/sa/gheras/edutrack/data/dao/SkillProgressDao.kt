@@ -5,6 +5,7 @@ import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 import sa.gheras.edutrack.data.entity.SkillProgressEntity
@@ -56,6 +57,21 @@ interface SkillProgressDao {
     )
     fun observeLatestByStudent(studentId: String): Flow<List<SkillProgressEntity>>
 
+    @Query("DELETE FROM skill_progress WHERE student_id = :studentId")
+    suspend fun clearByStudent(studentId: String)
+
     @Query("DELETE FROM skill_progress")
     suspend fun clear()
+
+    @Transaction
+    suspend fun replaceScope(studentId: String, items: List<SkillProgressEntity>) {
+        clearByStudent(studentId)
+        upsertAll(items)
+    }
+
+    @Transaction
+    suspend fun replaceScopeAll(items: List<SkillProgressEntity>) {
+        clear()
+        upsertAll(items)
+    }
 }

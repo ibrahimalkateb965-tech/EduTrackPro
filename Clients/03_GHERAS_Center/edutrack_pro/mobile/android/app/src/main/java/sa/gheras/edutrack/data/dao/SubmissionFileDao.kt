@@ -5,6 +5,7 @@ import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 import sa.gheras.edutrack.data.entity.SubmissionFileEntity
@@ -45,4 +46,16 @@ interface SubmissionFileDao {
 
     @Query("DELETE FROM submission_files")
     suspend fun clear()
+
+    @Transaction
+    suspend fun replaceScope(submissionId: String, items: List<SubmissionFileEntity>) {
+        deleteBySubmission(submissionId)
+        upsertAll(items)
+    }
+
+    @Transaction
+    suspend fun replaceScopeAll(items: List<SubmissionFileEntity>) {
+        clear()
+        upsertAll(items)
+    }
 }

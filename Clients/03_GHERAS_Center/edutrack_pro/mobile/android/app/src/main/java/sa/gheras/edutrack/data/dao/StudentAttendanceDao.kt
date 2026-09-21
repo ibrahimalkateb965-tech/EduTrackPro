@@ -5,6 +5,7 @@ import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 import sa.gheras.edutrack.data.entity.StudentAttendanceEntity
@@ -53,6 +54,21 @@ interface StudentAttendanceDao {
     @Query("SELECT COUNT(*) FROM student_attendance WHERE deleted_at IS NULL AND date BETWEEN :from AND :to AND status = :status")
     fun countByStatusBetween(status: String, from: LocalDate, to: LocalDate): Flow<Int>
 
+    @Query("DELETE FROM student_attendance WHERE date BETWEEN :from AND :to")
+    suspend fun clearWindow(from: LocalDate, to: LocalDate)
+
     @Query("DELETE FROM student_attendance")
     suspend fun clear()
+
+    @Transaction
+    suspend fun replaceScope(from: LocalDate, to: LocalDate, items: List<StudentAttendanceEntity>) {
+        clearWindow(from, to)
+        upsertAll(items)
+    }
+
+    @Transaction
+    suspend fun replaceScopeAll(items: List<StudentAttendanceEntity>) {
+        clear()
+        upsertAll(items)
+    }
 }

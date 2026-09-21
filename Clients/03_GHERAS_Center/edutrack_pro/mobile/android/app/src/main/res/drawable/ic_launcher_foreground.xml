@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Placeholder launcher foreground: sand-colored sapling on the Gheras green background.
+     Replace with the final brand asset via Image Asset Studio before release. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- stem -->
+    <path
+        android:fillColor="@color/gheras_sand_accent"
+        android:pathData="M52,80 L56,80 L56,48 L52,48 Z" />
+    <!-- left leaf -->
+    <path
+        android:fillColor="@color/gheras_sand_light"
+        android:pathData="M54,56 C44,56 36,48 36,38 C46,38 54,46 54,56 Z" />
+    <!-- right leaf -->
+    <path
+        android:fillColor="@color/gheras_sand_light"
+        android:pathData="M54,48 C54,38 62,30 72,30 C72,40 64,48 54,48 Z" />
+    <!-- soil arc -->
+    <path
+        android:fillColor="@color/gheras_sand_accent"
+        android:pathData="M34,80 C34,76 44,74 54,74 C64,74 74,76 74,80 Z" />
+</vector>

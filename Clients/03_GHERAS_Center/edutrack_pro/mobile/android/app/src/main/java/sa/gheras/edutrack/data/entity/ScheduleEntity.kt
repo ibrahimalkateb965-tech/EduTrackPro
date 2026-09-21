@@ -16,12 +16,6 @@ import java.time.LocalTime
             parentColumns = ["id"],
             childColumns = ["room_id"],
             onDelete = ForeignKey.RESTRICT
-        ),
-        ForeignKey(
-            entity = UserEntity::class,
-            parentColumns = ["id"],
-            childColumns = ["teacher_user_id"],
-            onDelete = ForeignKey.RESTRICT
         )
     ],
     indices = [Index("room_id"), Index("teacher_user_id")]

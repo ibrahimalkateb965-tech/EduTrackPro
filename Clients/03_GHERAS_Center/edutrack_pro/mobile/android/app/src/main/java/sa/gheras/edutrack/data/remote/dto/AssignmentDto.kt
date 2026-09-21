@@ -1,0 +1,18 @@
+package sa.gheras.edutrack.data.remote.dto
+
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+
+@Serializable
+data class AssignmentDto(
+    val id: String,
+    @SerialName("schedule_id") val scheduleId: String? = null,
+    @SerialName("teacher_user_id") val teacherUserId: String? = null,
+    val title: String,
+    val description: String? = null,
+    @SerialName("due_date") val dueDate: String,
+    @SerialName("student_ids") val studentIds: List<String> = emptyList(),
+    @SerialName("created_at") val createdAt: String? = null,
+    @SerialName("updated_at") val updatedAt: String? = null,
+    @SerialName("deleted_at") val deletedAt: String? = null
+)

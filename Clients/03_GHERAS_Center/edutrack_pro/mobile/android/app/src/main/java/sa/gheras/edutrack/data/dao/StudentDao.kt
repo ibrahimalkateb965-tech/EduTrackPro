@@ -5,6 +5,7 @@ import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 import sa.gheras.edutrack.data.entity.StudentEntity
@@ -40,6 +41,9 @@ interface StudentDao {
     @Query("SELECT * FROM students WHERE deleted_at IS NULL ORDER BY name")
     fun observeAll(): Flow<List<StudentEntity>>
 
+    @Query("SELECT * FROM students WHERE id IN (:ids) AND deleted_at IS NULL ORDER BY name")
+    fun observeByIds(ids: List<String>): Flow<List<StudentEntity>>
+
     @Query("SELECT * FROM students WHERE deleted_at IS NULL AND room_id = :roomId ORDER BY name")
     fun observeByRoom(roomId: String): Flow<List<StudentEntity>>
 
@@ -57,4 +61,10 @@ interface StudentDao {
 
     @Query("DELETE FROM students")
     suspend fun clear()
+
+    @Transaction
+    suspend fun replaceScope(students: List<StudentEntity>) {
+        clear()
+        upsertAll(students)
+    }
 }
