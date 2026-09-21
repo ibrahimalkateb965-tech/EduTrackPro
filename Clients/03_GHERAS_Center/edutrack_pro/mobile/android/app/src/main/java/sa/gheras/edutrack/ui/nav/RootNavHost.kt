@@ -100,7 +100,7 @@ fun RootNavHost(
                             popUpTo(0) { inclusive = true }
                         }
                     }
-                } else if (state.role == Role.GUARDIAN) {
+                } else if (state.role == Role.GUARDIAN || state.role == Role.STUDENT) {
                     if (currentDestination?.contains("guardian") != true) {
                         navController.navigate(GuardianHomeRoute) {
                             popUpTo(0) { inclusive = true }
@@ -125,7 +125,7 @@ fun RootNavHost(
         currentDestination?.endsWith("AssignmentsRoute") == true ||
         currentDestination?.endsWith("NotificationsRoute") == true ||
         currentDestination?.endsWith("AccountRoute") == true ||
-        currentDestination?.endsWith("FeesRoute") == true
+        (currentDestination?.contains("FeesRoute") == true && activeRole != Role.STUDENT)
     )
 
     Scaffold(
@@ -425,7 +425,8 @@ fun RootNavHost(
                         onHomeworkClick = { studentId -> navController.navigate(ChildHomeworkRoute(studentId)) },
                         onLessonsClick = { studentId -> navController.navigate(ChildLessonsRoute(studentId)) },
                         onSkillsClick = { studentId -> navController.navigate(ChildSkillsRoute(studentId)) },
-                        onFeesClick = { studentId -> navController.navigate(FeesRoute(studentId)) }
+                        onFeesClick = { studentId -> navController.navigate(FeesRoute(studentId)) },
+                        showFees = activeRole != Role.STUDENT
                     )
                 }
 

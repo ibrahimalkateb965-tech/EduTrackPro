@@ -6,7 +6,8 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class LoginBody(
     val username: String,
-    val password: String
+    val password: String,
+    val role: String? = null
 )
 
 @Serializable

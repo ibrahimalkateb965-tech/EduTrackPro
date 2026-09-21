@@ -59,15 +59,16 @@ class SessionRepository(
         }
     }
 
-    suspend fun login(username: String, password: String): Result<SessionUser> {
+    suspend fun login(username: String, password: String, roleHint: Role? = null): Result<SessionUser> {
         return try {
-            val response = authApi.login(LoginBody(username, password))
+            val response = authApi.login(LoginBody(username, password, roleHint?.name?.lowercase()))
             val role = when (response.user.role.lowercase()) {
                 "teacher" -> Role.TEACHER
                 "guardian" -> Role.GUARDIAN
+                "student" -> Role.STUDENT
                 else -> {
                     try { authApi.logout() } catch (_: Exception) {}
-                    return Result.failure(IllegalStateException("هذا التطبيق مخصص للمعلمين وأولياء الأمور — استخدم لوحة التحكم على الويب"))
+                    return Result.failure(IllegalStateException("هذا التطبيق مخصص للطلاب وأولياء الأمور والمعلمين — استخدم لوحة التحكم على الويب"))
                 }
             }
             val user = SessionUser(

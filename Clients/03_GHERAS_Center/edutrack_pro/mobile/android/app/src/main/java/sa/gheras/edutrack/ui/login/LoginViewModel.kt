@@ -9,13 +9,16 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import sa.gheras.edutrack.data.local.session.Role
 import sa.gheras.edutrack.data.repo.OutboxRepository
 import sa.gheras.edutrack.data.repo.SessionRepository
 import sa.gheras.edutrack.data.repo.SessionState
+import sa.gheras.edutrack.ui.common.Num
 
 data class LoginUiState(
     val username: String = "",
     val password: String = "",
+    val selectedRole: Role = Role.GUARDIAN,
     val isPasswordVisible: Boolean = false,
     val isLoading: Boolean = false,
     val errorMessage: String? = null,
@@ -42,6 +45,7 @@ class LoginViewModel(
                 _uiState.update {
                     it.copy(
                         username = sessionState.user.username,
+                        selectedRole = sessionState.role,
                         isUsernameLocked = true,
                         isRenew = true
                     )
@@ -59,9 +63,16 @@ class LoginViewModel(
         }
     }
 
+    fun onRoleChange(role: Role) {
+        if (!_uiState.value.isUsernameLocked) {
+            _uiState.update { it.copy(selectedRole = role, errorMessage = null) }
+        }
+    }
+
     fun onUsernameChange(username: String) {
         if (!_uiState.value.isUsernameLocked) {
-            _uiState.update { it.copy(username = username, errorMessage = null) }
+            val sanitized = Num.enforceWesternNumerals(username)
+            _uiState.update { it.copy(username = sanitized, errorMessage = null) }
         }
     }
 
@@ -75,14 +86,19 @@ class LoginViewModel(
 
     fun login(onSuccess: () -> Unit = {}) {
         val state = _uiState.value
-        if (state.username.isBlank() || state.password.isBlank()) {
-            _uiState.update { it.copy(errorMessage = "يرجى إدخال اسم المستخدم وكلمة المرور") }
+        val identity = state.username.trim()
+        if (identity.isBlank()) {
+            _uiState.update { it.copy(errorMessage = "يرجى إدخال رقم الهوية الوطنية أو الإقامة") }
+            return
+        }
+        if (state.password.isBlank()) {
+            _uiState.update { it.copy(errorMessage = "يرجى إدخال كلمة المرور") }
             return
         }
 
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, errorMessage = null) }
-            val result = sessionRepository.login(state.username.trim(), state.password)
+            val result = sessionRepository.login(identity, state.password, state.selectedRole)
             result.fold(
                 onSuccess = {
                     _uiState.update { it.copy(isLoading = false) }

@@ -172,6 +172,7 @@ fun AccountScreen(
                         val roleLabel = when (state.user?.role) {
                             Role.TEACHER -> "معلم"
                             Role.GUARDIAN -> "ولي أمر"
+                            Role.STUDENT -> "طالب"
                             null -> ""
                         }
                         if (roleLabel.isNotBlank()) {

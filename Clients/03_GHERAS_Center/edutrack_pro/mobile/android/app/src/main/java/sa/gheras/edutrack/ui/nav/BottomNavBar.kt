@@ -29,18 +29,22 @@ fun AppBottomNavBar(
     onNavigate: (Route) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val items = if (role == Role.TEACHER) {
-        listOf(
+    val items = when (role) {
+        Role.TEACHER -> listOf(
             NavItem("الرئيسية", Icons.Default.Home, TeacherHomeRoute),
             NavItem("الطلاب", Icons.Default.School, TeacherStudentsRoute),
             NavItem("الواجبات", Icons.Default.Assignment, TeacherAssignmentsRoute),
             NavItem("التنبيهات", Icons.Default.Notifications, NotificationsRoute),
             NavItem("حسابي", Icons.Default.Person, AccountRoute)
         )
-    } else {
-        listOf(
+        Role.GUARDIAN -> listOf(
             NavItem("الرئيسية", Icons.Default.Home, GuardianHomeRoute),
             NavItem("الرسوم", Icons.Default.CreditCard, FeesRoute("")),
+            NavItem("التنبيهات", Icons.Default.Notifications, NotificationsRoute),
+            NavItem("حسابي", Icons.Default.Person, AccountRoute)
+        )
+        Role.STUDENT -> listOf(
+            NavItem("الرئيسية", Icons.Default.Home, GuardianHomeRoute),
             NavItem("التنبيهات", Icons.Default.Notifications, NotificationsRoute),
             NavItem("حسابي", Icons.Default.Person, AccountRoute)
         )

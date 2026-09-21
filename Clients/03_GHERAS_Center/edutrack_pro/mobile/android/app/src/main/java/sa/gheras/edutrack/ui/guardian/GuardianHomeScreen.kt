@@ -59,6 +59,7 @@ fun GuardianHomeScreen(
     onLessonsClick: (studentId: String) -> Unit,
     onSkillsClick: (studentId: String) -> Unit,
     onFeesClick: (studentId: String) -> Unit,
+    showFees: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -113,7 +114,7 @@ fun GuardianHomeScreen(
                         ) {
                             Column(modifier = Modifier.padding(16.dp)) {
                                 Text(
-                                    text = "متابعة الطالب: ${child.name}",
+                                    text = if (showFees) "متابعة الطالب: ${child.name}" else "مرحباً يا بطل: ${child.name}",
                                     style = MaterialTheme.typography.titleLarge,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onPrimaryContainer
@@ -197,21 +198,23 @@ fun GuardianHomeScreen(
                         )
                     }
 
-                    // 6. Fees
-                    item {
-                        val feeSubtitle = if (state.nextUnpaidInstallment != null) {
-                            val inst = state.nextUnpaidInstallment!!
-                            "القسط القادم: ${Num.formatCurrency(inst.amount)} (استحقاق ${inst.dueDate ?: ""})"
-                        } else {
-                            "جميع الأقساط مسددة"
-                        }
+                    // 6. Fees (Hidden for student role)
+                    if (showFees) {
+                        item {
+                            val feeSubtitle = if (state.nextUnpaidInstallment != null) {
+                                val inst = state.nextUnpaidInstallment!!
+                                "القسط القادم: ${Num.formatCurrency(inst.amount)} (استحقاق ${inst.dueDate ?: ""})"
+                            } else {
+                                "جميع الأقساط مسددة"
+                            }
 
-                        GuardianActionCard(
-                            title = "الرسوم والأقساط",
-                            subtitle = feeSubtitle,
-                            icon = Icons.Default.CreditCard,
-                            onClick = { onFeesClick(child.id) }
-                        )
+                            GuardianActionCard(
+                                title = "الرسوم والأقساط",
+                                subtitle = feeSubtitle,
+                                icon = Icons.Default.CreditCard,
+                                onClick = { onFeesClick(child.id) }
+                            )
+                        }
                     }
                 }
             }

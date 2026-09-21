@@ -21,8 +21,9 @@ from edutrack_api.auth import current_user
 from edutrack_api.db import get_conn
 from edutrack_api.errors import ApiError
 
-MSG_NOT_MOBILE = "هذه الواجهة مخصصة لتطبيق المعلم وولي الأمر"
+MSG_NOT_MOBILE = "هذه الواجهة مخصصة لتطبيق المعلم وولي الأمر والطالب"
 MSG_GUARDIAN_UNLINKED = "حساب ولي الأمر غير مرتبط بطالب — راجع إدارة المركز"
+MSG_STUDENT_UNLINKED = "حساب الطالب غير مرتبط بسجل طالب — راجع إدارة المركز"
 MSG_STUDENT_OUT_OF_SCOPE = "الطالب خارج نطاق صلاحيتك"
 
 
@@ -81,14 +82,35 @@ def _guardian_scope(conn, user: dict) -> Scope:
     )
 
 
+def _student_scope(conn, user: dict) -> Scope:
+    if not user.get("student_id"):
+        raise ApiError(403, "forbidden", MSG_STUDENT_UNLINKED)
+    row = conn.execute(
+        "SELECT id, room_id FROM students WHERE id = %s AND deleted_at IS NULL",
+        (user["student_id"],),
+    ).fetchone()
+    if not row:
+        raise ApiError(403, "forbidden", MSG_STUDENT_UNLINKED)
+    room_ids = frozenset([row["room_id"]]) if row.get("room_id") else frozenset()
+    return Scope(
+        role="student",
+        room_ids=room_ids,
+        student_ids=frozenset([row["id"]]),
+        user_id=user["id"],
+    )
+
+
 def resolve_scope(conn, user: dict) -> Scope:
     if user["role"] == "teacher":
         return _teacher_scope(conn, user)
     if user["role"] == "guardian":
         return _guardian_scope(conn, user)
+    if user["role"] == "student":
+        return _student_scope(conn, user)
     raise ApiError(403, "forbidden", MSG_NOT_MOBILE)
 
 
 def require_scope(user: dict = Depends(current_user), conn=Depends(get_conn)) -> Scope:
-    """FastAPI dependency for /api/v1/me/*: teacher or guardian only, scope resolved once per request."""
+    """FastAPI dependency for /api/v1/me/*: teacher, guardian or student only, scope resolved once per request."""
     return resolve_scope(conn, user)
+

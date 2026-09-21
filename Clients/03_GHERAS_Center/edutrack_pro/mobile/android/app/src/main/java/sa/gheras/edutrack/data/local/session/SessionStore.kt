@@ -3,7 +3,7 @@ package sa.gheras.edutrack.data.local.session
 import sa.gheras.edutrack.data.remote.dto.ProfileDto
 import java.time.Instant
 
-enum class Role { TEACHER, GUARDIAN }
+enum class Role { TEACHER, GUARDIAN, STUDENT }
 
 data class SessionUser(
     val id: String,

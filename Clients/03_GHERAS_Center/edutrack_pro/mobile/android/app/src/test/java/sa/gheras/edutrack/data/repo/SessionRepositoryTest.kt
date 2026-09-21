@@ -71,6 +71,17 @@ class SessionRepositoryTest {
     }
 
     @Test
+    fun testLogin_student_success() = runTest {
+        fakeAuth.loginUserRole = "student"
+        val result = repo.login("1098765432", "password123", Role.STUDENT)
+        assertTrue(result.isSuccess)
+        val user = result.getOrThrow()
+        assertEquals(Role.STUDENT, user.role)
+        assertTrue(repo.state.value is SessionState.Active)
+        assertEquals(Role.STUDENT, (repo.state.value as SessionState.Active).role)
+    }
+
+    @Test
     fun testRoleGate_rejectsManager() = runTest {
         fakeAuth.loginUserRole = "manager"
         val result = repo.login("manager1", "password123")

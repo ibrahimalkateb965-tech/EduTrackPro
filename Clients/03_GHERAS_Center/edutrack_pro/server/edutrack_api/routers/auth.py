@@ -17,6 +17,7 @@ router = APIRouter()
 class LoginBody(BaseModel):
     username: str
     password: str
+    role: str | None = None
 
 
 class ChangePasswordBody(BaseModel):
@@ -34,16 +35,37 @@ def _user_name(conn, user: dict) -> str:
         staff = conn.execute("SELECT name FROM staff WHERE id = %s AND deleted_at IS NULL", (user["staff_id"],)).fetchone()
         if staff:
             return staff["name"]
+    if user.get("guardian_id"):
+        guardian = conn.execute("SELECT name FROM guardians WHERE id = %s AND deleted_at IS NULL", (user["guardian_id"],)).fetchone()
+        if guardian:
+            return guardian["name"]
+    if user.get("student_id"):
+        student = conn.execute("SELECT name FROM students WHERE id = %s AND deleted_at IS NULL", (user["student_id"],)).fetchone()
+        if student:
+            return student["name"]
     return user["username"]
 
 
 @router.post("/auth/login")
 def login(body: LoginBody, conn=Depends(get_conn)):
-    user = conn.execute(
-        "SELECT id, username, password_hash, role, staff_id, is_active "
-        "FROM users WHERE username = %s AND deleted_at IS NULL",
-        (body.username,),
-    ).fetchone()
+    ident = body.username.strip()
+    role_filter = body.role.strip().lower() if body.role else None
+
+    if role_filter:
+        user = conn.execute(
+            "SELECT id, username, password_hash, role, staff_id, guardian_id, room_id, student_id, is_active "
+            "FROM users WHERE (username = %s OR national_id = %s) AND role = %s AND deleted_at IS NULL "
+            "ORDER BY id LIMIT 1",
+            (ident, ident, role_filter),
+        ).fetchone()
+    else:
+        user = conn.execute(
+            "SELECT id, username, password_hash, role, staff_id, guardian_id, room_id, student_id, is_active "
+            "FROM users WHERE (username = %s OR national_id = %s) AND deleted_at IS NULL "
+            "ORDER BY id LIMIT 1",
+            (ident, ident),
+        ).fetchone()
+
     if not user or not user["is_active"] or not verify_password(user["password_hash"], body.password):
         raise ApiError(401, "unauthorized", "بيانات الدخول غير صحيحة")
     user = dict(user)

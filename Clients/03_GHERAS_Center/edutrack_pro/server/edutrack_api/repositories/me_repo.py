@@ -82,6 +82,9 @@ def profile(conn, scope: Scope, user: dict) -> dict:
     elif scope.role == "guardian":
         row = conn.execute("SELECT name FROM guardians WHERE id = %s AND deleted_at IS NULL", (user["guardian_id"],)).fetchone()
         name = row["name"] if row else None
+    elif scope.role == "student" and user.get("student_id"):
+        row = conn.execute("SELECT name FROM students WHERE id = %s AND deleted_at IS NULL", (user["student_id"],)).fetchone()
+        name = row["name"] if row else None
     settings = load_settings(conn)
     return {
         "user": {"id": user["id"], "username": user["username"], "role": scope.role, "name": name or user["username"]},

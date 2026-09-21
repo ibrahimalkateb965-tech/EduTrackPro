@@ -1,6 +1,7 @@
 package sa.gheras.edutrack.ui.login
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,12 +12,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Badge
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Visibility
@@ -42,6 +45,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -51,7 +55,9 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import sa.gheras.edutrack.BuildConfig
+import sa.gheras.edutrack.data.local.session.Role
 import sa.gheras.edutrack.ui.common.Num
+
 
 @Composable
 fun LoginScreen(
@@ -186,16 +192,69 @@ fun LoginScreen(
                 Spacer(modifier = Modifier.height(16.dp))
             }
 
+            // Role Selection (Student / Guardian / Teacher)
+            if (!state.isUsernameLocked) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            shape = RoundedCornerShape(14.dp)
+                        )
+                        .padding(4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    val roles = listOf(
+                        Triple(Role.STUDENT, "طالب", "🎓"),
+                        Triple(Role.GUARDIAN, "ولي أمر", "👨‍👩‍👧"),
+                        Triple(Role.TEACHER, "معلم", "👨‍🏫")
+                    )
+                    roles.forEach { (role, label, emoji) ->
+                        val isSelected = state.selectedRole == role
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .background(
+                                    color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
+                                    shape = RoundedCornerShape(10.dp)
+                                )
+                                .clickable(enabled = !state.isLoading) {
+                                    viewModel.onRoleChange(role)
+                                }
+                                .padding(vertical = 10.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center
+                            ) {
+                                Text(text = emoji, style = MaterialTheme.typography.bodySmall)
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = label,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+
             // Form Fields
+            val isTeacher = state.selectedRole == Role.TEACHER
             OutlinedTextField(
                 value = state.username,
                 onValueChange = viewModel::onUsernameChange,
-                label = { Text("اسم المستخدم") },
-                leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
+                label = { Text(if (isTeacher) "اسم المستخدم أو رقم الهوية" else "رقم الهوية الوطنية / الإقامة") },
+                leadingIcon = { Icon(if (isTeacher) Icons.Default.Person else Icons.Default.Badge, contentDescription = null) },
                 enabled = !state.isUsernameLocked && !state.isLoading,
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Text,
+                    keyboardType = if (isTeacher) KeyboardType.Text else KeyboardType.Number,
                     autoCorrectEnabled = false,
                     imeAction = ImeAction.Next
                 ),
