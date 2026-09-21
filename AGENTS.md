@@ -208,5 +208,9 @@ Governed by [.agents/CONTEXT_GOVERNANCE.md](file:///f:/AI%20PROJECTS/Autovemtech
    - In FastAPI/Python endpoints querying raw SQL monetary amounts or database aggregates (`sum(amount)`), **NEVER** return raw `Decimal` objects in response payloads.
    - Pydantic v2 automatically serializes raw `Decimal` objects as JSON strings (`"500.00"`), breaking client arithmetic and test comparisons.
    - All response dictionaries containing monetary/numeric fields must be routed through the recursive `_convert()` serializer (e.g. `return _resp(...)`) to guarantee all `Decimal` values are converted to rounded `float` numbers (`round(float(val), 2)`).
+10. **Rule 10 (Room Topological Sync & Outbox Protection Invariant)**:
+    - In offline-first Android apps using Room with foreign keys enabled (`PRAGMA foreign_keys = ON`), local cache replacement/invalidation must strictly follow reverse topological order (leaf children ➔ parent roots) inside a single `@Transaction` method.
+    - The mutation outbox (`pending_writes`) must NEVER declare foreign keys and must NEVER be cleared or touched during pull sync routines.
+
 
 
