@@ -20,6 +20,7 @@ class Settings:
     database_url: str
     jwt_secret: str
     jwt_ttl_minutes: int = 720
+    mobile_jwt_ttl_minutes: int = 43200  # 30 days — teacher/guardian tokens (Phase 5 (c) D4)
     cors_origins: list[str] = field(default_factory=list)
     main_branch_id: uuid.UUID = uuid.UUID("00000000-0000-0000-0000-000000000001")
 
@@ -37,6 +38,11 @@ def get_settings() -> Settings:
         jwt_ttl_minutes = int(ttl_raw)
     except ValueError:
         raise RuntimeError("JWT_TTL_MINUTES is not a valid integer") from None
+    mobile_ttl_raw = os.environ.get("MOBILE_JWT_TTL_MINUTES", "43200")
+    try:
+        mobile_jwt_ttl_minutes = int(mobile_ttl_raw)
+    except ValueError:
+        raise RuntimeError("MOBILE_JWT_TTL_MINUTES is not a valid integer") from None
     cors_raw = os.environ.get("CORS_ORIGINS", "")
     cors_origins = [o.strip() for o in cors_raw.split(",") if o.strip()]
     branch_raw = os.environ.get("MAIN_BRANCH_ID")
@@ -48,6 +54,7 @@ def get_settings() -> Settings:
         database_url=database_url,
         jwt_secret=jwt_secret,
         jwt_ttl_minutes=jwt_ttl_minutes,
+        mobile_jwt_ttl_minutes=mobile_jwt_ttl_minutes,
         cors_origins=cors_origins,
         main_branch_id=main_branch_id,
     )

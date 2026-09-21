@@ -27,7 +27,7 @@ die() { echo "error: $*" >&2; exit 1; }
 command -v docker >/dev/null || die "docker is not installed"
 docker compose version >/dev/null 2>&1 || die "docker compose v2 is required"
 command -v openssl >/dev/null || die "openssl is required"
-for f in db/postgres/001_schema.sql db/postgres/002_reference.sql db/postgres/003_phase2.sql db/postgres/004_phase3.sql db/postgres/005_saturday.sql db/postgres/006_settings.sql \
+for f in db/postgres/001_schema.sql db/postgres/002_reference.sql db/postgres/003_phase2.sql db/postgres/004_phase3.sql db/postgres/005_saturday.sql db/postgres/006_settings.sql db/postgres/007_revoked_tokens_purge.sql \
          server/Dockerfile server/uv.lock web/dashboard/index.html assets/gheras_logo.png \
          deploy/backup.sh deploy/edutrack-backup.service deploy/edutrack-backup.timer; do
   [[ -f "$ROOT/$f" ]] || die "missing $f — sync the full edutrack_pro tree first"
@@ -44,6 +44,7 @@ if [[ ! -f "$ENV_FILE" ]]; then
     echo "GHERAS_APP_PASSWORD=$(openssl rand -hex 24)"
     echo "JWT_SECRET=$(openssl rand -hex 32)"
     echo "JWT_TTL_MINUTES=720"
+    echo "MOBILE_JWT_TTL_MINUTES=43200"
     echo "CORS_ORIGINS="
     echo "MAIN_BRANCH_ID=00000000-0000-0000-0000-000000000001"
   } > "$ENV_FILE"
@@ -68,13 +69,13 @@ done
 
 # A reused volume skips the initdb scripts; apply 001->006 ourselves (003 through 006 are idempotent).
 if [[ "$("${PSQL[@]}" -c "SELECT to_regclass('public.users') IS NOT NULL")" != "t" ]]; then
-  log "Empty database — applying migrations 001 -> 006"
-  for m in 001_schema.sql 002_reference.sql 003_phase2.sql 004_phase3.sql 005_saturday.sql 006_settings.sql; do
+  log "Empty database — applying migrations 001 -> 007"
+  for m in 001_schema.sql 002_reference.sql 003_phase2.sql 004_phase3.sql 005_saturday.sql 006_settings.sql 007_revoked_tokens_purge.sql; do
     "${PSQL[@]}" -f "/docker-entrypoint-initdb.d/$m" >/dev/null
   done
 else
-  log "Applying incremental idempotent migrations (003 -> 006)"
-  for m in 003_phase2.sql 004_phase3.sql 005_saturday.sql 006_settings.sql; do
+  log "Applying incremental idempotent migrations (003 -> 007)"
+  for m in 003_phase2.sql 004_phase3.sql 005_saturday.sql 006_settings.sql 007_revoked_tokens_purge.sql; do
     "${PSQL[@]}" -f "/docker-entrypoint-initdb.d/$m" >/dev/null || true
   done
 fi

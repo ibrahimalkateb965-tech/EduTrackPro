@@ -294,7 +294,7 @@ Units for the record: `JWT_TTL_MINUTES=720` = 12 h (manager/supervisor, unchange
 
 **Env documentation** (one identical line each, no VPS change required — the default applies when the variable is absent): `server/.env.example`, `deploy/.env.prod.example`, and the generated block at `deploy/deploy.sh:46`: `MOBILE_JWT_TTL_MINUTES=43200`.
 
-**Hygiene — D4-a, APPROVED 2026-09-21 (+1 statement in `logout`)**: `DELETE FROM revoked_tokens WHERE expires_at < now()` before the `INSERT`. With 30-day tokens, revoked rows now live up to 30 days and nothing purges them today. Lookups are by PK `jti`, so this is housekeeping, not a correctness fix. Covered by the third test in §7.6.
+**Hygiene — D4-a, APPROVED 2026-09-21 (+1 statement in `logout`)**: `DELETE FROM revoked_tokens WHERE expires_at < now()` before the `INSERT`. With 30-day tokens, revoked rows now live up to 30 days and nothing purges them today. Lookups are by PK `jti`, so this is housekeeping, not a correctness fix. Covered by the third test in §7.6. **Implementation finding (2026-09-21)**: `gheras_app` holds `SELECT/INSERT/UPDATE` only (`003_phase2.sql:33`), so the purge 500s without `db/postgres/007_revoked_tokens_purge.sql` (`GRANT DELETE ON revoked_tokens TO gheras_app`, idempotent, registered in `deploy/deploy.sh`'s three migration lists). Least privilege is unchanged for every other table.
 
 **Tests — `server/tests/test_auth_ttl.py` (2 TTL tests below + the purge test in §7.6 = 3, conftest fixtures only, no scope setup)**:
 
@@ -327,8 +327,8 @@ def test_dashboard_roles_keep_jwt_ttl(db, client, manager, supervisor):
         assert _ttl_seconds(headers) == 60 * 60  # conftest pins JWT_TTL_MINUTES=60
 ```
 
-- TDD order: write both tests → run → test 1 **RED** (teacher/guardian currently get 3 600 s), test 2 already green (regression guard) → apply the two edits → both green → full suite (100 + 3) green under the embedded PG booter → `[APPROVED]`.
-- Deploy: `deploy/push.sh` → API rebuild only; no migration, no web `v=` bump. Post-deploy probe (Ibrahim, locally, token never pasted into chat): `curl` login as a teacher → `python -c` / `jq` decode of the payload → `exp - iat == 2592000`; a manager login must still give `43200`.
+- TDD order: write both tests → run → test 1 **RED** (teacher/guardian currently get 3 600 s), test 2 already green (regression guard) → apply the two edits → both green → full suite green under the embedded PG booter (105 on 2026-09-21) → `[APPROVED]`.
+- Deploy: `deploy/push.sh` → API rebuild + `deploy.sh` applies idempotent migration 007 (grant only); no web `v=` bump. Post-deploy probe (Ibrahim, locally, token never pasted into chat): `curl` login as a teacher → `python -c` / `jq` decode of the payload → `exp - iat == 2592000`; a manager login must still give `43200`.
 - Existing tokens are unaffected (TTL is fixed at issue time); teachers who are already logged in on the web keep their 12 h tokens.
 
 ---

@@ -55,6 +55,7 @@ def login(body: LoginBody, conn=Depends(get_conn)):
 
 @router.post("/auth/logout", status_code=204)
 def logout(user: dict = Depends(current_user), conn=Depends(get_conn)) -> Response:
+    conn.execute("DELETE FROM revoked_tokens WHERE expires_at < now()")  # D4-a housekeeping
     conn.execute(
         "INSERT INTO revoked_tokens (jti, expires_at) VALUES (%s, %s) ON CONFLICT (jti) DO NOTHING",
         (user["_jti"], datetime.fromtimestamp(user["_exp"], UTC)),

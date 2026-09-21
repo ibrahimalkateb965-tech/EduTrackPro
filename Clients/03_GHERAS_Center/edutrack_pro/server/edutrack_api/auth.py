@@ -13,6 +13,7 @@ from edutrack_api.errors import ApiError
 
 _password_hasher = PasswordHasher()
 _bearer = HTTPBearer(auto_error=False)
+MOBILE_ROLES = frozenset({"teacher", "guardian"})
 
 
 def hash_password(plain: str) -> str:
@@ -26,6 +27,10 @@ def verify_password(password_hash: str, plain: str) -> bool:
         return False
 
 
+def token_ttl_minutes(role: str, settings) -> int:
+    return settings.mobile_jwt_ttl_minutes if role in MOBILE_ROLES else settings.jwt_ttl_minutes
+
+
 def issue_token(user_row: dict, settings) -> str:
     now = datetime.now(UTC)
     payload = {
@@ -33,7 +38,7 @@ def issue_token(user_row: dict, settings) -> str:
         "role": user_row["role"],
         "jti": str(uuid4()),
         "iat": now,
-        "exp": now + timedelta(minutes=settings.jwt_ttl_minutes),
+        "exp": now + timedelta(minutes=token_ttl_minutes(user_row["role"], settings)),
     }
     return jwt.encode(payload, settings.jwt_secret, algorithm="HS256")
 
