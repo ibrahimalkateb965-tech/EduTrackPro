@@ -193,6 +193,11 @@ Governed by [.agents/CONTEXT_GOVERNANCE.md](file:///f:/AI%20PROJECTS/Autovemtech
 5. **Rule 51 (Clean Templates & Zero Cross-Project Bleed)**:
    - Templates in `_Agency_Templates/` and MCP docx generators must be 100% generic structural templates.
    - Never allow data from one client (e.g., Shajan) to bleed into another (e.g., YAZ or Apex).
+   - **Rule 51+ (Data Source Independence — Standalone App Invariant)**: When building any financial or management app from an external data source (Excel, CSV, JSON):
+     1. **Phase 1 (Active):** Build with real client data for verification (`initialData_[client].js`).
+     2. **Phase 2 (Purge):** `initialData.js` (the template) MUST be purged to generic professional roles (e.g., `treasurer`, `site_engineer`) and all balances zeroed (`0.00`).
+     3. **Phase 3 (Dual Output):** The build script MUST produce TWO standalone HTML files: one with live client data (`_النشطة_البيانات_الحالية.html`) and one blank template (`_نسخة_جديدة_فارغة.html`).
+     4. **Absolute Prohibitions in template files:** No personal names, no Excel cell references (e.g., `C92`, `C94`), no employee-named tabs or labels anywhere in UI, documentation, or export headers.
 6. **Rule 1 (BiDi & RTL Isolation & Artifact Pre-Flight Gate)**:
    - **Mandatory `<div dir="rtl">` Wrapper:** Every Arabic markdown artifact (`implementation_plan.md`, `walkthrough.md`, `learning_proposal.md`, reports, client summaries) MUST strictly begin with `<div dir="rtl">` on Line 1 and end with `</div>` on the final line.
    - **Strict BiDi Isolation:** In all Arabic markdown, HTML, and SVG files, isolate all English terms, acronyms, model names, CLI commands, code symbols, and file paths using `<bdi>` (e.g. `<bdi>OpenCode CLI</bdi>` or `<bdi>`web/print/`</bdi>`) or `<span dir="ltr">` to prevent punctuation and line-flow inversion.
