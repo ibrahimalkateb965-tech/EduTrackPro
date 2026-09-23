@@ -216,6 +216,12 @@ Governed by [.agents/CONTEXT_GOVERNANCE.md](file:///f:/AI%20PROJECTS/Autovemtech
 10. **Rule 10 (Room Topological Sync & Outbox Protection Invariant)**:
     - In offline-first Android apps using Room with foreign keys enabled (`PRAGMA foreign_keys = ON`), local cache replacement/invalidation must strictly follow reverse topological order (leaf children ➔ parent roots) inside a single `@Transaction` method.
     - The mutation outbox (`pending_writes`) must NEVER declare foreign keys and must NEVER be cleared or touched during pull sync routines.
+11. **Rule 52 (Production DB Migration Parity & Physical ADB Viewport Shift Standard)**:
+    - **Production Schema Parity Gate:** Before running live end-to-end integration tests or classifying HTTP 500 errors as application code defects, agents must verify that all incremental migration scripts (`db/postgres/*.sql`) have been applied to the remote/container production database (`edutrack-db-1`), executing missing migrations immediately to prevent schema mismatch crashes on new columns or tables.
+    - **Physical ADB Automation Protocol:**
+      - **Screen Sleep Prevention:** Always set `settings put global stay_on_while_plugged_in 3` upon ADB device connection to prevent display timeouts during automated testing.
+      - **Biometric/Bouncer Respect:** When a device displays secure keyguard (`Bouncer`), automation scripts must wait gracefully for one-time user biometric/pattern unlock rather than prematurely failing or exiting.
+      - **Soft-Keyboard Viewport Shift Invariant:** On physical devices, software keyboards shift Jetpack Compose viewports upward. Avoid blind coordinate taps while the keyboard is visible; navigate form fields using `KEYCODE_TAB` (61) / `ImeAction.Next`, and dismiss the software keyboard explicitly with `KEYCODE_BACK` (4) before clicking submission buttons.
 
 ---
 
