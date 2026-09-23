@@ -269,8 +269,16 @@ fun LoginScreen(
                     OutlinedTextField(
                         value = state.username,
                         onValueChange = viewModel::onUsernameChange,
-                        label = { Text(if (isTeacher) "اسم المستخدم أو رقم الهوية" else "رقم الهوية الوطنية / الإقامة") },
-                        leadingIcon = { Icon(if (isTeacher) Icons.Default.Person else Icons.Default.Badge, contentDescription = null) },
+                        label = {
+                            Text(
+                                when (state.selectedRole) {
+                                    Role.TEACHER -> "رقم الجوال أو اسم المستخدم أو الهوية"
+                                    Role.GUARDIAN -> "رقم الجوال أو رقم الهوية"
+                                    Role.STUDENT -> "رقم الهوية الوطنية أو الإقامة"
+                                }
+                            )
+                        },
+                        leadingIcon = { Icon(if (isTeacher) Icons.Default.Phone else Icons.Default.Badge, contentDescription = null) },
                         enabled = !state.isLoading,
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(
@@ -480,8 +488,16 @@ fun LoginScreen(
                 OutlinedTextField(
                     value = state.username,
                     onValueChange = viewModel::onUsernameChange,
-                    label = { Text(if (isTeacher) "اسم المستخدم أو رقم الهوية" else "رقم الهوية الوطنية / الإقامة") },
-                    leadingIcon = { Icon(if (isTeacher) Icons.Default.Person else Icons.Default.Badge, contentDescription = null) },
+                    label = {
+                        Text(
+                            when (state.selectedRole) {
+                                Role.TEACHER -> "رقم الجوال أو اسم المستخدم أو الهوية"
+                                Role.GUARDIAN -> "رقم الجوال أو رقم الهوية"
+                                Role.STUDENT -> "رقم الهوية الوطنية أو الإقامة"
+                            }
+                        )
+                    },
+                    leadingIcon = { Icon(if (isTeacher) Icons.Default.Phone else Icons.Default.Badge, contentDescription = null) },
                     enabled = !state.isUsernameLocked && !state.isLoading,
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(
@@ -524,6 +540,17 @@ fun LoginScreen(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp)
                 )
+
+                if (isTeacher && !state.isUsernameLocked) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "💡 يتم تسليم بيانات الدخول للمعلم بواسطة إدارة المركز",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
 
                 if (!state.errorMessage.isNullOrBlank()) {
                     Spacer(modifier = Modifier.height(12.dp))

@@ -86,29 +86,62 @@ def _user_phone(conn, user: dict) -> str | None:
     return None
 
 
+def _phone_candidates(ident: str) -> list[str]:
+    candidates = [ident]
+    try:
+        norm = normalize_saudi_phone(ident)
+        candidates.append(norm)
+        if norm.startswith("966") and len(norm) == 12:
+            candidates.append("0" + norm[3:])
+            candidates.append(norm[3:])
+    except ValueError:
+        pass
+    return list(dict.fromkeys(candidates))
+
+
 @router.post("/auth/login")
 def login(body: LoginBody, conn=Depends(get_conn)):
     ident = body.username.strip()
     role_filter = body.role.strip().lower() if body.role else None
+    phones = _phone_candidates(ident)
 
     if role_filter:
-        user = conn.execute(
-            "SELECT id, username, password_hash, role, staff_id, guardian_id, room_id, student_id, is_active "
-            "FROM users WHERE (username = %s OR national_id = %s) AND role = %s AND deleted_at IS NULL "
-            "ORDER BY id LIMIT 1",
-            (ident, ident, role_filter),
-        ).fetchone()
+        query = (
+            "SELECT u.id, u.username, u.password_hash, u.role, u.staff_id, u.guardian_id, u.room_id, u.student_id, u.is_active "
+            "FROM users u "
+            "LEFT JOIN staff s ON s.id = u.staff_id AND s.deleted_at IS NULL "
+            "LEFT JOIN guardians g ON g.id = u.guardian_id AND g.deleted_at IS NULL "
+            "WHERE (u.username = %s OR u.national_id = %s OR u.phone = ANY(%s) OR s.phone = ANY(%s) OR g.phone = ANY(%s)) "
+            "  AND u.role = %s AND u.deleted_at IS NULL "
+            "ORDER BY CASE WHEN u.username = %s OR u.national_id = %s THEN 0 "
+            "              WHEN u.phone = ANY(%s) THEN 1 ELSE 2 END, u.id"
+        )
+        params = (ident, ident, phones, phones, phones, role_filter, ident, ident, phones)
     else:
-        user = conn.execute(
-            "SELECT id, username, password_hash, role, staff_id, guardian_id, room_id, student_id, is_active "
-            "FROM users WHERE (username = %s OR national_id = %s) AND deleted_at IS NULL "
-            "ORDER BY id LIMIT 1",
-            (ident, ident),
-        ).fetchone()
+        query = (
+            "SELECT u.id, u.username, u.password_hash, u.role, u.staff_id, u.guardian_id, u.room_id, u.student_id, u.is_active "
+            "FROM users u "
+            "LEFT JOIN staff s ON s.id = u.staff_id AND s.deleted_at IS NULL "
+            "LEFT JOIN guardians g ON g.id = u.guardian_id AND g.deleted_at IS NULL "
+            "WHERE (u.username = %s OR u.national_id = %s OR u.phone = ANY(%s) OR s.phone = ANY(%s) OR g.phone = ANY(%s)) "
+            "  AND u.deleted_at IS NULL "
+            "ORDER BY CASE WHEN u.username = %s OR u.national_id = %s THEN 0 "
+            "              WHEN u.phone = ANY(%s) THEN 1 ELSE 2 END, u.id"
+        )
+        params = (ident, ident, phones, phones, phones, ident, ident, phones)
 
-    if not user or not user["is_active"] or not verify_password(user["password_hash"], body.password):
+    candidates = conn.execute(query, params).fetchall()
+
+    authenticated_user = None
+    for row in candidates:
+        if row["is_active"] and verify_password(row["password_hash"], body.password):
+            authenticated_user = dict(row)
+            break
+
+    if not authenticated_user:
         raise ApiError(401, "unauthorized", "بيانات الدخول غير صحيحة")
-    user = dict(user)
+
+    user = authenticated_user
     return {
         "token": issue_token(user, get_settings()),
         "user": {key: str(user[key]) if key == "id" else user[key] for key in ("id", "username", "role")} | {"name": _user_name(conn, user)},
@@ -119,16 +152,21 @@ def login(body: LoginBody, conn=Depends(get_conn)):
 def request_otp(body: RequestOtpBody, conn=Depends(get_conn)):
     ident = body.national_id.strip()
     role_filter = body.role.strip().lower()
+    phones = _phone_candidates(ident)
 
     user = conn.execute(
-        "SELECT id, username, role, staff_id, guardian_id, room_id, student_id, phone, is_active "
-        "FROM users WHERE (national_id = %s OR username = %s) AND role = %s AND deleted_at IS NULL "
-        "ORDER BY id LIMIT 1",
-        (ident, ident, role_filter),
+        "SELECT u.id, u.username, u.role, u.staff_id, u.guardian_id, u.room_id, u.student_id, u.phone, u.is_active "
+        "FROM users u "
+        "LEFT JOIN staff s ON s.id = u.staff_id AND s.deleted_at IS NULL "
+        "LEFT JOIN guardians g ON g.id = u.guardian_id AND g.deleted_at IS NULL "
+        "WHERE (u.national_id = %s OR u.username = %s OR u.phone = ANY(%s) OR s.phone = ANY(%s) OR g.phone = ANY(%s)) "
+        "  AND u.role = %s AND u.deleted_at IS NULL "
+        "ORDER BY u.id LIMIT 1",
+        (ident, ident, phones, phones, phones, role_filter),
     ).fetchone()
 
     if not user or not user["is_active"]:
-        raise ApiError(404, "not_found", "لا يوجد حساب مسجل برقم الهوية المحدد لهذا الدور")
+        raise ApiError(404, "not_found", "لا يوجد حساب مسجل برقم الهوية أو الجوال المحدد لهذا الدور")
 
     raw_phone = _user_phone(conn, user)
     if not raw_phone:

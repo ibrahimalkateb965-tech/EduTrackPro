@@ -217,5 +217,52 @@ Governed by [.agents/CONTEXT_GOVERNANCE.md](file:///f:/AI%20PROJECTS/Autovemtech
     - In offline-first Android apps using Room with foreign keys enabled (`PRAGMA foreign_keys = ON`), local cache replacement/invalidation must strictly follow reverse topological order (leaf children ➔ parent roots) inside a single `@Transaction` method.
     - The mutation outbox (`pending_writes`) must NEVER declare foreign keys and must NEVER be cleared or touched during pull sync routines.
 
+---
 
+## 6. Scope Guard & Minimal Sufficient Change Directive
 
+All agents and CLI harnesses must complete tasks with the **smallest sufficient change** while rigorously addressing the **root cause**. Explicit user instructions for a given task override default behaviors below.
+
+### 6.1. Pre-Edit Discovery & Context Restraint
+- **Targeted Inspection**: Read only immediately relevant code, call paths, and conventions using `lean-ctx` (`mode='signatures'`) or line-range slices. Do **NEVER** read entire repositories or large files (`mode='full'`) for small modifications.
+- **Skill Parsimony**: Load only skills strictly required for the immediate task; do not load expansive multi-agent workflows for casual keyword triggers.
+- **Direct Execution**: Make clear, small fixes directly. Draft a formal `implementation_plan.md` only when the approach is ambiguous, architecture-altering, or high-impact.
+- **Autonomous Routine Decisions**: Resolve routine implementation details independently. Escalate only when conflicting interpretations lead to materially divergent outcomes.
+
+### 6.2. Implementation Hierarchy & Anti-Band-Aid Mandate
+- **Implementation Precedence**: Before writing any new code, evaluate solutions in this strict order:
+  1. Existing patterns, utilities, and helper functions within the repository.
+  2. Standard library and built-in runtime/platform capabilities.
+  3. Already installed dependencies and frameworks.
+  4. Only then, minimal new code strictly necessary for the active scope.
+- **Root-Cause Invariant**: Address root causes directly. Never deploy superficial band-aids (e.g. suppression blocks, blind `try/except: pass`, or brittle hacks). Do not introduce speculative abstractions, factories, or compatibility layers for hypothetical future needs.
+- **Dependency Justification**: Never introduce new external libraries or packages without explicit technical justification explaining why existing installed dependencies are insufficient.
+- **Scope Discipline**: Fix nearby issues only if they directly block the active task; otherwise, flag them as technical debt for follow-up. Avoid unrelated refactoring or full-file rewrites.
+- **Dead Code Cleanup**: Purge replaced code paths immediately. Retain legacy shims only when explicit backward compatibility is mandated.
+- **Non-Negotiables**: Never compromise validation, error handling, security, or accessibility (WCAG AA) in the name of brevity.
+
+### 6.3. Escalation & Authorization Gates
+- **Continuous Execution**: Keep implementing, verifying, and fixing within authorized scope without repeatedly pausing to ask routine confirmation.
+- **Mandatory Escalation Triggers**: Halt and request explicit user confirmation before:
+  - Material scope expansion beyond original intent.
+  - Adding unapproved recurring costs or changing production permissions.
+  - Executing irreversible or destructive system actions.
+- **Analysis-Only Scope**: If requested only to analyze, inspect, or audit, report structured findings—do not modify code.
+
+### 6.4. Fleet-Calibrated Verification & Testing Invariant
+- **Fleet Testing Monopoly**: All automated test execution (`test`, `analyze`, lint gates) remains the **exclusive monopoly of Claude Code CLI (Opus Max)**. Other agents (`OpenCode`, `agcli`, `Codex`) must perform static code inspection and rely on Claude Code for automated test execution and final `[APPROVED]` status.
+- **Verification Parsimony**: Reuse existing tests first. Add new tests only for real behavior and genuine regression risks—never mechanical tests that mirror implementation details.
+- **Ephemeral Verification**: Keep scratch scripts in temporary folders; do not leave temporary verification scripts as permanent repository tests.
+- **Check Restraint**: Once checks pass, repeat them only if subsequent edits are made, failures emerge, or unresolved edge cases remain.
+
+### 6.5. Scope Growth Circuit Breaker
+If the implementation plan begins to demand future-only abstractions, unrelated refactoring, peripheral features, or redundant validation loops:
+1. Immediately pause and prune the excess work.
+2. Re-anchor strictly to the core requirement.
+3. Finish execution strictly within the originally authorized boundary.
+
+### 6.6. Definition of Done (DoD)
+A task is considered **DONE** only when:
+1. The requested functionality functions completely and verification evidence is established.
+2. Every modified line directly serves the task; all scratch files, debug logs, and dead code have been purged.
+3. A concise summary is delivered detailing the result, verification evidence, and any unresolved items or follow-ups.

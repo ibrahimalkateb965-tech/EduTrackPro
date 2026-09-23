@@ -82,7 +82,15 @@ class LoginViewModel(
 
     fun onRoleChange(role: Role) {
         if (!_uiState.value.isUsernameLocked) {
-            _uiState.update { it.copy(selectedRole = role, errorMessage = null, isOtpSent = false) }
+            val nextAuthMethod = if (role == Role.TEACHER) AuthMethod.PASSWORD else AuthMethod.WHATSAPP_OTP
+            _uiState.update {
+                it.copy(
+                    selectedRole = role,
+                    errorMessage = null,
+                    isOtpSent = false,
+                    authMethod = nextAuthMethod
+                )
+            }
         }
     }
 
@@ -123,7 +131,12 @@ class LoginViewModel(
         val state = _uiState.value
         val identity = state.username.trim()
         if (identity.isBlank()) {
-            _uiState.update { it.copy(errorMessage = "يرجى إدخال رقم الهوية الوطنية أو الإقامة") }
+            val msg = if (state.selectedRole == Role.TEACHER) {
+                "يرجى إدخال رقم الجوال أو رقم الهوية"
+            } else {
+                "يرجى إدخال رقم الهوية الوطنية أو الإقامة"
+            }
+            _uiState.update { it.copy(errorMessage = msg) }
             return
         }
 
@@ -214,7 +227,12 @@ class LoginViewModel(
 
         val identity = state.username.trim()
         if (identity.isBlank()) {
-            _uiState.update { it.copy(errorMessage = "يرجى إدخال رقم الهوية الوطنية أو الإقامة") }
+            val msg = if (state.selectedRole == Role.TEACHER) {
+                "يرجى إدخال رقم الجوال أو اسم المستخدم أو الهوية"
+            } else {
+                "يرجى إدخال رقم الهوية الوطنية أو الإقامة"
+            }
+            _uiState.update { it.copy(errorMessage = msg) }
             return
         }
         if (state.password.isBlank()) {
