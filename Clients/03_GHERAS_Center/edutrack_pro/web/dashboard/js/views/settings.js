@@ -1,4 +1,14 @@
 import { el, toast, modal } from '../ui.js';
+import {
+  generateSecureTempPassword,
+  showCredentialsModal,
+  openPermissionsModal,
+  openCreateManagerModal,
+  openCreateSupervisorModal,
+  openCreateTeacherModal,
+  openCreateGuardianModal,
+  openCreateStudentModal
+} from '../account_modals.js';
 
 export async function render(container, api) {
   container.replaceChildren();
@@ -78,214 +88,69 @@ export async function render(container, api) {
     const addManagerBtn = el('button', {
       class: 'button',
       type: 'button',
-      style: 'background: #7c3aed; border-color: #6d28d9; color: #fff; margin-bottom: 14px;'
+      style: 'background: #7c3aed; border-color: #6d28d9; color: #fff;'
     }, '👑 إضافة حساب مدير عام (أدمن)');
 
     const addSupervisorBtn = el('button', {
       class: 'button button-outline',
+      type: 'button'
+    }, '➕ إضافة حساب مشرف');
+
+    const addTeacherBtn = el('button', {
+      class: 'button',
       type: 'button',
-      style: 'margin-bottom: 14px;'
-    }, '➕ إضافة حساب مشرف جديد');
+      style: 'background: #1d4ed8; border-color: #1e40af; color: #fff;'
+    }, '👨‍🏫 إضافة حساب معلم');
 
-    function openPermissionsModal(user, onUpdated) {
-      const perms = user.permissions || {};
-      const permStudents = el('input', { type: 'checkbox', checked: Boolean(perms.students) });
-      const permAttendance = el('input', { type: 'checkbox', checked: Boolean(perms.attendance) });
-      const permDailyEval = el('input', { type: 'checkbox', checked: Boolean(perms.daily_evaluation) });
-      const permMonthlyEval = el('input', { type: 'checkbox', checked: Boolean(perms.monthly_evaluation) });
-      const permFinance = el('input', { type: 'checkbox', checked: Boolean(perms.finance) });
+    const addGuardianBtn = el('button', {
+      class: 'button',
+      type: 'button',
+      style: 'background: #059669; border-color: #047857; color: #fff;'
+    }, '👨‍👩‍👧 إضافة حساب ولي أمر');
 
-      const modalSubmit = el('button', { class: 'button', type: 'submit' }, 'حفظ الصلاحيات');
-      const modalForm = el('form', { class: 'form-grid' },
-        el('p', { style: 'grid-column: 1 / -1;' }, `تعديل صلاحيات المشرف: `, el('strong', {}, user.username)),
-        el('div', { style: 'grid-column: 1 / -1;' },
-          el('div', { style: 'display: grid; gap: 8px;' },
-            el('label', { style: 'display: flex; gap: 8px; align-items: center; font-weight: normal;' }, permStudents, '♟ إدارة وسجلات الطلاب'),
-            el('label', { style: 'display: flex; gap: 8px; align-items: center; font-weight: normal;' }, permAttendance, '☑ تسجيل الحضور والغياب (طلاب وموظفين)'),
-            el('label', { style: 'display: flex; gap: 8px; align-items: center; font-weight: normal;' }, permDailyEval, '★ إدخال التقييم اليومي للطلاب'),
-            el('label', { style: 'display: flex; gap: 8px; align-items: center; font-weight: normal;' }, permMonthlyEval, '▥ التقييم الشهري وتقارير الإنجاز'),
-            el('label', { style: 'display: flex; gap: 8px; align-items: center; font-weight: normal;' }, permFinance, '▤ العمليات المالية، الرسوم، المصروفات والحسابات')
-          )
-        ),
-        el('div', { class: 'form-actions', style: 'grid-column: 1 / -1; margin-top: 14px;' }, modalSubmit)
-      );
+    const addStudentBtn = el('button', {
+      class: 'button',
+      type: 'button',
+      style: 'background: #0284c7; border-color: #0369a1; color: #fff;'
+    }, '🎓 إضافة حساب طالب');
 
-      const { close } = modal(`تعديل صلاحيات المشرف (${user.username})`, modalForm);
 
-      modalForm.onsubmit = async ev => {
-        ev.preventDefault();
-        modalSubmit.disabled = true;
-        try {
-          await api.patch(`users/${user.id}`, {
-            permissions: {
-              students: permStudents.checked,
-              attendance: permAttendance.checked,
-              daily_evaluation: permDailyEval.checked,
-              monthly_evaluation: permMonthlyEval.checked,
-              finance: permFinance.checked
-            }
-          });
-          toast('تم تحديث صلاحيات المشرف بنجاح');
-          close();
-          if (onUpdated) onUpdated();
-        } catch (err) {
-          toast(err.message || 'فشل تحديث الصلاحيات', true);
-          modalSubmit.disabled = false;
-        }
-      };
-    }
 
-    function openCreateManagerModal(onCreated) {
-      const usernameInput = el('input', { type: 'text', required: 'required', autocomplete: 'off', placeholder: 'اسم المستخدم للمدير (مثال: admin_ahmed)' });
-      const pwdInput = el('input', { type: 'password', required: 'required', minlength: '8', placeholder: 'كلمة المرور (8 أحرف فأكثر)' });
-      const pwdConfirmInput = el('input', { type: 'password', required: 'required', minlength: '8', placeholder: 'تأكيد كلمة المرور' });
 
-      const modalSubmit = el('button', {
-        class: 'button',
-        type: 'submit',
-        style: 'background: #7c3aed; border-color: #6d28d9; color: #fff;'
-      }, 'تأكيد إنشاء حساب المدير');
 
-      const modalForm = el('form', { class: 'form-grid' },
-        el('label', { style: 'grid-column: 1 / -1;' }, el('span', {}, 'اسم المستخدم للمدير العام (أدمن)'), usernameInput),
-        el('label', { style: 'grid-column: 1 / -1;' }, el('span', {}, 'كلمة المرور المؤقتة'), pwdInput),
-        el('label', { style: 'grid-column: 1 / -1;' }, el('span', {}, 'تأكيد كلمة المرور'), pwdConfirmInput),
-        el('div', {
-          class: 'card',
-          style: 'grid-column: 1 / -1; background: #faf5ff; border: 1px solid #e9d5ff; padding: 12px; margin-top: 6px; border-radius: 8px;'
-        },
-          el('div', { style: 'color: #6b21a8; font-weight: 600; margin-bottom: 4px;' }, '👑 تنبيه أمني عالي الحساسية:'),
-          el('div', { style: 'color: #581c87; font-size: 13px; line-height: 1.6;' },
-            'حساب المدير العام (الأدمن) يمتلك وصولاً كاملاً وغير مقيد لكافة بيانات الطلاب، المعلمين، الحلقات، التقارير والعمليات المالية والرواتب، بالإضافة لصلاحية تعديل الإعدادات وإدارة الحسابات. يرجى منح هذا الدور فقط للأشخاص المخولين رسمياً.'
-          )
-        ),
-        el('div', { class: 'form-actions', style: 'grid-column: 1 / -1; margin-top: 14px;' }, modalSubmit)
-      );
 
-      const { close } = modal('👑 إنشاء حساب مدير عام (أدمن جديد)', modalForm);
-
-      modalForm.onsubmit = async ev => {
-        ev.preventDefault();
-        const username = usernameInput.value.trim();
-        const password = pwdInput.value;
-        const confirmPassword = pwdConfirmInput.value;
-
-        if (username.length < 3) {
-          toast('اسم المستخدم يجب ألا يقل عن 3 أحرف', true);
-          return;
-        }
-        if (password.length < 8) {
-          toast('كلمة المرور يجب ألا تقل عن 8 أحرف', true);
-          return;
-        }
-        if (password !== confirmPassword) {
-          toast('كلمتا المرور غير متطابقتين', true);
-          return;
-        }
-
-        modalSubmit.disabled = true;
-        try {
-          const payload = {
-            username,
-            password,
-            role: 'manager',
-            permissions: {
-              students: true,
-              attendance: true,
-              daily_evaluation: true,
-              monthly_evaluation: true,
-              finance: true
-            }
-          };
-          await api.post('users', payload);
-          toast('تم إنشاء حساب المدير العام (الأدمن) بنجاح');
-          close();
-          if (onCreated) onCreated();
-        } catch (err) {
-          toast(err.message || 'فشلت عملية إنشاء حساب المدير', true);
-          modalSubmit.disabled = false;
-        }
-      };
-    }
-
-    function openCreateSupervisorModal(onCreated) {
-      const usernameInput = el('input', { type: 'text', required: 'required', autocomplete: 'off', placeholder: 'اسم المستخدم (مثال: supervisor_hoda)' });
-      const pwdInput = el('input', { type: 'password', required: 'required', minlength: '8', placeholder: 'كلمة المرور (8 أحرف فأكثر)' });
-
-      const permStudents = el('input', { type: 'checkbox', checked: true });
-      const permAttendance = el('input', { type: 'checkbox', checked: true });
-      const permDailyEval = el('input', { type: 'checkbox', checked: true });
-      const permMonthlyEval = el('input', { type: 'checkbox', checked: false });
-      const permFinance = el('input', { type: 'checkbox', checked: false });
-
-      const modalSubmit = el('button', { class: 'button', type: 'submit' }, 'تأكيد إنشاء الحساب');
-      const modalForm = el('form', { class: 'form-grid' },
-        el('label', { style: 'grid-column: 1 / -1;' }, el('span', {}, 'اسم المستخدم للمشرف'), usernameInput),
-        el('label', { style: 'grid-column: 1 / -1;' }, el('span', {}, 'كلمة المرور المؤقتة'), pwdInput),
-        el('div', { style: 'grid-column: 1 / -1; margin-top: 6px;' },
-          el('h4', { style: 'margin: 0 0 8px 0; font-size:14px;' }, 'تحديد صلاحيات المشرف:'),
-          el('div', { style: 'display: grid; gap: 8px;' },
-            el('label', { style: 'display: flex; gap: 8px; align-items: center; font-weight: normal;' }, permStudents, '♟ إدارة وسجلات الطلاب'),
-            el('label', { style: 'display: flex; gap: 8px; align-items: center; font-weight: normal;' }, permAttendance, '☑ تسجيل الحضور والغياب (طلاب وموظفين)'),
-            el('label', { style: 'display: flex; gap: 8px; align-items: center; font-weight: normal;' }, permDailyEval, '★ إدخال التقييم اليومي للطلاب'),
-            el('label', { style: 'display: flex; gap: 8px; align-items: center; font-weight: normal;' }, permMonthlyEval, '▥ التقييم الشهري وتقارير الإنجاز'),
-            el('label', { style: 'display: flex; gap: 8px; align-items: center; font-weight: normal;' }, permFinance, '▤ العمليات المالية، الرسوم، المصروفات والحسابات')
-          )
-        ),
-        el('div', { class: 'form-actions', style: 'grid-column: 1 / -1; margin-top: 14px;' }, modalSubmit)
-      );
-
-      const { close } = modal('➕ إنشاء حساب مشرف بصلاحيات محددة', modalForm);
-
-      modalForm.onsubmit = async ev => {
-        ev.preventDefault();
-        if (pwdInput.value.length < 8) {
-          toast('كلمة المرور يجب ألا تقل عن 8 أحرف', true);
-          return;
-        }
-        modalSubmit.disabled = true;
-        try {
-          const payload = {
-            username: usernameInput.value.trim(),
-            password: pwdInput.value,
-            role: 'supervisor',
-            permissions: {
-              students: permStudents.checked,
-              attendance: permAttendance.checked,
-              daily_evaluation: permDailyEval.checked,
-              monthly_evaluation: permMonthlyEval.checked,
-              finance: permFinance.checked
-            }
-          };
-          await api.post('users', payload);
-          toast('تم إنشاء حساب المشرف وتعيين الصلاحيات بنجاح');
-          close();
-          if (onCreated) onCreated();
-        } catch (err) {
-          toast(err.message || 'فشلت عملية إنشاء الحساب', true);
-          modalSubmit.disabled = false;
-        }
-      };
-    }
+    let activeUsersTab = 'all';
+    const userTabsBar = el('div', { class: 'toolbar', style: 'margin-bottom:12px; gap:6px; flex-wrap:wrap;' });
+    const USER_TABS = [
+      ['all', 'كل الحسابات'],
+      ['teachers', '👨‍🏫 المعلمون'],
+      ['guardians', '👨‍👩‍👧 أولياء الأمور'],
+      ['students', '🎓 الطلاب'],
+      ['admins', '👑 الإدارة والمشرفون']
+    ];
 
     userMgmtCard = el('div', { class: 'card', style: 'margin-top:20px;' },
       el('div', { style: 'display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:10px;' },
         el('div', {},
-          el('h2', { style: 'margin:0; font-size:18px;' }, '👥 إدارة حسابات النظام والمدراء والمشرفين'),
-          el('p', { class: 'muted', style: 'margin:4px 0 0 0;' }, 'إنشاء حسابات المدراء والمشرفين، تحديد الصلاحيات بدقة، وإعادة تعيين كلمات المرور')
+          el('h2', { style: 'margin:0; font-size:18px;' }, '👥 إدارة حسابات النظام والمستخدمين'),
+          el('p', { class: 'muted', style: 'margin:4px 0 0 0;' }, 'إنشاء وإدارة حسابات المعلمين، أولياء الأمور، الطلاب، والمدراء وتحديد الصلاحيات والربط العلائقي')
         ),
         el('div', { style: 'display:flex; gap:8px; flex-wrap:wrap;' },
-          addManagerBtn,
-          addSupervisorBtn
+          addTeacherBtn,
+          addGuardianBtn,
+          addStudentBtn,
+          addSupervisorBtn,
+          addManagerBtn
         )
       ),
+      userTabsBar,
       el('div', { class: 'table-wrap' },
         el('table', {},
           el('thead', {},
             el('tr', {},
-              el('th', {}, 'اسم المستخدم'),
-              el('th', {}, 'الدور'),
-              el('th', {}, 'الصلاحيات الممنوحة'),
+              el('th', {}, 'اسم المستخدم والجوال'),
+              el('th', {}, 'الدور والكيان المرتبط'),
+              el('th', {}, 'الصلاحيات والنطاق التعليمي'),
               el('th', {}, 'الحالة'),
               el('th', {}, 'الإجراءات')
             )
@@ -295,6 +160,214 @@ export async function render(container, api) {
       )
     );
 
+    let allLoadedUsers = [];
+
+    function renderUsersRows(tabId = activeUsersTab) {
+      activeUsersTab = tabId;
+      userTabsBar.replaceChildren(
+        ...USER_TABS.map(([id, label]) => {
+          const btn = el('button', {
+            class: activeUsersTab === id ? 'button' : 'button button-outline',
+            type: 'button',
+            style: 'padding:4px 12px; font-size:13px;'
+          }, label);
+          btn.onclick = () => renderUsersRows(id);
+          return btn;
+        })
+      );
+
+      const filtered = allLoadedUsers.filter(u => {
+        if (activeUsersTab === 'teachers') return u.role === 'teacher';
+        if (activeUsersTab === 'guardians') return u.role === 'guardian';
+        if (activeUsersTab === 'students') return u.role === 'student';
+        if (activeUsersTab === 'admins') return u.role === 'manager' || u.role === 'supervisor';
+        return true;
+      });
+
+      usersTableBody.replaceChildren();
+
+      if (!filtered.length) {
+        usersTableBody.append(el('tr', {}, el('td', { colspan: '5', class: 'muted', style: 'text-align:center; padding:18px;' }, 'لا توجد حسابات مطابقة في هذا القسم')));
+        return;
+      }
+
+      filtered.forEach(u => {
+        const isMe = me && u.id === me.id;
+        const resetBtn = el('button', { class: 'button button-outline', type: 'button', style: 'padding:4px 8px; font-size:12px;' }, 'كلمة المرور');
+
+        resetBtn.onclick = () => {
+          const adminNewPwdInput = el('input', { type: 'text', required: 'required', minlength: '6', value: generateSecureTempPassword(), style: 'font-family:Consolas,monospace;' });
+          const modalSubmit = el('button', { class: 'button', type: 'submit' }, 'تأكيد التغيير');
+          const modalForm = el('form', { class: 'form-grid' },
+            el('p', { style: 'grid-column:1/-1;' }, `إعادة تعيين كلمة المرور للمستخدم: `, el('strong', {}, u.username)),
+            el('label', { style: 'grid-column:1/-1;' }, el('span', {}, 'كلمة المرور الجديدة'), adminNewPwdInput),
+            el('div', { class: 'form-actions', style: 'grid-column:1/-1; margin-top:14px;' }, modalSubmit)
+          );
+
+          const { close } = modal(`إعادة تعيين كلمة المرور (${u.username})`, modalForm);
+
+          modalForm.onsubmit = async ev => {
+            ev.preventDefault();
+            if (adminNewPwdInput.value.length < 6) {
+              toast('كلمة المرور يجب ألا تقل عن 6 أحرف', true);
+              return;
+            }
+            modalSubmit.disabled = true;
+            try {
+              await api.patch(`users/${u.id}`, { password: adminNewPwdInput.value });
+              toast('تم تحديث كلمة المرور بنجاح');
+              close();
+              showCredentialsModal(u.username, adminNewPwdInput.value, u.role, u.username);
+            } catch (err) {
+              toast(err.message || 'فشلت عملية إعادة التعيين', true);
+              modalSubmit.disabled = false;
+            }
+          };
+        };
+
+        // Linked entity description
+        const roleCell = el('td', {});
+        let linkedDesc = '';
+        if (u.role === 'manager') {
+          roleCell.append(el('span', { class: 'badge', style: 'background:#f3e8ff; color:#6b21a8; font-weight:600;' }, '👑 مدير عام (أدمن)'));
+        } else if (u.role === 'supervisor') {
+          roleCell.append(el('span', { class: 'badge' }, 'مشرف'));
+        } else if (u.role === 'teacher') {
+          roleCell.append(
+            el('div', {},
+              el('span', { class: 'badge', style: 'background:#dbeafe; color:#1e40af; font-weight:600;' }, '👨‍🏫 معلم'),
+              el('div', { style: 'font-size:12px; margin-top:3px;' }, el('strong', {}, u.staff_name || '—')),
+              u.room_name ? el('div', { class: 'muted', style: 'font-size:11px;' }, `حلقة: ${u.room_name}`) : null
+            )
+          );
+        } else if (u.role === 'guardian') {
+          const childrenList = u.children && u.children.length ? u.children.map(c => c.name).join('، ') : 'بدون أبناء مربوطين';
+          roleCell.append(
+            el('div', {},
+              el('span', { class: 'badge', style: 'background:#d1fae5; color:#065f46; font-weight:600;' }, '👨‍👩‍👧 ولي أمر'),
+              el('div', { style: 'font-size:12px; margin-top:3px;' }, el('strong', {}, u.guardian_name || '—')),
+              el('div', { style: 'font-size:11px; color:#047857;' }, `الأبناء: ${childrenList}`)
+            )
+          );
+        } else if (u.role === 'student') {
+          roleCell.append(
+            el('div', {},
+              el('span', { class: 'badge', style: 'background:#e0f2fe; color:#0369a1; font-weight:600;' }, '🎓 طالب'),
+              el('div', { style: 'font-size:12px; margin-top:3px;' }, el('strong', {}, u.student_name || '—')),
+              u.linked_guardian ? el('div', { style: 'font-size:11px; color:#0284c7;' }, `ولي الأمر: ${u.linked_guardian.name}`) : null
+            )
+          );
+        } else {
+          roleCell.append(el('span', { class: 'badge' }, u.role || '—'));
+        }
+
+        // Permissions and Scope cell
+        const permsCell = el('td');
+        if (u.role === 'manager') {
+          permsCell.append(el('span', { class: 'badge', style: 'background:#dcfce7; color:#15803d; font-weight:600;' }, '★ كامل الصلاحيات الإدارية والمالية'));
+        } else if (u.role === 'supervisor') {
+          const p = u.permissions || {};
+          const activeTags = [];
+          if (p.students) activeTags.push('الطلاب');
+          if (p.attendance) activeTags.push('الحضور');
+          if (p.daily_evaluation) activeTags.push('تقييم يومي');
+          if (p.monthly_evaluation) activeTags.push('تقييم شهري');
+          if (p.finance) activeTags.push('المالية');
+
+          if (activeTags.length) {
+            activeTags.forEach(tag => {
+              permsCell.append(el('span', { class: 'badge', style: 'margin-left:4px; font-size:11px;' }, tag));
+            });
+          } else {
+            permsCell.append(el('span', { class: 'muted', style: 'font-size:12px;' }, 'بدون صلاحيات'));
+          }
+        } else if (u.role === 'teacher') {
+          permsCell.append(el('span', { style: 'font-size:12px; color:#1e40af;' }, `نطاق: تدريس وتقييم حلقة ${u.room_name || 'المسندة'}`));
+        } else if (u.role === 'guardian') {
+          permsCell.append(el('span', { style: 'font-size:12px; color:#065f46;' }, `نطاق: متابعة سجلات أبنائه (${u.children?.length || 0})`));
+        } else if (u.role === 'student') {
+          permsCell.append(el('span', { style: 'font-size:12px; color:#0284c7;' }, 'نطاق: استعراض سجله الشخصي والواجبات'));
+        } else {
+          permsCell.append(el('span', { class: 'muted' }, '—'));
+        }
+
+        const actionsCell = el('td', { style: 'display:flex; gap:6px; flex-wrap:wrap;' });
+        if (u.role === 'supervisor') {
+          const editPermsBtn = el('button', { class: 'button button-outline', type: 'button', style: 'padding:4px 8px; font-size:12px;' }, 'الصلاحيات');
+          editPermsBtn.onclick = () => openPermissionsModal(api, u, loadUsersList);
+          actionsCell.append(editPermsBtn);
+        }
+        actionsCell.append(resetBtn);
+
+        if (u.id !== me?.id) {
+          const isManagerAccount = u.role === 'manager';
+          const delBtn = el('button', {
+            class: 'button button-outline',
+            type: 'button',
+            style: isManagerAccount
+              ? 'color:#991b1b; border-color:#f87171; background:#fee2e2; font-weight:600; padding:4px 8px; font-size:12px;'
+              : 'color:#dc2626; border-color:#fca5a5; background:#fef2f2; padding:4px 8px; font-size:12px;'
+          }, '🗑 حذف');
+
+          delBtn.onclick = () => {
+            const confirmSubmit = el('button', {
+              class: 'button',
+              type: 'submit',
+              style: 'background:#dc2626; border-color:#dc2626; color:#fff;'
+            }, 'نعم، حذف الحساب نهائياً');
+            const cancelBtn = el('button', { class: 'button button-outline', type: 'button' }, 'إلغاء');
+
+            const modalForm = el('form', {},
+              el('p', { style: 'line-height:1.7; font-size:15px; margin-top:0;' },
+                'هل أنت متأكد من رغبتك في حذف حساب ',
+                el('strong', { style: 'color:#dc2626;' }, u.username || 'المستخدم'),
+                '؟'
+              ),
+              el('div', { class: 'form-actions', style: 'display:flex; justify-content:flex-end; gap:8px;' },
+                cancelBtn,
+                confirmSubmit
+              )
+            );
+
+            const { close } = modal(`حذف حساب المستخدم (${u.username})`, modalForm);
+            cancelBtn.onclick = () => close();
+
+            modalForm.onsubmit = async ev => {
+              ev.preventDefault();
+              confirmSubmit.disabled = true;
+              try {
+                await api.del(`users/${u.id}`);
+                toast('تم حذف حساب المستخدم بنجاح');
+                close();
+                loadUsersList();
+              } catch (err) {
+                toast(err.message || 'فشلت عملية حذف الحساب', true);
+                confirmSubmit.disabled = false;
+              }
+            };
+          };
+
+          actionsCell.append(delBtn);
+        }
+
+        const usernameCell = el('td', {},
+          el('div', { style: 'font-weight:bold; font-size:13px;' }, u.username || '—'),
+          u.phone && u.phone !== u.username ? el('div', { class: 'muted', style: 'font-size:11px;' }, `جوال: ${u.phone}`) : null,
+          isMe ? el('span', { class: 'badge', style: 'margin-top:2px; background:#e0e7ff; color:#3730a3; font-size:10px;' }, 'حسابك الحالي') : null
+        );
+
+        usersTableBody.append(
+          el('tr', {},
+            usernameCell,
+            roleCell,
+            permsCell,
+            el('td', {}, u.is_active ? el('span', { class: 'badge' }, 'نشط') : el('span', { class: 'badge red' }, 'معطل')),
+            actionsCell
+          )
+        );
+      });
+    }
+
     // Load users function
     async function loadUsersList() {
       usersTableBody.replaceChildren(
@@ -302,162 +375,8 @@ export async function render(container, api) {
       );
       try {
         const users = await api.fetchAll('users');
-        const list = Array.isArray(users) ? users : users.items || [];
-        usersTableBody.replaceChildren();
-
-        if (!list.length) {
-          usersTableBody.append(el('tr', {}, el('td', { colspan: '5', class: 'muted', style: 'text-align:center;' }, 'لا يوجد مستخدمين')));
-          return;
-        }
-
-        list.forEach(u => {
-          const roleLabels = { manager: '👑 مدير عام (أدمن)', supervisor: 'مشرف', teacher: 'معلم' };
-          const resetBtn = el('button', { class: 'button button-outline', type: 'button' }, 'كلمة المرور');
-
-          resetBtn.onclick = () => {
-            const adminNewPwdInput = el('input', { type: 'password', required: 'required', minlength: '8', placeholder: 'كلمة مرور جديدة (8 أحرف فأكثر)' });
-            const modalSubmit = el('button', { class: 'button', type: 'submit' }, 'تأكيد التغيير');
-            const modalForm = el('form', {},
-              el('p', {}, `إعادة تعيين كلمة المرور للمستخدم: `, el('strong', {}, u.username)),
-              el('label', {}, 'كلمة المرور الجديدة', adminNewPwdInput),
-              el('div', { class: 'form-actions', style: 'margin-top:14px;' }, modalSubmit)
-            );
-
-            const { close } = modal(`إعادة تعيين كلمة المرور`, modalForm);
-
-            modalForm.onsubmit = async ev => {
-              ev.preventDefault();
-              if (adminNewPwdInput.value.length < 8) {
-                toast('كلمة المرور يجب ألا تقل عن 8 أحرف', true);
-                return;
-              }
-              modalSubmit.disabled = true;
-              try {
-                const res = await api.post(`auth/reset-password/${u.id}`, { new_password: adminNewPwdInput.value });
-                toast(res.message || 'تم تحديث كلمة المرور');
-                close();
-              } catch (err) {
-                toast(err.message || 'فشلت عملية إعادة التعيين', true);
-                modalSubmit.disabled = false;
-              }
-            };
-          };
-
-          // Permissions cell
-          const permsCell = el('td');
-          if (u.role === 'manager') {
-            permsCell.append(el('span', { class: 'badge', style: 'background:#dcfce7; color:#15803d; font-weight:600;' }, '★ كامل الصلاحيات الإدارية والمالية'));
-          } else if (u.role === 'supervisor') {
-            const p = u.permissions || {};
-            const activeTags = [];
-            if (p.students) activeTags.push('الطلاب');
-            if (p.attendance) activeTags.push('الحضور');
-            if (p.daily_evaluation) activeTags.push('تقييم يومي');
-            if (p.monthly_evaluation) activeTags.push('تقييم شهري');
-            if (p.finance) activeTags.push('المالية');
-
-            if (activeTags.length) {
-              activeTags.forEach(tag => {
-                permsCell.append(el('span', { class: 'badge', style: 'margin-left:4px; font-size:11px;' }, tag));
-              });
-            } else {
-              permsCell.append(el('span', { class: 'muted', style: 'font-size:12px;' }, 'بدون صلاحيات'));
-            }
-          } else {
-            permsCell.append(el('span', { class: 'muted' }, '—'));
-          }
-
-          const actionsCell = el('td', { style: 'display:flex; gap:6px; flex-wrap:wrap;' });
-          if (u.role === 'supervisor') {
-            const editPermsBtn = el('button', { class: 'button button-outline', type: 'button' }, 'تعديل الصلاحيات');
-            editPermsBtn.onclick = () => openPermissionsModal(u, loadUsersList);
-            actionsCell.append(editPermsBtn);
-          }
-          actionsCell.append(resetBtn);
-
-          if (u.id !== me?.id) {
-            const isManagerAccount = u.role === 'manager';
-            const delBtn = el('button', {
-              class: 'button button-outline',
-              type: 'button',
-              style: isManagerAccount
-                ? 'color:#991b1b; border-color:#f87171; background:#fee2e2; font-weight:600;'
-                : 'color:#dc2626; border-color:#fca5a5; background:#fef2f2;'
-            }, isManagerAccount ? '🗑 حذف حساب المدير' : '🗑 حذف الحساب');
-
-            delBtn.onclick = () => {
-              const confirmSubmit = el('button', {
-                class: 'button',
-                type: 'submit',
-                style: 'background:#dc2626; border-color:#dc2626; color:#fff;'
-              }, isManagerAccount ? 'نعم، حذف حساب المدير نهائياً' : 'نعم، حذف الحساب نهائياً');
-              const cancelBtn = el('button', { class: 'button button-outline', type: 'button' }, 'إلغاء');
-
-              const warningTitle = isManagerAccount ? '⚠️ تحذير أمني شديد الخطورة:' : '⚠️ تنبيه هام:';
-              const warningText = isManagerAccount
-                ? 'أنت على وشك حذف حساب مدير عام (أدمن). سيتم إلغاء كافة صلاحياته الإدارية والمالية فوراً. يرجى التأكد التام قبل المتابعة.'
-                : 'سيتم تعطيل وإلغاء وصول هذا المستخدم فوراً إلى المنظومة، مع الحفاظ على سلامة السجلات المرتبطة به في النظام.';
-
-              const modalForm = el('form', {},
-                el('p', { style: 'line-height:1.7; font-size:15px; margin-top:0;' },
-                  'هل أنت متأكد من رغبتك في حذف حساب ',
-                  el('strong', { style: 'color:#dc2626;' }, u.username || 'المستخدم'),
-                  isManagerAccount ? ' (مدير عام أدمن)؟' : '؟'
-                ),
-                el('div', { class: 'card', style: 'background:#fff1f2; border:1px solid #fecdd3; padding:12px; margin-bottom:16px; border-radius:8px;' },
-                  el('div', { style: 'color:#9f1239; font-weight:600; margin-bottom:4px;' }, warningTitle),
-                  el('div', { style: 'color:#881337; font-size:13px; line-height:1.6;' }, warningText)
-                ),
-                el('div', { class: 'form-actions', style: 'display:flex; justify-content:flex-end; gap:8px;' },
-                  cancelBtn,
-                  confirmSubmit
-                )
-              );
-
-              const { close } = modal(`حذف حساب المستخدم (${u.username})`, modalForm);
-              cancelBtn.onclick = () => close();
-
-              modalForm.onsubmit = async ev => {
-                ev.preventDefault();
-                confirmSubmit.disabled = true;
-                try {
-                  await api.del(`users/${u.id}`);
-                  toast('تم حذف حساب المستخدم بنجاح');
-                  close();
-                  loadUsersList();
-                } catch (err) {
-                  toast(err.message || 'فشلت عملية حذف الحساب', true);
-                  confirmSubmit.disabled = false;
-                }
-              };
-            };
-
-            actionsCell.append(delBtn);
-          }
-
-          const isMe = me && u.id === me.id;
-          const usernameCell = el('td', {}, el('strong', {}, u.username || '—'));
-          if (isMe) {
-            usernameCell.append(el('span', { class: 'badge', style: 'margin-right:6px; background:#e0e7ff; color:#3730a3; font-size:11px;' }, 'حسابك الحالي'));
-          }
-
-          const roleCell = el('td', {});
-          if (u.role === 'manager') {
-            roleCell.append(el('span', { class: 'badge', style: 'background:#f3e8ff; color:#6b21a8; font-weight:600;' }, '👑 مدير عام (أدمن)'));
-          } else {
-            roleCell.append(roleLabels[u.role] || u.role || '—');
-          }
-
-          usersTableBody.append(
-            el('tr', {},
-              usernameCell,
-              roleCell,
-              permsCell,
-              el('td', {}, u.is_active ? el('span', { class: 'badge' }, 'نشط') : el('span', { class: 'badge red' }, 'معطل')),
-              actionsCell
-            )
-          );
-        });
+        allLoadedUsers = Array.isArray(users) ? users : users.items || [];
+        renderUsersRows(activeUsersTab);
       } catch (err) {
         usersTableBody.replaceChildren(
           el('tr', {}, el('td', { colspan: '5', class: 'muted', style: 'text-align:center;' }, 'تعذر جلب قائمة المستخدمين'))
@@ -466,8 +385,11 @@ export async function render(container, api) {
     }
 
     refreshUsersList = loadUsersList;
-    addManagerBtn.onclick = () => openCreateManagerModal(loadUsersList);
-    addSupervisorBtn.onclick = () => openCreateSupervisorModal(loadUsersList);
+    addManagerBtn.onclick = () => openCreateManagerModal(api, loadUsersList);
+    addSupervisorBtn.onclick = () => openCreateSupervisorModal(api, loadUsersList);
+    addTeacherBtn.onclick = () => openCreateTeacherModal(api, loadUsersList);
+    addGuardianBtn.onclick = () => openCreateGuardianModal(api, loadUsersList);
+    addStudentBtn.onclick = () => openCreateStudentModal(api, loadUsersList);
     loadUsersList();
   }
 

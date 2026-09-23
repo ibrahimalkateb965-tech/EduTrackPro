@@ -1,4 +1,5 @@
 import { el, toast, modal, fmtSAR, fmtDate } from '../ui.js';
+import { openCreateTeacherModal } from '../account_modals.js';
 
 const STATUSES = { active: 'نشط', on_leave: 'إجازة', terminated: 'منتهي' };
 const ROLES = [['manager', 'مدير'], ['supervisor', 'مشرف'], ['teacher', 'معلم']];
@@ -78,8 +79,19 @@ function staffRow(member, api) {
       accountInfo.addEventListener('click', () => showUserCredentials(api, member, memberUser));
       actions.push(' ', accountInfo);
     } else {
-      const account = el('button', { class: 'button button-outline', type: 'button' }, '+ حساب دخول');
-      account.addEventListener('click', () => openUserForm(api, member));
+      const isTeacher = (member.role_title || '').includes('معلم') || (member.role_title || '').includes('تحفيظ') || (member.role_title || '').includes('تعليم');
+      const account = el('button', {
+        class: 'button button-outline',
+        type: 'button',
+        style: isTeacher ? 'color:#1d4ed8; border-color:#93c5fd;' : ''
+      }, isTeacher ? '+ حساب معلم' : '+ حساب دخول');
+      account.addEventListener('click', () => {
+        if (isTeacher) {
+          openCreateTeacherModal(api, () => reload(api), member.id);
+        } else {
+          openUserForm(api, member);
+        }
+      });
       actions.push(' ', account);
     }
   }
@@ -609,7 +621,15 @@ export async function render(container, api) {
     } else {
       const addStaffBtn = el('button', { class: 'button', type: 'button' }, '➕ إضافة موظف');
       addStaffBtn.onclick = () => openStaffForm(api, null);
-      toolbar.append(addStaffBtn);
+
+      const addTeacherAccBtn = el('button', {
+        class: 'button',
+        type: 'button',
+        style: 'background: #1d4ed8; border-color: #1e40af; color: #fff;'
+      }, '👨‍🏫 إضافة حساب معلم');
+      addTeacherAccBtn.onclick = () => openCreateTeacherModal(api, () => reload(api));
+
+      toolbar.append(addStaffBtn, addTeacherAccBtn);
     }
   }
 

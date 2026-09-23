@@ -22,7 +22,8 @@ from edutrack_api.services.finance import (
 )
 
 RESOURCES = {
-    "students": "students", "guardians": "guardians", "staff": "staff", "users": "users",
+    "students": "students", "guardians": "guardians", "student-guardians": "student_guardians",
+    "staff": "staff", "users": "users",
     "rooms": "rooms", "schedules": "schedules", "fee-plans": "fee_plans", "installments": "installments",
     "payments": "payments", "receipts": "receipts", "expenses": "expenses", "expense-categories": "expense_categories",
     "payroll-runs": "payroll_runs", "staff-advances": "staff_advances", "staff-assets": "staff_assets",
@@ -35,6 +36,20 @@ RESOURCES = {
 }
 
 router = APIRouter()
+
+
+MAIN_BRANCH_ID = "00000000-0000-0000-0000-000000000001"
+
+
+def _find_or_create_guardian(conn, branch_id: UUID | str, name: str, phone: str, relation: str = "ولي الأمر") -> UUID:
+    existing = conn.execute("SELECT id FROM guardians WHERE phone = %s AND deleted_at IS NULL", (phone,)).fetchone()
+    if existing:
+        return existing["id"]
+    new_g = conn.execute(
+        "INSERT INTO guardians (branch_id, name, phone, relation) VALUES (%s, %s, %s, %s) RETURNING id",
+        (branch_id, name, phone, relation),
+    ).fetchone()
+    return new_g["id"]
 
 
 def _clean_user(row: dict) -> dict:
@@ -57,6 +72,34 @@ def _clean_user_with_perms(conn, row: dict) -> dict:
         "students": bool(perms["students"]) if perms else False,
         "finance": bool(perms["finance"]) if perms else False,
     }
+    # Linked metadata for rich UI display
+    if row.get("staff_id"):
+        st = conn.execute("SELECT name FROM staff WHERE id = %s", (row["staff_id"],)).fetchone()
+        result["staff_name"] = st["name"] if st else None
+        if row.get("room_id"):
+            rm = conn.execute("SELECT name FROM rooms WHERE id = %s", (row["room_id"],)).fetchone()
+            result["room_name"] = rm["name"] if rm else None
+    elif row.get("guardian_id"):
+        g = conn.execute("SELECT name, phone FROM guardians WHERE id = %s", (row["guardian_id"],)).fetchone()
+        result["guardian_name"] = g["name"] if g else None
+        children = conn.execute(
+            "SELECT s.id, s.name FROM student_guardians sg "
+            "JOIN students s ON s.id = sg.student_id "
+            "WHERE sg.guardian_id = %s AND sg.deleted_at IS NULL AND s.deleted_at IS NULL",
+            (row["guardian_id"],),
+        ).fetchall()
+        result["children"] = [{"id": str(c["id"]), "name": c["name"]} for c in children]
+    elif row.get("student_id"):
+        s = conn.execute("SELECT name, national_id, room_id FROM students WHERE id = %s", (row["student_id"],)).fetchone()
+        result["student_name"] = s["name"] if s else None
+        g_link = conn.execute(
+            "SELECT g.id, g.name, g.phone FROM student_guardians sg "
+            "JOIN guardians g ON g.id = sg.guardian_id "
+            "WHERE sg.student_id = %s AND sg.deleted_at IS NULL AND g.deleted_at IS NULL "
+            "ORDER BY sg.is_primary DESC LIMIT 1",
+            (row["student_id"],),
+        ).fetchone()
+        result["linked_guardian"] = {"id": str(g_link["id"]), "name": g_link["name"], "phone": g_link["phone"]} if g_link else None
     return result
 
 
@@ -167,8 +210,25 @@ def _create_hook(conn, repo, table: str, data: dict, actor: dict) -> tuple[dict,
         from edutrack_api.auth import hash_password
         password = data.pop("password", None)
         permissions = data.pop("permissions", None)
+        child_student_ids = data.pop("child_student_ids", None)
+        legacy_student_ids = data.pop("student_ids", None)
+        if child_student_ids is None:
+            child_student_ids = legacy_student_ids
+        guardian_name = data.pop("guardian_name", None)
+        guardian_relation = data.pop("guardian_relation", None)
         if password:
             data["password_hash"] = hash_password(password)
+
+        # For guardian role: auto-link or auto-create guardian identity
+        if data.get("role") == "guardian":
+            if not data.get("guardian_id"):
+                phone = data.get("phone") or data.get("username")
+                name = guardian_name or data.get("name") or data.get("username")
+                relation = guardian_relation or "ولي الأمر"
+                if phone:
+                    branch_id = actor.get("branch_id") or MAIN_BRANCH_ID
+                    data["guardian_id"] = _find_or_create_guardian(conn, branch_id, name, phone, relation)
+
         # Auto-inherit phone and national_id if not explicitly provided
         if not data.get("phone"):
             if data.get("staff_id"):
@@ -186,6 +246,46 @@ def _create_hook(conn, repo, table: str, data: dict, actor: dict) -> tuple[dict,
                     if not data.get("national_id") and st["national_id"]:
                         data["national_id"] = st["national_id"]
         row = repo.create(data)
+
+        # Relational linkage post-creation
+        if row.get("role") == "guardian" and row.get("guardian_id") and child_student_ids:
+            branch_id = row.get("branch_id") or MAIN_BRANCH_ID
+            valid_ids = []
+            for sid in child_student_ids:
+                try:
+                    valid_ids.append(UUID(str(sid)))
+                except (ValueError, TypeError):
+                    continue
+            if valid_ids:
+                existing_students = conn.execute(
+                    "SELECT id FROM students WHERE id = ANY(%s) AND deleted_at IS NULL",
+                    (valid_ids,),
+                ).fetchall()
+                for s in existing_students:
+                    conn.execute(
+                        "INSERT INTO student_guardians (branch_id, student_id, guardian_id, is_primary) "
+                        "VALUES (%s, %s, %s, true) ON CONFLICT (student_id, guardian_id) DO NOTHING",
+                        (branch_id, s["id"], row["guardian_id"]),
+                    )
+        elif row.get("role") == "student" and row.get("student_id"):
+            st = conn.execute(
+                "SELECT id, name, guardian_phone, guardian_relation, father_name, father_phone, mother_name, mother_phone "
+                "FROM students WHERE id = %s",
+                (row["student_id"],),
+            ).fetchone()
+            if st:
+                g_phone = st.get("guardian_phone") or st.get("father_phone") or st.get("mother_phone")
+                g_name = st.get("father_name") or st.get("mother_name") or f"ولي أمر {st['name']}"
+                g_rel = st.get("guardian_relation") or "ولي الأمر"
+                if g_phone:
+                    branch_id = row.get("branch_id") or MAIN_BRANCH_ID
+                    gid = _find_or_create_guardian(conn, branch_id, g_name, g_phone, g_rel)
+                    conn.execute(
+                        "INSERT INTO student_guardians (branch_id, student_id, guardian_id, is_primary) "
+                        "VALUES (%s, %s, %s, true) ON CONFLICT (student_id, guardian_id) DO NOTHING",
+                        (branch_id, st["id"], gid),
+                    )
+
         if permissions is not None:
             _permissions(conn, row["id"], row["branch_id"], permissions)
         return row, details
@@ -202,7 +302,19 @@ def _create_hook(conn, repo, table: str, data: dict, actor: dict) -> tuple[dict,
         row = transfer_between_accounts(conn, data, actor.get("branch_id"))
         return row, details
     row = repo.create(data)
-    if table == "fee_plans":
+    if table == "students":
+        g_phone = data.get("guardian_phone") or data.get("father_phone") or data.get("mother_phone")
+        g_name = data.get("father_name") or data.get("mother_name") or f"ولي أمر {data.get('name', '')}"
+        g_rel = data.get("guardian_relation") or "ولي الأمر"
+        if g_phone:
+            branch_id = row.get("branch_id") or MAIN_BRANCH_ID
+            gid = _find_or_create_guardian(conn, branch_id, g_name, g_phone, g_rel)
+            conn.execute(
+                "INSERT INTO student_guardians (branch_id, student_id, guardian_id, is_primary) "
+                "VALUES (%s, %s, %s, true) ON CONFLICT (student_id, guardian_id) DO NOTHING",
+                (branch_id, row["id"], gid),
+            )
+    elif table == "fee_plans":
         row["installments"] = generate_installments(conn, row)
     elif table == "payments":
         touched = allocate_payment(conn, row, row.get("installment_id"))

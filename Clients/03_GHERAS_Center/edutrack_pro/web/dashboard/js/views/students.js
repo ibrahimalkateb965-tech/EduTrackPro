@@ -1,4 +1,5 @@
 import { el, toast, modal, createDatePicker } from '../ui.js';
+import { openCreateStudentModal, openCreateGuardianModal } from '../account_modals.js';
 
 const GROUPS = ['الصباح', 'المساء', 'الإنجليزي', 'القدرات'];
 const GUARDIAN_RELATIONS = ['الأب', 'الأم', 'ولي الأمر', 'شخص آخر'];
@@ -6,6 +7,7 @@ const STATUS_LABELS = { active: 'نشط', dismissed: 'منسحب', archived: 'م
 const YES_NO = [['false', 'لا'], ['true', 'نعم']];
 
 let students = [];
+let users = [];
 let rooms = [];
 let query = '';
 let activeTab = 'all';
@@ -93,6 +95,7 @@ function printCardHref(student) {
 }
 
 function studentRow(student, api) {
+  const isManager = !api.currentUser || api.currentUser.role === 'manager';
   const edit = el('button', { class: 'button button-outline', type: 'button' }, 'تعديل');
   edit.addEventListener('click', () => openStudentForm(api, student));
   const printCard = el('a', { class: 'button button-outline', href: printCardHref(student), target: '_blank', rel: 'noopener' }, 'بطاقة الطالب');
@@ -111,12 +114,58 @@ function studentRow(student, api) {
     }
   });
 
+  // Account checks
+  const studentUser = users.find(u => u.student_id === student.id || (student.national_id && u.national_id === student.national_id));
+  const guardianPhone = student.guardian_phone || student.father_phone || student.mother_phone;
+  const guardianUser = users.find(u => u.role === 'guardian' && (
+    (guardianPhone && (u.username === guardianPhone || u.phone === guardianPhone)) ||
+    (u.children && u.children.some(c => c.id === student.id))
+  ));
+
+  const nameCol = el('td', { style: 'font-weight:600;' },
+    el('div', { style: 'display:flex; align-items:center; gap:6px; flex-wrap:wrap;' },
+      el('span', {}, student.name || '—'),
+      studentUser
+        ? el('span', { class: 'badge', style: 'background:#e0f2fe; color:#0369a1; font-size:11px;' }, '🎓 حساب مفعل')
+        : (isManager ? el('button', {
+            class: 'button button-outline',
+            type: 'button',
+            style: 'padding:2px 6px; font-size:11px; color:#0284c7; border-color:#bae6fd;',
+            title: 'إنشاء حساب دخول للطالب في التطبيق'
+          }, '+ حساب طالب') : null)
+    )
+  );
+
+  if (!studentUser && isManager) {
+    const btn = nameCol.querySelector('button');
+    if (btn) btn.onclick = () => openCreateStudentModal(api, () => reload(api), student.id);
+  }
+
+  const guardianCol = el('td', {},
+    el('div', { style: 'display:flex; align-items:center; gap:6px; flex-wrap:wrap;' },
+      el('span', {}, student.guardian_phone || '—'),
+      guardianUser
+        ? el('span', { class: 'badge', style: 'background:#dcfce7; color:#166534; font-size:11px;' }, '👨‍👩‍👧 ولي أمر نشط')
+        : (isManager && guardianPhone ? el('button', {
+            class: 'button button-outline',
+            type: 'button',
+            style: 'padding:2px 6px; font-size:11px; color:#059669; border-color:#a7f3d0;',
+            title: 'إنشاء حساب دخول لولي الأمر وربطه بالطالب'
+          }, '+ حساب ولي أمر') : null)
+    )
+  );
+
+  if (!guardianUser && isManager) {
+    const btn = guardianCol.querySelector('button');
+    if (btn) btn.onclick = () => openCreateGuardianModal(api, () => reload(api), student.id);
+  }
+
   return el('tr', {},
-    el('td', { style: 'font-weight:600;' }, student.name || '—'),
+    nameCol,
     el('td', {}, student.group_name || '—'),
     el('td', {}, genderBadge(student)),
     el('td', {}, roomLabel(student)),
-    el('td', {}, student.guardian_phone || '—'),
+    guardianCol,
     el('td', {}, statusBadge(student)),
     el('td', {}, edit, ' ', printCard, ' ', commBtn)
   );
@@ -194,7 +243,12 @@ function paint(api) {
 
 async function reload(api) {
   try {
-    students = toList(await api.fetchAll('students'));
+    const [st, u] = await Promise.all([
+      api.fetchAll('students'),
+      api.fetchAll('users').catch(() => [])
+    ]);
+    students = toList(st);
+    users = toList(u);
   } catch (error) {
     toast(error.message, true);
   }
@@ -389,18 +443,38 @@ export async function render(container, api) {
   search.addEventListener('input', () => { query = search.value.trim(); paint(api); });
   const addButton = el('button', { class: 'button', type: 'button' }, '➕ إضافة طالب');
   addButton.addEventListener('click', () => openStudentForm(api, null));
+
+  const addStudentAccBtn = el('button', {
+    class: 'button',
+    type: 'button',
+    style: 'background: #0284c7; border-color: #0369a1; color: #fff;'
+  }, '🎓 إضافة حساب طالب');
+  addStudentAccBtn.onclick = () => openCreateStudentModal(api, () => reload(api));
+
+  const addGuardianAccBtn = el('button', {
+    class: 'button',
+    type: 'button',
+    style: 'background: #059669; border-color: #047857; color: #fff;'
+  }, '👨‍👩‍👧 إضافة حساب ولي أمر');
+  addGuardianAccBtn.onclick = () => openCreateGuardianModal(api, () => reload(api));
+
   tbody = el('tbody', {}, el('tr', {}, el('td', { colspan: '7', class: 'muted' }, 'جارٍ التحميل...')));
   container.append(
     el('div', { class: 'view-header' }, el('h1', {}, 'الطلاب')),
     tabsContainer,
-    el('div', { class: 'toolbar' }, search, addButton),
+    el('div', { class: 'toolbar', style: 'display:flex; gap:8px; flex-wrap:wrap; align-items:center;' },
+      search,
+      addButton,
+      addStudentAccBtn,
+      addGuardianAccBtn
+    ),
     el('div', { class: 'table-wrap' }, el('table', {},
       el('thead', {}, el('tr', {},
-        el('th', {}, 'الاسم'),
+        el('th', {}, 'اسم الطالب والحساب'),
         el('th', {}, 'المجموعة'),
         el('th', {}, 'القسم (الجنس)'),
         el('th', {}, 'الفصل'),
-        el('th', {}, 'هاتف ولي الأمر'),
+        el('th', {}, 'ولي الأمر والهاتف'),
         el('th', {}, 'الحالة'),
         el('th', {}, 'إجراءات')
       )),
