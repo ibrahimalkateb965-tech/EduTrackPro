@@ -114,7 +114,8 @@ def login(body: LoginBody, conn=Depends(get_conn)):
             "WHERE (u.username = %s OR u.national_id = %s OR u.phone = ANY(%s) OR s.phone = ANY(%s) OR g.phone = ANY(%s)) "
             "  AND u.role = %s AND u.deleted_at IS NULL "
             "ORDER BY CASE WHEN u.username = %s OR u.national_id = %s THEN 0 "
-            "              WHEN u.phone = ANY(%s) THEN 1 ELSE 2 END, u.id"
+            "              WHEN u.phone = ANY(%s) THEN 1 ELSE 2 END, u.id "
+            "LIMIT 10"
         )
         params = (ident, ident, phones, phones, phones, role_filter, ident, ident, phones)
     else:
@@ -126,7 +127,8 @@ def login(body: LoginBody, conn=Depends(get_conn)):
             "WHERE (u.username = %s OR u.national_id = %s OR u.phone = ANY(%s) OR s.phone = ANY(%s) OR g.phone = ANY(%s)) "
             "  AND u.deleted_at IS NULL "
             "ORDER BY CASE WHEN u.username = %s OR u.national_id = %s THEN 0 "
-            "              WHEN u.phone = ANY(%s) THEN 1 ELSE 2 END, u.id"
+            "              WHEN u.phone = ANY(%s) THEN 1 ELSE 2 END, u.id "
+            "LIMIT 10"
         )
         params = (ident, ident, phones, phones, phones, ident, ident, phones)
 
