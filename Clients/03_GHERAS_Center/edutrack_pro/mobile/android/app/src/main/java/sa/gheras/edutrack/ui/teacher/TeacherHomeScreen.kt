@@ -156,13 +156,7 @@ fun TeacherHomeScreen(
                         Spacer(modifier = Modifier.height(8.dp))
 
                         // Quick days selector
-                        val daysOfWeek = listOf(
-                            "الأحد" to LocalDate.now().minusDays(LocalDate.now().dayOfWeek.value.toLong() % 7),
-                            "الاثنين" to LocalDate.now().minusDays(LocalDate.now().dayOfWeek.value.toLong() % 7).plusDays(1),
-                            "الثلاثاء" to LocalDate.now().minusDays(LocalDate.now().dayOfWeek.value.toLong() % 7).plusDays(2),
-                            "الأربعاء" to LocalDate.now().minusDays(LocalDate.now().dayOfWeek.value.toLong() % 7).plusDays(3),
-                            "الخميس" to LocalDate.now().minusDays(LocalDate.now().dayOfWeek.value.toLong() % 7).plusDays(4)
-                        )
+                        val daysOfWeek = TeacherHomeViewModel.schoolWeek(LocalDate.now())
 
                         LazyRow(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),

@@ -281,7 +281,12 @@ fun RootNavHost(
                 composable<TeacherStudentsRoute> {
                     val vm: StudentsViewModel = viewModel(
                         factory = viewModelFactory {
-                            StudentsViewModel(container.studentsRepository, container.database.roomDao())
+                            StudentsViewModel(
+                                container.studentsRepository,
+                                container.database.roomDao(),
+                                container.sessionStore,
+                                container.pullSync
+                            )
                         }
                     )
                     StudentsScreen(

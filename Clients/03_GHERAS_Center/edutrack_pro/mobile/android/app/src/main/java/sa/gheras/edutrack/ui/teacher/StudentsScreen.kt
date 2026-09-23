@@ -22,6 +22,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -29,6 +30,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -58,7 +60,21 @@ fun StudentsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("الطلاب", fontWeight = FontWeight.Bold) }
+                title = { Text("الطلاب", fontWeight = FontWeight.Bold) },
+                actions = {
+                    if (state.isRefreshing) {
+                        CircularProgressIndicator(
+                            strokeWidth = 2.dp,
+                            modifier = Modifier
+                                .padding(horizontal = 12.dp)
+                                .size(24.dp)
+                        )
+                    } else {
+                        IconButton(onClick = viewModel::refresh) {
+                            Icon(Icons.Default.Refresh, contentDescription = "تحديث")
+                        }
+                    }
+                }
             )
         },
         modifier = modifier
@@ -88,8 +104,32 @@ fun StudentsScreen(
                 shape = RoundedCornerShape(12.dp)
             )
 
+            if (state.isScopedToAssigned) {
+                Text(
+                    text = "الحلقات المكلف بها",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+                )
+            }
+
             // Room Filter Chips
-            if (state.rooms.isNotEmpty()) {
+            val singleAssignedRoom = state.rooms.singleOrNull()?.takeIf { state.isScopedToAssigned }
+            if (singleAssignedRoom != null) {
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+                ) {
+                    Text(
+                        text = "حلقة: ${singleAssignedRoom.name}",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                    )
+                }
+            } else if (state.rooms.isNotEmpty()) {
                 LazyRow(
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -98,7 +138,7 @@ fun StudentsScreen(
                         FilterChip(
                             selected = state.selectedRoomId == null,
                             onClick = { viewModel.selectRoom(null) },
-                            label = { Text("جميع الحلقات") }
+                            label = { Text(if (state.isScopedToAssigned) "كل حلقاتي" else "جميع الحلقات") }
                         )
                     }
                     items(state.rooms, key = { it.id }) { room ->

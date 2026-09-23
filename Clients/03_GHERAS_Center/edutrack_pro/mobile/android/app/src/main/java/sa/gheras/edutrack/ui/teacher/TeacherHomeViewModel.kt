@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -64,7 +65,7 @@ class TeacherHomeViewModel(
 
     val uiState: StateFlow<TeacherHomeUiState> = _selectedDate.flatMapLatest { date ->
         val dayName = toArabicDay(date.dayOfWeek)
-        val isWeekend = date.dayOfWeek == DayOfWeek.FRIDAY || date.dayOfWeek == DayOfWeek.SATURDAY
+        val isWeekend = isWeekend(date.dayOfWeek)
 
         combine(
             scheduleRepository.observeByDay(dayName),
@@ -103,6 +104,13 @@ class TeacherHomeViewModel(
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), TeacherHomeUiState())
 
+    init {
+        // First launch after login may land here before the initial pull finishes.
+        viewModelScope.launch {
+            if (scheduleRepository.observeAll().first().isEmpty()) refresh()
+        }
+    }
+
     fun selectDate(date: LocalDate) {
         _selectedDate.value = date
     }
@@ -131,6 +139,19 @@ class TeacherHomeViewModel(
     }
 
     companion object {
+        /** Gheras school week runs Saturday–Thursday; only Friday is off (db/postgres/005_saturday.sql). */
+        fun isWeekend(day: DayOfWeek): Boolean = day == DayOfWeek.FRIDAY
+
+        /** Saturday-first school week containing [today] (Friday maps to the week that began the day before). */
+        fun schoolWeek(today: LocalDate): List<Pair<String, LocalDate>> {
+            val daysSinceSaturday = (today.dayOfWeek.value % 7 + 1) % 7
+            val saturday = today.minusDays(daysSinceSaturday.toLong())
+            return (0L..5L).map { offset ->
+                val date = saturday.plusDays(offset)
+                toArabicDay(date.dayOfWeek) to date
+            }
+        }
+
         fun toArabicDay(day: DayOfWeek): String = when (day) {
             DayOfWeek.SUNDAY -> "الأحد"
             DayOfWeek.MONDAY -> "الاثنين"
