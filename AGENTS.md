@@ -109,18 +109,18 @@ Autovemtech operates an autonomous multi-CLI fleet governed by [fleet_config.jso
                    │                                  │
                    ▼                                  ▼
 ┌──────────────────────────────────────┐  ┌─────────────────────────────────────────────────────────────┐
-│     CODEX CLI / CHATGPT DESKTOP      │  │                   OPENCODE CLI (DUAL WORKERS)               │
-│           (GPT-5.6 Soul)             │  │ ┌─────────────────────────────┬───────────────────────────┐ │
-│ Algorithmic Logic • Complex Refactor │  │ │ Worker A: GLM 5.3 Flash     │ Worker B: Meta Muse Spark │ │
-│ Deep Optimizations • Data Parsers    │  │ │ Fast Terminal & Scaffolding │ DB, Migrations & DAOs     │ │
-└──────────────────────────────────────┘  │ └─────────────────────────────┴───────────────────────────┘ │
+│     CODEX CLI / CHATGPT DESKTOP      │  │                 OPENCODE CLI (PAID GO EXECUTOR)             │
+│           (GPT-5.6 Soul)             │  │ ┌─────────────────────────────────────────────────────────┐ │
+│ Algorithmic Logic • Complex Refactor │  │ │ Worker A: GLM 5.3 Flash (opencode-go/glm-5.3-flash)     │ │
+│ Deep Optimizations • Data Parsers    │  │ │ Fast Terminal, Builds, Scaffolding, DB & Backend Logic  │ │
+└──────────────────────────────────────┘  │ └─────────────────────────────────────────────────────────┘ │
                    │                      └─────────────────────────────────────────────────────────────┘
                    │                      ┌─────────────────────────────────────────────────────────────┐
-                   │                      │                     CLINE CLI (DUAL WORKERS)                │
-                   │                      │ ┌─────────────────────────────┬───────────────────────────┐ │
-                   │                      │ │ Worker C: GLM 5.3 Flash     │ Worker D: Meta Muse Spark │ │
-                   │                      │ │ UI Scaffolding & Terminal   │ Data & API Controllers    │ │
-                   │                      │ └─────────────────────────────┴───────────────────────────┘ │
+                   │                      │                     CLINE CLI (WORKER B)                    │
+                   │                      │ ┌─────────────────────────────────────────────────────────┐ │
+                   │                      │ │ Worker B: GLM 5.3 Flash (medium)                        │ │
+                   │                      │ │ Parallel UI Scaffolding, Terminal & API Integration     │ │
+                   │                      │ └─────────────────────────────────────────────────────────┘ │
                    │                      └──────────────────────────────┬──────────────────────────────┘
                    │                                                     │
                    └──────────────────┬──────────────────────────────────┘
@@ -144,18 +144,16 @@ Autovemtech operates an autonomous multi-CLI fleet governed by [fleet_config.jso
 | :--- | :--- | :--- | :--- |
 | **Claude Code CLI** | `claude` | Opus Max / Sonnet 5 | Master Orchestrator, Staff Architect, **Sole Testing Authority**, Quality Gatekeeper. |
 | **Codex CLI / Desktop** | `codex` / ChatGPT Desktop | GPT-5.6 Soul / gpt-6-astra | Algorithmic logic, complex math engines, heavy refactoring, data pipelines. |
-| **OpenCode CLI (Worker A)** | `opencode` (Flash) | `-m opencode-go/glm-5.3-flash` | **Ultra-Fast Terminal Executor**: Shell commands, CLI build tasks, scaffolding, rapid scripts (runs in parallel with Worker B; **MAX 1 instance of GLM concurrently**). |
-| **OpenCode CLI (Worker B)** | `opencode` (Muse) | `-m opencode-go/muse-spark-1.3-contributor` | **Database & Data Architect**: Database schemas, migrations, DAOs, repositories, data transformers (runs in parallel). |
-| **Cline CLI (Worker C)** | `cline` (Flash) | `glm-5.3-flash (medium)` | **Parallel UI Scaffolding**: Runs concurrently with Worker A. Rapid terminal tasks, defaults to Act mode with Auto-approve. ($0.00) |
-| **Cline CLI (Worker D)** | `cline` (Muse) | `muse-spark-1.3-contributor` | **Parallel Data Architect**: Redundancy for Worker B. Data logic, API routes, defaults to Act mode with Auto-approve. ($0.00) |
+| **OpenCode CLI (Worker A)** | `opencode` (Flash) | `-m opencode-go/glm-5.3-flash` | **Primary Paid Fast Executor**: Shell commands, CLI build tasks, database migrations, DAOs, repositories, backend endpoints (NO TESTING; **MAX 1 instance of GLM concurrently**). |
+| **Cline CLI (Worker B)** | `cline` (Flash) | `glm-5.3-flash (medium)` | **Parallel UI & Scaffolding**: Runs concurrently with Worker A. Rapid terminal tasks, defaults to Act mode with Auto-approve. ($0.00) |
 | **Antigravity CLI (`agcli`)** | `agcli` | Gemini 3.8 Flash High | **Autonomous Terminal Executor**: Headless generation of UI components, Jetpack Compose, Web views, and domain logic. |
 | **Antigravity IDE** | Editor Workbench | Gemini 3.8 Flash High | **Interactive Human-AI Cockpit**: High-level strategy, consultation, visual inspection, monitoring real-time outputs, and manually refining/optimizing commands with the user *before* routing them to the CLI fleet. **Never target Antigravity IDE with automated CLI delegate prompts.** |
 
 ### Dual-Harness Concurrency Invariants
 > [!IMPORTANT]
-> **OpenCode Parallel Execution Rule**: Worker A (`GLM 5.3 Flash`) and Worker B (`Meta Muse Spark 1.3`) are designed to operate concurrently in parallel on separate tasks (e.g. terminal execution + database modeling).
-> However, **NEVER spawn more than ONE instance of `opencode-go/glm-5.3-flash` simultaneously**. Exceeding 1 concurrent GLM Flash instance triggers API provider concurrency lockouts (HTTP 429).
-> **Cline Parallel Execution Rule**: Worker C (`GLM 5.3 Flash`) and Worker D (`Meta Muse Spark 1.3`) operate in a separate harness (`cline`). Worker C can run safely in parallel with Worker A without triggering lockouts, providing 100% capacity boost.
+> **OpenCode & Cline Parallel Execution Rule**: Worker A (`opencode` with `opencode-go/glm-5.3-flash`) and Worker B (`cline` with `glm-5.3-flash`) operate in separate harnesses.
+> However, **NEVER spawn more than ONE instance of `opencode-go/glm-5.3-flash` simultaneously** in OpenCode CLI to prevent provider concurrency lockouts (HTTP 429).
+> Worker B in Cline operates in parallel without collision, providing rapid execution redundancy.
 
 ### Mandatory Testing & Verification Monopoly
 > [!CAUTION]
@@ -169,7 +167,7 @@ Governed by [.agents/CONTEXT_GOVERNANCE.md](file:///f:/AI%20PROJECTS/Autovemtech
   1. **🟢 Green Zone (< 180k tokens):** 100% attention; normal operations with `lean-ctx` signatures.
   2. **🟡 Yellow Zone (180k – 240k tokens):** Strict ban on `mode='full'` reads; line range inspection only.
   3. **🟠 Orange Zone (240k – 300k tokens):** Scope freeze, clean git commit, log ADR in `MEMORY_STORE.md`, generate resumption prompt.
-- **Active Offloading Engine:** Route all boilerplate, shell commands, and DB migrations to OpenCode CLI (GLM 5.3 Flash & Meta Muse Spark) to conserve expensive Claude Opus Max token budget.
+- **Active Offloading Engine:** Route all boilerplate, shell commands, and DB migrations to OpenCode CLI (GLM 5.3 Flash) to conserve expensive Claude Opus Max token budget.
 - **Claude-Exclusive Statusline Golden Safety Calibration (150,000 tokens):**
   The 150,000 token safety cap applies **EXCLUSIVELY to Claude Code CLI** (and not to other agents like Antigravity IDE / Gemini or OpenCode, which operate up to their 300,000 golden sweet spot or full model limits). Claude statusline scripts (`statusline.ps1` / `statusline.js`) must strictly calculate context consumption against this 150,000 cap to safeguard against Claude's quadratic cache cost escalation $O(N^2)$.
   Display format: `ctx {tokens}k/150k ({pct}%)` with calibrated thresholds: Cyan (<60%), Yellow (60–84%), Red (>=85% / strategic clear trigger).
