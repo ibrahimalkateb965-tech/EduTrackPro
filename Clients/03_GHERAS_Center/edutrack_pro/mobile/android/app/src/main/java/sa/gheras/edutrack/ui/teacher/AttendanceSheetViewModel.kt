@@ -68,7 +68,7 @@ class AttendanceSheetViewModel(
 
             _uiState.update {
                 it.copy(
-                    roomName = room?.name ?: "الحلقة",
+                    roomName = room?.name ?: "القاعة",
                     drafts = drafts,
                     isDirty = false
                 )

@@ -162,7 +162,7 @@ fun EvaluationSheetScreen(
 
             if (state.drafts.isEmpty()) {
                 EmptyView(
-                    message = "لا يوجد طلاب في هذه الحلقة",
+                    message = "لا يوجد طلاب في هذه القاعة",
                     modifier = Modifier.weight(1f)
                 )
             } else {

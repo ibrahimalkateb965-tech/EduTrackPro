@@ -81,7 +81,7 @@ class StudentsViewModel(
         }.map { student ->
             StudentWithRoom(
                 student = student,
-                roomName = roomMap[student.roomId]?.name ?: "حلقة غير محددة"
+                roomName = roomMap[student.roomId]?.name ?: "قاعة غير محددة"
             )
         }
 

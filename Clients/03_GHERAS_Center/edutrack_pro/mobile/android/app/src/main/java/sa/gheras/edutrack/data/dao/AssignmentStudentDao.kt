@@ -50,6 +50,9 @@ interface AssignmentStudentDao {
     @Query("SELECT * FROM assignment_students WHERE student_id = :studentId AND deleted_at IS NULL")
     fun observeByStudent(studentId: String): Flow<List<AssignmentStudentEntity>>
 
+    @Query("SELECT * FROM assignment_students WHERE deleted_at IS NULL")
+    fun observeAll(): Flow<List<AssignmentStudentEntity>>
+
     @Query("DELETE FROM assignment_students")
     suspend fun clear()
 

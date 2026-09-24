@@ -57,7 +57,7 @@ object StudentMappers {
                 RoomEntity(
                     id = s.roomId!!,
                     branchId = defaultBranchId,
-                    name = s.roomName ?: "حلقة ${s.name}",
+                    name = s.roomName ?: "قاعة ${s.name}",
                     groupName = s.groupName ?: "",
                     createdAt = now,
                     updatedAt = now,

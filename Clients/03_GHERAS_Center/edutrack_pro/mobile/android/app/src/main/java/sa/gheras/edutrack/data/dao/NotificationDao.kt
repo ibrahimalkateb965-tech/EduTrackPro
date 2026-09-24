@@ -38,6 +38,9 @@ interface NotificationDao {
     @Query("SELECT * FROM notifications WHERE deleted_at IS NULL AND user_id = :userId AND read_at IS NULL ORDER BY sent_at DESC")
     fun observeUnreadByUser(userId: String): Flow<List<NotificationEntity>>
 
+    @Query("SELECT * FROM notifications WHERE deleted_at IS NULL AND user_id = :userId AND read_at IS NULL")
+    suspend fun getUnreadByUser(userId: String): List<NotificationEntity>
+
     @Query("SELECT COUNT(*) FROM notifications WHERE deleted_at IS NULL AND user_id = :userId AND read_at IS NULL")
     fun countUnreadByUser(userId: String): Flow<Int>
 

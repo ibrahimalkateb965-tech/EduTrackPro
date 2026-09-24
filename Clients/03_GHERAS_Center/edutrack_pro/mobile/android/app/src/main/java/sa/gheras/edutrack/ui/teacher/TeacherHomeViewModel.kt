@@ -80,7 +80,7 @@ class TeacherHomeViewModel(
 
             val slots = schedules.map { schedule ->
                 val room = roomMap[schedule.roomId]
-                val roomName = room?.name ?: schedule.groupName ?: "حلقة"
+                val roomName = room?.name ?: schedule.groupName ?: "قاعة"
 
                 ScheduleSlotItem(
                     schedule = schedule,

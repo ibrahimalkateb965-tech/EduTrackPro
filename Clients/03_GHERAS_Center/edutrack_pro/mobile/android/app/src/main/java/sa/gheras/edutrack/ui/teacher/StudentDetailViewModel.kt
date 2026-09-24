@@ -66,7 +66,7 @@ class StudentDetailViewModel(
 
         StudentDetailUiState(
             student = student,
-            roomName = room?.name ?: student?.groupName ?: "حلقة غير محددة",
+            roomName = room?.name ?: student?.groupName ?: "قاعة غير محددة",
             attendanceStats = stats,
             latestEvaluations = evals.take(10),
             skillProgress = skills,

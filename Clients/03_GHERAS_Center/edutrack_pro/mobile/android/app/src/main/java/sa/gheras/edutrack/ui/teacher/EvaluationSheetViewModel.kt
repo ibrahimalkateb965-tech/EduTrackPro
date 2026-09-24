@@ -87,7 +87,7 @@ class EvaluationSheetViewModel(
 
             _uiState.update {
                 it.copy(
-                    roomName = room?.name ?: "الحلقة",
+                    roomName = room?.name ?: "القاعة",
                     availableSubjects = subjects,
                     selectedSubject = currentSubject,
                     drafts = drafts,

@@ -35,6 +35,8 @@ class PullSync(
     private val _lastSyncAt = MutableStateFlow<Instant?>(null)
     val lastSyncAt: StateFlow<Instant?> = _lastSyncAt.asStateFlow()
 
+    suspend fun sync(): Boolean = requestFull()
+
     suspend fun requestFull(): Boolean {
         if (_status.value is SyncStatus.Syncing) return false
         _status.value = SyncStatus.Syncing
@@ -123,8 +125,10 @@ class PullSync(
                 notifications = notifEntities
             )
 
-            // Commit atomic replaceAll with reverse-dependency topological delete
-            db.replaceAll(payload)
+            // Commit atomic replaceAll with reverse-dependency topological delete and reapply pending outbox projections
+            db.replaceAll(payload) { pending ->
+                outbox.reapplyPending(pending)
+            }
 
             val now = Instant.now()
             _lastSyncAt.value = now

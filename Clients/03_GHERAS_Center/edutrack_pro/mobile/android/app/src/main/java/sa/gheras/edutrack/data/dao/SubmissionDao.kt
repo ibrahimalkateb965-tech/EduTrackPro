@@ -47,6 +47,9 @@ interface SubmissionDao {
     @Query("SELECT * FROM submissions WHERE deleted_at IS NULL AND status = :status ORDER BY submitted_at DESC")
     fun observeByStatus(status: String): Flow<List<SubmissionEntity>>
 
+    @Query("SELECT * FROM submissions WHERE deleted_at IS NULL ORDER BY submitted_at DESC")
+    fun observeAll(): Flow<List<SubmissionEntity>>
+
     @Query("DELETE FROM submissions")
     suspend fun clear()
 

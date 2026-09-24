@@ -139,7 +139,7 @@ fun AttendanceSheetScreen(
     ) { innerPadding ->
         if (state.drafts.isEmpty()) {
             EmptyView(
-                message = "لا يوجد طلاب في هذه الحلقة",
+                message = "لا يوجد طلاب في هذه القاعة",
                 modifier = Modifier.padding(innerPadding)
             )
         } else {

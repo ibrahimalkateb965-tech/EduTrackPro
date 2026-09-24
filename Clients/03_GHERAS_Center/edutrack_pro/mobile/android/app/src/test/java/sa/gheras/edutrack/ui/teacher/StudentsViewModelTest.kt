@@ -56,7 +56,7 @@ class StudentsViewModelTest {
     }
 
     private fun room(id: String) = RoomEntity(
-        id = id, branchId = "b1", name = "حلقة $id", groupName = "g",
+        id = id, branchId = "b1", name = "قاعة $id", groupName = "g",
         createdAt = now, updatedAt = now
     )
 

@@ -44,6 +44,7 @@ Clients/03_GHERAS_Center/*
 *.docx
 *.xlsx
 *.log
+*.apk
 
 # --- Build caches ---
 **/build/

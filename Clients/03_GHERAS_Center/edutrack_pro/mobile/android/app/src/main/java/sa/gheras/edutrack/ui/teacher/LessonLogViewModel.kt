@@ -52,7 +52,7 @@ class LessonLogViewModel(
             _uiState.update {
                 it.copy(
                     schedule = schedule,
-                    roomName = room?.name ?: schedule?.groupName ?: "الحلقة",
+                    roomName = room?.name ?: schedule?.groupName ?: "القاعة",
                     status = existing?.status ?: "تمت",
                     covered = existing?.covered ?: "",
                     homework = existing?.homework ?: "",

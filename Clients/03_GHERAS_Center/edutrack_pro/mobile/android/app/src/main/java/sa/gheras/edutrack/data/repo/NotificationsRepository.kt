@@ -21,6 +21,9 @@ class NotificationsRepository(
         notificationDao.countUnreadByUser(userId)
 
     suspend fun markRead(id: String) {
+        val now = java.time.Instant.now()
+        notificationDao.markRead(id, now, now)
+
         val payload = JSONObject().apply {
             put("id", id)
         }.toString()
@@ -30,5 +33,23 @@ class NotificationsRepository(
             naturalKey = "notif_read:$id",
             payloadJson = payload
         )
+    }
+
+    suspend fun markAllRead(userId: String) {
+        val now = java.time.Instant.now()
+        val unreadList = notificationDao.getUnreadByUser(userId)
+        notificationDao.markAllReadByUser(userId, now, now)
+
+        for (notif in unreadList) {
+            val payload = JSONObject().apply {
+                put("id", notif.id)
+            }.toString()
+
+            outbox.enqueue(
+                kind = PendingWriteEntity.KIND_NOTIFICATION_READ,
+                naturalKey = "notif_read:${notif.id}",
+                payloadJson = payload
+            )
+        }
     }
 }

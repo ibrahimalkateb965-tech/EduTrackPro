@@ -101,7 +101,7 @@ fun StudentDetailScreen(
                             )
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                text = "الحلقة: ${state.roomName} ${if (!student?.groupName.isNullOrBlank()) "(${student?.groupName})" else ""}",
+                                text = "القاعة: ${state.roomName} ${if (!student?.groupName.isNullOrBlank()) "(${student?.groupName})" else ""}",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )

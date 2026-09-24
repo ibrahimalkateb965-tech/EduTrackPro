@@ -243,7 +243,11 @@ fun RootNavHost(
                 composable<NotificationsRoute> {
                     val vm: NotificationsViewModel = viewModel(
                         factory = viewModelFactory {
-                            NotificationsViewModel(container.sessionStore, container.notificationsRepository)
+                            NotificationsViewModel(
+                                sessionStore = container.sessionStore,
+                                notificationsRepository = container.notificationsRepository,
+                                pullSync = container.pullSync
+                            )
                         }
                     )
                     NotificationsScreen(viewModel = vm)
@@ -379,7 +383,15 @@ fun RootNavHost(
                 composable<TeacherAssignmentsRoute> {
                     val vm: AssignmentsViewModel = viewModel(
                         factory = viewModelFactory {
-                            AssignmentsViewModel(container.assignmentsRepository, container.database.roomDao())
+                            AssignmentsViewModel(
+                                container.assignmentsRepository,
+                                container.database.roomDao(),
+                                container.database.assignmentStudentDao(),
+                                container.studentsRepository,
+                                container.database.submissionDao(),
+                                container.sessionStore,
+                                container.pullSync
+                            )
                         }
                     )
                     AssignmentsScreen(
@@ -399,7 +411,8 @@ fun RootNavHost(
                                 container.assignmentsRepository,
                                 container.database.assignmentStudentDao(),
                                 container.studentsRepository,
-                                container.database.roomDao()
+                                container.database.roomDao(),
+                                container.pullSync
                             )
                         }
                     )

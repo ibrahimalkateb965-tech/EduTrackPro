@@ -106,7 +106,7 @@ fun StudentsScreen(
 
             if (state.isScopedToAssigned) {
                 Text(
-                    text = "الحلقات المكلف بها",
+                    text = "القاعات المكلف بها",
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -123,7 +123,7 @@ fun StudentsScreen(
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
                 ) {
                     Text(
-                        text = "حلقة: ${singleAssignedRoom.name}",
+                        text = "قاعة: ${singleAssignedRoom.name}",
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.onPrimaryContainer,
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
@@ -138,7 +138,7 @@ fun StudentsScreen(
                         FilterChip(
                             selected = state.selectedRoomId == null,
                             onClick = { viewModel.selectRoom(null) },
-                            label = { Text(if (state.isScopedToAssigned) "كل حلقاتي" else "جميع الحلقات") }
+                            label = { Text(if (state.isScopedToAssigned) "كل قاعاتي" else "جميع القاعات") }
                         )
                     }
                     items(state.rooms, key = { it.id }) { room ->
@@ -165,7 +165,7 @@ fun StudentsScreen(
                 LoadingView()
             } else if (state.students.isEmpty()) {
                 EmptyView(
-                    message = if (state.searchQuery.isNotBlank()) "لا توجد نتائج مطابقة للبحث" else "لا يوجد طلاب مسجلين في هذه الحلقة"
+                    message = if (state.searchQuery.isNotBlank()) "لا توجد نتائج مطابقة للبحث" else "لا يوجد طلاب مسجلين في هذه القاعة"
                 )
             } else {
                 LazyColumn(

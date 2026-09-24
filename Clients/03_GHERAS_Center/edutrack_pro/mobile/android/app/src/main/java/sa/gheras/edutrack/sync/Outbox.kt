@@ -139,6 +139,13 @@ class Outbox(
         }
     }
 
+    suspend fun reapplyPending(items: List<PendingWriteEntity>) {
+        val now = Instant.now()
+        for (item in items) {
+            applyOptimisticProjection(item.kind, item.naturalKey, item.payloadJson, now)
+        }
+    }
+
     fun scheduleFlush() {
         try {
             val constraints = Constraints.Builder()
