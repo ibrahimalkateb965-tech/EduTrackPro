@@ -9,6 +9,8 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import org.json.JSONObject
 import sa.gheras.edutrack.data.db.GherasDatabase
+import sa.gheras.edutrack.data.entity.AssignmentEntity
+import sa.gheras.edutrack.data.entity.AssignmentStudentEntity
 import sa.gheras.edutrack.data.entity.EvaluationEntity
 import sa.gheras.edutrack.data.entity.LessonLogEntity
 import sa.gheras.edutrack.data.entity.PendingWriteEntity
@@ -62,7 +64,7 @@ class Outbox(
                 val studentId = json.optString("student_id")
                 val dateStr = json.optString("date")
                 val status = json.optString("status")
-                val note = json.optString("note", null)
+                val note = json.optString("note").takeIf { it.isNotBlank() }
                 val date = DateParsers.parseLocalDate(dateStr) ?: LocalDate.now()
 
                 val entity = StudentAttendanceEntity(
@@ -105,9 +107,9 @@ class Outbox(
                 val scheduleId = json.optString("schedule_id")
                 val dateStr = json.optString("date")
                 val status = json.optString("status")
-                val covered = json.optString("covered", null)
-                val homework = json.optString("homework", null)
-                val notes = json.optString("notes", null)
+                val covered = json.optString("covered").takeIf { it.isNotBlank() }
+                val homework = json.optString("homework").takeIf { it.isNotBlank() }
+                val notes = json.optString("notes").takeIf { it.isNotBlank() }
                 val date = DateParsers.parseLocalDate(dateStr) ?: LocalDate.now()
 
                 val existingLog = db.lessonLogDao().getByScheduleAndDate(scheduleId, date)
@@ -134,6 +136,50 @@ class Outbox(
                 val existing = db.notificationDao().getById(notifId)
                 if (existing != null) {
                     db.notificationDao().upsert(existing.copy(readAt = now, updatedAt = now))
+                }
+            }
+            PendingWriteEntity.KIND_ASSIGNMENT -> {
+                val assignmentId = json.optString("assignment_id")
+                val title = json.optString("title")
+                val subject = json.optString("subject").takeIf { it.isNotBlank() }
+                val dueDateStr = json.optString("due_date")
+                val dueDate = DateParsers.parseLocalDate(dueDateStr) ?: LocalDate.parse(dueDateStr)
+                val instructions = json.optString("instructions").takeIf { it.isNotBlank() }
+                val pageRef = json.optString("page_ref").takeIf { it.isNotBlank() }
+                val teacherUserId = json.optString("teacher_user_id").takeIf { it.isNotBlank() } ?: me
+                val branchId = json.optString("branch_id").takeIf { it.isNotBlank() }
+
+                val entity = AssignmentEntity(
+                    id = assignmentId,
+                    branchId = branchId,
+                    title = title,
+                    subject = subject,
+                    kind = "homework",
+                    dueDate = dueDate,
+                    teacherUserId = teacherUserId,
+                    instructions = instructions,
+                    pageRef = pageRef,
+                    createdAt = now,
+                    updatedAt = now,
+                    deletedAt = null
+                )
+                db.assignmentDao().upsert(entity)
+
+                val studentIdsArray = json.optJSONArray("student_ids")
+                if (studentIdsArray != null && studentIdsArray.length() > 0) {
+                    val links = (0 until studentIdsArray.length()).map { i ->
+                        val studentId = studentIdsArray.getString(i)
+                        AssignmentStudentEntity(
+                            id = "local:$assignmentId:$studentId",
+                            branchId = branchId,
+                            assignmentId = assignmentId,
+                            studentId = studentId,
+                            createdAt = now,
+                            updatedAt = now,
+                            deletedAt = null
+                        )
+                    }
+                    db.assignmentStudentDao().upsertAll(links)
                 }
             }
         }

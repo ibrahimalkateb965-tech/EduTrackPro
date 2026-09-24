@@ -9,8 +9,12 @@ import sa.gheras.edutrack.GherasApp
 import sa.gheras.edutrack.data.entity.PendingWriteEntity
 import sa.gheras.edutrack.data.remote.ErrorMapper
 import sa.gheras.edutrack.data.remote.dto.AttendanceItemBody
+import sa.gheras.edutrack.data.remote.dto.CreateAssignmentBody
 import sa.gheras.edutrack.data.remote.dto.DailyEvalItemBody
 import sa.gheras.edutrack.data.remote.dto.LessonLogBody
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.RequestBody.Companion.asRequestBody
+import java.io.File
 import java.io.IOException
 
 class OutboxWorker(
@@ -30,7 +34,7 @@ class OutboxWorker(
 
         for (item in pendingList) {
             try {
-                flushItem(item, meApi)
+                flushItem(item, meApi, db)
                 // 2xx success: remove row from pending_writes
                 db.pendingWriteDao().deleteById(item.id)
             } catch (e: HttpException) {
@@ -54,13 +58,18 @@ class OutboxWorker(
                 return Result.retry()
             } catch (e: Exception) {
                 db.pendingWriteDao().markFailed(item.id, e.message ?: "unknown error")
+                revertOptimisticProjection(item, db)
             }
         }
 
         return Result.success()
     }
 
-    private suspend fun flushItem(item: PendingWriteEntity, meApi: sa.gheras.edutrack.data.remote.MeApi) {
+    private suspend fun flushItem(
+        item: PendingWriteEntity,
+        meApi: sa.gheras.edutrack.data.remote.MeApi,
+        db: sa.gheras.edutrack.data.db.GherasDatabase
+    ) {
         val json = JSONObject(item.payloadJson)
 
         when (item.kind) {
@@ -69,7 +78,7 @@ class OutboxWorker(
                     studentId = json.getString("student_id"),
                     date = json.getString("date"),
                     status = json.getString("status"),
-                    note = json.optString("note", null)
+                    note = json.optString("note").takeIf { it.isNotBlank() }
                 )
                 val response = meApi.postAttendanceBatch(listOf(body))
                 if (!response.isSuccessful) throw HttpException(response)
@@ -79,9 +88,9 @@ class OutboxWorker(
                     studentId = json.getString("student_id"),
                     date = json.getString("date"),
                     subject = json.optString("subject", "عام"),
-                    value = json.optString("value", null),
+                    value = json.optString("value").takeIf { it.isNotBlank() },
                     score = json.optDouble("score", 0.0),
-                    notes = json.optString("notes", null)
+                    notes = json.optString("notes").takeIf { it.isNotBlank() }
                 )
                 val response = meApi.postDailyEvaluationsBatch(listOf(body))
                 if (!response.isSuccessful) throw HttpException(response)
@@ -91,15 +100,78 @@ class OutboxWorker(
                     scheduleId = json.getString("schedule_id"),
                     date = json.getString("date"),
                     status = json.getString("status"),
-                    covered = json.optString("covered", null),
-                    homework = json.optString("homework", null),
-                    notes = json.optString("notes", null)
+                    covered = json.optString("covered").takeIf { it.isNotBlank() },
+                    homework = json.optString("homework").takeIf { it.isNotBlank() },
+                    notes = json.optString("notes").takeIf { it.isNotBlank() }
                 )
                 meApi.postLessonLog(body)
             }
             PendingWriteEntity.KIND_NOTIFICATION_READ -> {
                 val notifId = json.getString("id")
                 meApi.markNotificationRead(notifId)
+            }
+            PendingWriteEntity.KIND_ASSIGNMENT -> {
+                val studentIdsList = mutableListOf<String>()
+                val arr = json.optJSONArray("student_ids")
+                if (arr != null) {
+                    for (i in 0 until arr.length()) {
+                        studentIdsList.add(arr.getString(i))
+                    }
+                }
+
+                var instructions = json.optString("instructions").takeIf { it.isNotBlank() }
+                if (!instructions.isNullOrBlank()) {
+                    val (cleanText, attachments) = sa.gheras.edutrack.ui.teacher.media.AssignmentMediaParser.parse(instructions)
+                    var hasUploaded = false
+                    val updatedAttachments = attachments.map { att ->
+                        if (!att.uri.startsWith("http://") && !att.uri.startsWith("https://")) {
+                            val file = File(att.uri)
+                            if (file.exists() && file.isFile) {
+                                if (file.length() > 25 * 1024 * 1024) {
+                                    throw IllegalStateException("حجم الملف يتجاوز الحد الأقصى 25 ميجابايت")
+                                }
+                                val mediaType = when (file.extension.lowercase()) {
+                                    "pdf" -> "application/pdf".toMediaTypeOrNull()
+                                    "jpg", "jpeg" -> "image/jpeg".toMediaTypeOrNull()
+                                    "png" -> "image/png".toMediaTypeOrNull()
+                                    "m4a", "aac" -> "audio/mp4".toMediaTypeOrNull()
+                                    "mp3" -> "audio/mpeg".toMediaTypeOrNull()
+                                    else -> "application/octet-stream".toMediaTypeOrNull()
+                                }
+                                val reqBody = file.asRequestBody(mediaType)
+                                val res = meApi.uploadAttachment(file.name, reqBody)
+                                hasUploaded = true
+                                att.copy(uri = res.url)
+                            } else {
+                                att
+                            }
+                        } else {
+                            att
+                        }
+                    }
+                    if (hasUploaded) {
+                        instructions = sa.gheras.edutrack.ui.teacher.media.AssignmentMediaParser.serialize(cleanText, updatedAttachments)
+                        val assignmentId = json.optString("assignment_id")
+                        val existing = db.assignmentDao().getById(assignmentId)
+                        if (existing != null) {
+                            db.assignmentDao().upsert(existing.copy(instructions = instructions))
+                        }
+                        // Update outbox pending item payload to prevent re-uploading on retry
+                        json.put("instructions", instructions)
+                        db.pendingWriteDao().upsert(item.copy(payloadJson = json.toString()))
+                    }
+                }
+
+                val body = CreateAssignmentBody(
+                    id = json.optString("assignment_id").takeIf { it.isNotBlank() },
+                    title = json.getString("title"),
+                    subject = json.optString("subject").takeIf { it.isNotBlank() },
+                    dueDate = json.getString("due_date"),
+                    instructions = instructions,
+                    pageRef = json.optString("page_ref").takeIf { it.isNotBlank() },
+                    studentIds = studentIdsList
+                )
+                meApi.postAssignment(body)
             }
         }
     }
@@ -125,6 +197,11 @@ class OutboxWorker(
                 val scheduleId = json.optString("schedule_id")
                 val dateStr = json.optString("date")
                 db.lessonLogDao().deleteById("local:$scheduleId:$dateStr")
+            }
+            PendingWriteEntity.KIND_ASSIGNMENT -> {
+                val assignmentId = json.optString("assignment_id")
+                db.assignmentStudentDao().deleteByAssignment(assignmentId)
+                db.assignmentDao().deleteById(assignmentId)
             }
         }
     }

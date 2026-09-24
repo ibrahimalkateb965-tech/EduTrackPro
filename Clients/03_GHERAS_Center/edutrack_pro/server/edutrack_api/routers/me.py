@@ -7,10 +7,13 @@ Manager/supervisor are rejected by require_scope (403); role mismatches per rout
 from __future__ import annotations
 
 import datetime as dt
+import os
+import uuid
+from pathlib import Path
 from typing import Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel
 
 from edutrack_api.auth import current_user
@@ -228,3 +231,72 @@ def list_receipts(limit: int = 100, offset: int = 0, student_id: UUID | None = N
 def post_lesson_log(body: LessonLogIn, scope: Scope = _SCOPE, conn=_CONN) -> dict:
     _only(scope, "teacher")
     return row_to_json(me_repo.upsert_lesson_log(conn, scope, body.model_dump()))
+
+
+class CreateAssignmentIn(BaseModel):
+    id: UUID | None = None
+    title: str
+    subject: str | None = None
+    kind: str | None = "homework"
+    due_date: dt.date
+    instructions: str | None = None
+    page_ref: str | None = None
+    student_ids: list[UUID] = []
+
+
+@router.post("/assignments")
+def post_assignment(body: CreateAssignmentIn, scope: Scope = _SCOPE, conn=_CONN) -> dict:
+    _only(scope, "teacher")
+    return row_to_json(me_repo.create_assignment(conn, scope, body.model_dump()))
+
+
+@router.post("/uploads")
+async def upload_file(
+    request: Request,
+    scope: Scope = _SCOPE,
+) -> dict:
+    _only(scope, "teacher")
+
+    filename = request.headers.get("x-filename") or f"{uuid.uuid4().hex}.bin"
+    ext = Path(filename).suffix.lower().lstrip(".")
+    allowed_extensions = {"pdf", "jpg", "jpeg", "png", "m4a", "aac", "mp3"}
+    if ext not in allowed_extensions:
+        raise ApiError(
+            422,
+            "invalid_file_type",
+            f"نوع الملف غير مسموح به. الأنواع المسموحة فقط: {', '.join(sorted(allowed_extensions))}"
+        )
+
+    safe_base = Path(filename).name.replace(" ", "_")
+    safe_name = f"{uuid.uuid4().hex}_{safe_base}"
+
+    upload_dir = Path(os.getenv("UPLOAD_DIR", "uploads")).resolve()
+    upload_dir.mkdir(parents=True, exist_ok=True)
+    dest = upload_dir / safe_name
+
+    content_length = request.headers.get("content-length")
+    if content_length and int(content_length) > 25 * 1024 * 1024:
+        raise ApiError(413, "file_too_large", "حجم الملف يتجاوز الحد المسموح (25 ميجابايت)")
+
+    total_bytes = 0
+    with open(dest, "wb") as f:
+        async for chunk in request.stream():
+            total_bytes += len(chunk)
+            if total_bytes > 25 * 1024 * 1024:
+                dest.unlink(missing_ok=True)
+                raise ApiError(413, "file_too_large", "حجم الملف يتجاوز الحد المسموح (25 ميجابايت)")
+            f.write(chunk)
+
+    proto = request.headers.get("x-forwarded-proto", "https")
+    host = request.headers.get("host")
+    if host:
+        url = f"{proto}://{host}/api/v1/static/uploads/{safe_name}"
+    else:
+        url = f"{str(request.base_url).rstrip('/')}/api/v1/static/uploads/{safe_name}"
+
+    return {
+        "url": url,
+        "filename": safe_name,
+        "size": total_bytes,
+    }
+

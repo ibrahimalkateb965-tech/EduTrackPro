@@ -23,6 +23,9 @@ import sa.gheras.edutrack.data.local.session.SessionStore
 import sa.gheras.edutrack.data.repo.AssignmentsRepository
 import sa.gheras.edutrack.data.repo.StudentsRepository
 import sa.gheras.edutrack.sync.PullSync
+import sa.gheras.edutrack.ui.teacher.media.AssignmentMediaParser
+import sa.gheras.edutrack.ui.teacher.media.MediaAttachment
+import kotlinx.coroutines.flow.first
 import java.time.LocalDate
 
 enum class AssignmentStatusFilter(val title: String) {
@@ -240,6 +243,49 @@ class AssignmentsViewModel(
             } catch (_: Exception) {
             } finally {
                 _isRefreshing.value = false
+            }
+        }
+    }
+
+    fun createAssignment(
+        title: String,
+        subject: String?,
+        roomId: String?,
+        dueDate: LocalDate,
+        instructions: String?,
+        pageRef: String?,
+        attachments: List<MediaAttachment>,
+        onSuccess: () -> Unit = {},
+        onError: (String) -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            try {
+                val allStudents = studentsRepository?.observeAll()?.first() ?: emptyList()
+                val targetStudentIds = if (!roomId.isNullOrBlank()) {
+                    allStudents.filter { it.roomId == roomId }.map { it.id }
+                } else if (isScoped) {
+                    allStudents.filter { it.roomId in assignedRoomIds }.map { it.id }
+                } else {
+                    allStudents.map { it.id }
+                }
+
+                val fullInstructions = AssignmentMediaParser.serialize(instructions.orEmpty(), attachments)
+                val teacherUserId = sessionStore?.user?.id
+
+                assignmentsRepository.createAssignment(
+                    title = title,
+                    subject = subject,
+                    dueDate = dueDate,
+                    instructions = fullInstructions.ifBlank { null },
+                    pageRef = pageRef?.ifBlank { null },
+                    teacherUserId = teacherUserId,
+                    studentIds = targetStudentIds
+                )
+                onSuccess()
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                onError(e.message ?: "حدث خطأ أثناء حفظ التكليف")
             }
         }
     }

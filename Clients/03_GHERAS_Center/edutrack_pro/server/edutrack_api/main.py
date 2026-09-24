@@ -7,6 +7,10 @@ from contextlib import asynccontextmanager
 from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+import os
+from pathlib import Path
+from starlette.staticfiles import StaticFiles
+
 from edutrack_api import __version__
 from edutrack_api.config import Settings, get_settings
 from edutrack_api.db import introspect_columns, make_pool
@@ -61,6 +65,10 @@ def create_app() -> FastAPI:
         return {"status": "ok", "version": __version__}
 
     app.include_router(api)
+    upload_dir = Path(os.getenv("UPLOAD_DIR", "uploads")).resolve()
+    upload_dir.mkdir(parents=True, exist_ok=True)
+    app.mount("/api/v1/static/uploads", StaticFiles(directory=str(upload_dir)), name="api_uploads")
+    app.mount("/static/uploads", StaticFiles(directory=str(upload_dir)), name="uploads")
     return app
 
 

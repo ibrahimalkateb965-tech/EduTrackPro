@@ -346,3 +346,85 @@ def upsert_lesson_log(conn, scope: Scope, body: dict) -> dict:
         {"schedule_id": str(body["schedule_id"]), "date": body["date"].isoformat(), "status": body["status"]},
     )
     return row
+
+
+def create_assignment(conn, scope: Scope, body: dict) -> dict:
+    if scope.role != "teacher":
+        raise ApiError(403, "forbidden", "إضافة التكليفات متاحة للمعلمين فقط")
+
+    student_ids = body.get("student_ids") or []
+    if student_ids:
+        scope.assert_students(student_ids)
+
+    valid_subjects = ("القرآن", "لغتي", "الإنجليزي", "الرياضيات")
+    subject = body.get("subject")
+    if subject is not None and subject not in valid_subjects:
+        raise ApiError(422, "invalid_subject", f"المادة غير صالحة. المواد المسموحة هي: {', '.join(valid_subjects)}")
+
+    user_row = conn.execute("SELECT branch_id FROM users WHERE id = %s", (scope.user_id,)).fetchone()
+    branch_id = user_row["branch_id"] if user_row and user_row.get("branch_id") else None
+    if not branch_id and student_ids:
+        s_row = conn.execute("SELECT branch_id FROM students WHERE id = %s", (student_ids[0],)).fetchone()
+        if s_row and s_row.get("branch_id"):
+            branch_id = s_row["branch_id"]
+    if not branch_id:
+        raise ApiError(422, "branch_missing", "لا يوجد فرع مرتبط بهذا المعلم أو بطلاب التكليف")
+
+    params = {
+        "branch_id": branch_id,
+        "title": body["title"],
+        "subject": subject,
+        "kind": body.get("kind") or "homework",
+        "due_date": body["due_date"],
+        "teacher_user_id": scope.user_id,
+        "instructions": body.get("instructions"),
+        "page_ref": body.get("page_ref"),
+    }
+    assignment_id = body.get("id")
+    if assignment_id:
+        params["id"] = assignment_id
+        sql = """
+            INSERT INTO assignments (id, branch_id, title, subject, kind, due_date, teacher_user_id, instructions, page_ref)
+            VALUES (%(id)s, %(branch_id)s, %(title)s, %(subject)s, %(kind)s, %(due_date)s, %(teacher_user_id)s, %(instructions)s, %(page_ref)s)
+            ON CONFLICT (id) DO UPDATE SET
+                title = EXCLUDED.title,
+                subject = EXCLUDED.subject,
+                due_date = EXCLUDED.due_date,
+                instructions = EXCLUDED.instructions,
+                page_ref = EXCLUDED.page_ref,
+                updated_at = now()
+            WHERE assignments.teacher_user_id = EXCLUDED.teacher_user_id
+            RETURNING *
+        """
+    else:
+        sql = """
+            INSERT INTO assignments (branch_id, title, subject, kind, due_date, teacher_user_id, instructions, page_ref)
+            VALUES (%(branch_id)s, %(title)s, %(subject)s, %(kind)s, %(due_date)s, %(teacher_user_id)s, %(instructions)s, %(page_ref)s)
+            RETURNING *
+        """
+    row = conn.execute(sql, params).fetchone()
+    if not row:
+        raise ApiError(403, "forbidden", "لا يمكنك تعديل تكليف لمعلم آخر أو التكليف غير موجود")
+
+    for sid in student_ids:
+        existing = conn.execute(
+            "SELECT id FROM assignment_students WHERE assignment_id = %s AND student_id = %s AND deleted_at IS NULL",
+            (row["id"], sid),
+        ).fetchone()
+        if not existing:
+            conn.execute(
+                "INSERT INTO assignment_students (branch_id, assignment_id, student_id) VALUES (%s, %s, %s)",
+                (branch_id, row["id"], sid),
+            )
+
+    action = "update" if assignment_id else "create"
+    write_audit(
+        conn,
+        scope.user_id,
+        action,
+        "assignments",
+        row["id"],
+        {"title": body["title"], "due_date": body["due_date"].isoformat()},
+    )
+    return row
+

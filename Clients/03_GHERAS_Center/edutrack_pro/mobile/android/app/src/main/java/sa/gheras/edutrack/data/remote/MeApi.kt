@@ -1,14 +1,17 @@
 package sa.gheras.edutrack.data.remote
 
+import okhttp3.RequestBody
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.GET
+import retrofit2.http.Header
 import retrofit2.http.POST
 import retrofit2.http.Path
 import retrofit2.http.Query
 import sa.gheras.edutrack.data.remote.dto.AttendanceDto
 import sa.gheras.edutrack.data.remote.dto.AttendanceItemBody
 import sa.gheras.edutrack.data.remote.dto.AssignmentDto
+import sa.gheras.edutrack.data.remote.dto.CreateAssignmentBody
 import sa.gheras.edutrack.data.remote.dto.DailyEvalItemBody
 import sa.gheras.edutrack.data.remote.dto.Envelope
 import sa.gheras.edutrack.data.remote.dto.EvaluationDto
@@ -22,6 +25,7 @@ import sa.gheras.edutrack.data.remote.dto.RoomDto
 import sa.gheras.edutrack.data.remote.dto.ScheduleDto
 import sa.gheras.edutrack.data.remote.dto.SkillProgressDto
 import sa.gheras.edutrack.data.remote.dto.StudentDto
+import sa.gheras.edutrack.data.remote.dto.UploadResponseDto
 import sa.gheras.edutrack.data.remote.dto.SubmissionDto
 
 interface MeApi {
@@ -86,6 +90,9 @@ interface MeApi {
         @Query("due_to") dueTo: String? = null
     ): Envelope<AssignmentDto>
 
+    @POST("me/assignments")
+    suspend fun postAssignment(@Body body: CreateAssignmentBody): AssignmentDto
+
     @GET("me/submissions")
     suspend fun listSubmissions(
         @Query("limit") limit: Int = 500,
@@ -134,4 +141,10 @@ interface MeApi {
 
     @POST("evaluations/daily")
     suspend fun postDailyEvaluationsBatch(@Body items: List<DailyEvalItemBody>): Response<Unit>
+
+    @POST("me/uploads")
+    suspend fun uploadAttachment(
+        @Header("X-Filename") filename: String,
+        @Body body: RequestBody
+    ): UploadResponseDto
 }

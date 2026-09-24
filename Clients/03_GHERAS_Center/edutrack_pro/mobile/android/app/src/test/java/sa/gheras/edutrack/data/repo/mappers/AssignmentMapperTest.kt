@@ -14,12 +14,18 @@ class AssignmentMapperTest {
             id = "asgn_1",
             scheduleId = "sc_1",
             title = "Surah Memorization",
+            subject = "القرآن",
+            instructions = "حفظ الآيات 1 إلى 10",
+            pageRef = "صفحة 582",
             dueDate = "2026-09-28",
             studentIds = listOf("s_1", "s_2")
         )
         val entity = AssignmentMappers.assignmentToEntity(dto, "branch_1")
         assertEquals("asgn_1", entity.id)
         assertEquals("Surah Memorization", entity.title)
+        assertEquals("القرآن", entity.subject)
+        assertEquals("حفظ الآيات 1 إلى 10", entity.instructions)
+        assertEquals("صفحة 582", entity.pageRef)
         assertEquals("2026-09-28", entity.dueDate.toString())
 
         val students = AssignmentMappers.assignmentStudentsToEntities(dto, "branch_1")

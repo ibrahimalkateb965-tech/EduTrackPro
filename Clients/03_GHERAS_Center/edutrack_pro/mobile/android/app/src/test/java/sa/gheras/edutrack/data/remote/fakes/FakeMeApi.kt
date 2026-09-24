@@ -1,10 +1,13 @@
 package sa.gheras.edutrack.data.remote.fakes
 
+import okhttp3.RequestBody
 import retrofit2.Response
 import sa.gheras.edutrack.data.remote.MeApi
+import sa.gheras.edutrack.data.remote.dto.UploadResponseDto
 import sa.gheras.edutrack.data.remote.dto.AttendanceDto
 import sa.gheras.edutrack.data.remote.dto.AttendanceItemBody
 import sa.gheras.edutrack.data.remote.dto.AssignmentDto
+import sa.gheras.edutrack.data.remote.dto.CreateAssignmentBody
 import sa.gheras.edutrack.data.remote.dto.DailyEvalItemBody
 import sa.gheras.edutrack.data.remote.dto.Envelope
 import sa.gheras.edutrack.data.remote.dto.EvaluationDto
@@ -48,4 +51,20 @@ class FakeMeApi : MeApi {
     override suspend fun listReceipts(limit: Int, offset: Int, studentId: String?) = Envelope<ReceiptDto>()
     override suspend fun postAttendanceBatch(items: List<AttendanceItemBody>) = Response.success(Unit)
     override suspend fun postDailyEvaluationsBatch(items: List<DailyEvalItemBody>) = Response.success(Unit)
+    override suspend fun postAssignment(body: CreateAssignmentBody) = AssignmentDto(
+        id = body.id ?: "assign_fake",
+        title = body.title,
+        dueDate = body.dueDate,
+        instructions = body.instructions,
+        pageRef = body.pageRef,
+        studentIds = body.studentIds
+    )
+
+    override suspend fun uploadAttachment(filename: String, body: RequestBody): UploadResponseDto {
+        return UploadResponseDto(
+            url = "https://example.com/uploads/$filename",
+            filename = filename,
+            size = 1024L
+        )
+    }
 }

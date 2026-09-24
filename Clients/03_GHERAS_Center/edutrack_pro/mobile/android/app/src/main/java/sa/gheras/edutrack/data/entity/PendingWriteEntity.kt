@@ -31,6 +31,7 @@ data class PendingWriteEntity(
         const val KIND_DAILY_EVAL = "DAILY_EVAL"
         const val KIND_LESSON_LOG = "LESSON_LOG"
         const val KIND_NOTIFICATION_READ = "NOTIFICATION_READ"
+        const val KIND_ASSIGNMENT = "ASSIGNMENT"
         const val ATTEMPTS_FAILED = -1
     }
 }

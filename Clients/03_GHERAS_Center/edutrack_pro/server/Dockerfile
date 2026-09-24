@@ -18,7 +18,9 @@ RUN uv sync --frozen --no-dev --no-install-project
 COPY edutrack_api ./edutrack_api
 RUN uv sync --frozen --no-dev
 
-RUN useradd --system --uid 10001 --no-create-home edutrack
+RUN useradd --system --uid 10001 --no-create-home edutrack && \
+    mkdir -p /app/uploads && \
+    chown -R edutrack:edutrack /app/uploads
 USER edutrack
 
 EXPOSE 8000
