@@ -128,6 +128,12 @@ def list_schedule(conn, scope: Scope, filters: dict, limit: int, offset: int) ->
     return _run(conn, _select(cols, _SCHEDULE_FROM, where, "sc.day, sc.start_time, sc.id"), params, limit, offset)
 
 
+_NOTIFICATIONS_FROM = (
+    "notifications n LEFT JOIN users u ON u.id = n.sender_user_id "
+    "LEFT JOIN staff st ON st.id = u.staff_id"
+)
+
+
 def list_notifications(conn, scope: Scope, filters: dict, limit: int, offset: int) -> Rows:
     where = ["n.deleted_at IS NULL", "n.user_id = %(user_id)s"]
     params: dict = {"user_id": scope.user_id}
@@ -136,7 +142,8 @@ def list_notifications(conn, scope: Scope, filters: dict, limit: int, offset: in
         where.append("n.read_at IS NULL")
     elif unread is False:
         where.append("n.read_at IS NOT NULL")
-    return _run(conn, _select("n.*", "notifications n", where, "n.created_at DESC, n.id"), params, limit, offset)
+    cols = "n.*, COALESCE(st.name, u.username) AS sender_name"
+    return _run(conn, _select(cols, _NOTIFICATIONS_FROM, where, "COALESCE(n.sent_at, n.created_at) DESC, n.id"), params, limit, offset)
 
 
 def mark_notification_read(conn, scope: Scope, notification_id: UUID) -> dict | None:
@@ -145,6 +152,193 @@ def mark_notification_read(conn, scope: Scope, notification_id: UUID) -> dict | 
         "WHERE id = %s AND user_id = %s AND deleted_at IS NULL RETURNING *",
         (notification_id, scope.user_id),
     ).fetchone()
+
+
+def delete_notification(conn, scope: Scope, notification_id: UUID) -> dict | None:
+    row = conn.execute(
+        "UPDATE notifications SET deleted_at = COALESCE(deleted_at, now()), updated_at = now() "
+        "WHERE id = %s AND user_id = %s RETURNING id",
+        (notification_id, scope.user_id),
+    ).fetchone()
+    if not row:
+        return None
+    return {"id": str(row["id"])}
+
+
+def clear_read_notifications(conn, scope: Scope, ids: list[UUID]) -> int:
+    if len(ids) > 500:
+        raise ApiError(422, "too_many_ids", "لا يمكن مسح أكثر من 500 إشعار دفعة واحدة")
+    if not ids:
+        return 0
+    cur = conn.execute(
+        "UPDATE notifications SET deleted_at = COALESCE(deleted_at, now()), updated_at = now() "
+        "WHERE user_id = %s AND id = ANY(%s) AND read_at IS NOT NULL AND deleted_at IS NULL "
+        "RETURNING id",
+        (scope.user_id, ids),
+    )
+    return len(cur.fetchall())
+
+
+def create_broadcast(conn, scope: Scope, body: dict) -> dict:
+    if scope.role != "teacher":
+        raise ApiError(403, "forbidden", "صلاحية البث متاحة للمعلمين فقط")
+
+    broadcast_id = body.get("id")
+    if not broadcast_id:
+        raise ApiError(422, "id_required", "معرف الإعلان مطلوب")
+
+    title = (body.get("title") or "").strip()
+    if not title or len(title) > 120:
+        raise ApiError(422, "invalid_title", "عنوان الإعلان يجب أن يكون بين 1 و 120 حرفاً")
+
+    body_text = body.get("body")
+    if body_text is not None:
+        body_text = body_text.strip()
+        if len(body_text) > 2000:
+            raise ApiError(422, "invalid_body", "نص الإعلان لا يجب أن يتجاوز 2000 حرف")
+
+    priority = body.get("priority", "normal")
+    if priority not in ("normal", "urgent"):
+        raise ApiError(422, "invalid_priority", "درجة الأهمية غير صالحة")
+
+    room_id = body.get("room_id")
+    student_ids = body.get("student_ids") or []
+    if not room_id and not student_ids:
+        raise ApiError(422, "target_required", "يجب اختيار قاعة أو طلاب")
+
+    if len(student_ids) > 200:
+        raise ApiError(422, "too_many_students", "لا يمكن تحديد أكثر من 200 طالب")
+
+    include_guardians = bool(body.get("include_guardians", True))
+    include_students = bool(body.get("include_students", True))
+    if not include_guardians and not include_students:
+        raise ApiError(422, "target_audience_required", "يجب تحديد فئة مستهدفة (أولياء الأمور أو الطلاب)")
+
+    # Scope assertions
+    if room_id:
+        scope.assert_rooms([room_id])
+    if student_ids:
+        scope.assert_students(student_ids)
+
+    # 4. Idempotent replay: INSERT INTO notification_broadcasts
+    branch_id = None
+    if scope.user_id:
+        u_row = conn.execute("SELECT branch_id FROM users WHERE id = %s", (scope.user_id,)).fetchone()
+        if u_row:
+            branch_id = u_row.get("branch_id")
+    if not branch_id and room_id:
+        r_row = conn.execute("SELECT branch_id FROM rooms WHERE id = %s", (room_id,)).fetchone()
+        if r_row:
+            branch_id = r_row.get("branch_id")
+    if not branch_id:
+        branch_id = UUID("00000000-0000-0000-0000-000000000001")
+
+    ins_broadcast = """
+        INSERT INTO notification_broadcasts (
+            id, branch_id, sender_user_id, room_id, student_ids,
+            include_guardians, include_students, title, body, priority, recipient_count
+        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 0)
+        ON CONFLICT (id) DO NOTHING RETURNING *
+    """
+    row = conn.execute(ins_broadcast, (
+        broadcast_id, branch_id, scope.user_id, room_id, student_ids,
+        include_guardians, include_students, title, body_text, priority
+    )).fetchone()
+
+    if not row:
+        existing = conn.execute("SELECT * FROM notification_broadcasts WHERE id = %s", (broadcast_id,)).fetchone()
+        if existing and existing["sender_user_id"] == scope.user_id:
+            return {
+                "id": str(existing["id"]),
+                "recipient_count": existing["recipient_count"],
+                "created_at": existing["created_at"].isoformat()
+            }
+        raise ApiError(422, "id_conflict", "معرف الإعلان مستخدم مسبقاً")
+
+    # 5. Resolve target students
+    target_students_set = set(student_ids)
+    if room_id:
+        room_st_rows = conn.execute(
+            "SELECT id FROM students WHERE room_id = %s AND deleted_at IS NULL",
+            (room_id,)
+        ).fetchall()
+        for r in room_st_rows:
+            target_students_set.add(r["id"])
+
+    if not target_students_set:
+        raise ApiError(422, "no_students", "لا يوجد طلاب في القاعة المحددة")
+
+    target_student_list = list(target_students_set)
+
+    user_children_map: dict[UUID, set[UUID]] = {}
+
+    if include_guardians:
+        g_rows = conn.execute("""
+            SELECT u.id AS user_id, sg.student_id
+            FROM users u
+            JOIN student_guardians sg ON sg.guardian_id = u.guardian_id
+            WHERE sg.student_id = ANY(%s)
+              AND sg.deleted_at IS NULL
+              AND u.is_active = true
+              AND u.deleted_at IS NULL
+              AND u.id <> %s
+        """, (target_student_list, scope.user_id)).fetchall()
+        for r in g_rows:
+            user_children_map.setdefault(r["user_id"], set()).add(r["student_id"])
+
+    if include_students:
+        s_rows = conn.execute("""
+            SELECT u.id AS user_id, u.student_id
+            FROM users u
+            WHERE u.student_id = ANY(%s)
+              AND u.is_active = true
+              AND u.deleted_at IS NULL
+              AND u.id <> %s
+        """, (target_student_list, scope.user_id)).fetchall()
+        for r in s_rows:
+            user_children_map.setdefault(r["user_id"], set()).add(r["student_id"])
+
+    recipient_count = len(user_children_map)
+    if recipient_count == 0:
+        raise ApiError(422, "no_recipients", "لا يوجد مستلمون لهذا الإعلان")
+    if recipient_count > 500:
+        raise ApiError(422, "too_many_recipients", "عدد المستلمين يتجاوز الحد الأقصى (500)")
+
+    # Fan out insert
+    notif_sql = """
+        INSERT INTO notifications (
+            branch_id, user_id, kind, title, body, target_type, target_id,
+            priority, sender_user_id, broadcast_id, action_url, sent_at
+        ) VALUES (
+            %s, %s, 'announcement', %s, %s, 'announcement', %s,
+            %s, %s, %s, %s, now()
+        ) ON CONFLICT (broadcast_id, user_id) WHERE broadcast_id IS NOT NULL DO NOTHING
+    """
+    for u_id, children in user_children_map.items():
+        action_url = None
+        if len(children) == 1:
+            child_id = next(iter(children))
+            action_url = f"gheras://announcement?student_id={child_id}"
+        conn.execute(notif_sql, (
+            branch_id, u_id, title, body_text, broadcast_id,
+            priority, scope.user_id, broadcast_id, action_url
+        ))
+
+    conn.execute(
+        "UPDATE notification_broadcasts SET recipient_count = %s, updated_at = now() WHERE id = %s",
+        (recipient_count, broadcast_id)
+    )
+
+    write_audit(
+        conn, scope.user_id, "broadcast", "notification_broadcasts", broadcast_id,
+        {"title": title, "recipient_count": recipient_count}
+    )
+
+    return {
+        "id": str(broadcast_id),
+        "recipient_count": recipient_count,
+        "created_at": row["created_at"].isoformat()
+    }
 
 
 # ---- batch 2: attendance, evaluations, assignments, submissions, lesson-logs, skill-progress ----
@@ -394,17 +588,20 @@ def create_assignment(conn, scope: Scope, body: dict) -> dict:
                 page_ref = EXCLUDED.page_ref,
                 updated_at = now()
             WHERE assignments.teacher_user_id = EXCLUDED.teacher_user_id
-            RETURNING *
+            RETURNING *, (xmax = 0) AS is_inserted
         """
     else:
         sql = """
             INSERT INTO assignments (branch_id, title, subject, kind, due_date, teacher_user_id, instructions, page_ref)
             VALUES (%(branch_id)s, %(title)s, %(subject)s, %(kind)s, %(due_date)s, %(teacher_user_id)s, %(instructions)s, %(page_ref)s)
-            RETURNING *
+            RETURNING *, true AS is_inserted
         """
     row = conn.execute(sql, params).fetchone()
     if not row:
         raise ApiError(403, "forbidden", "لا يمكنك تعديل تكليف لمعلم آخر أو التكليف غير موجود")
+
+    is_inserted = bool(row.get("is_inserted", False))
+    action = "create" if is_inserted else "update"
 
     for sid in student_ids:
         existing = conn.execute(
@@ -417,7 +614,6 @@ def create_assignment(conn, scope: Scope, body: dict) -> dict:
                 (branch_id, row["id"], sid),
             )
 
-    action = "update" if assignment_id else "create"
     write_audit(
         conn,
         scope.user_id,
@@ -426,5 +622,59 @@ def create_assignment(conn, scope: Scope, body: dict) -> dict:
         row["id"],
         {"title": body["title"], "due_date": body["due_date"].isoformat()},
     )
+
+    # Batch B5: Assignment notification producer (on creation)
+    if is_inserted and student_ids:
+        # 1. Guardians of target students
+        g_rows = conn.execute("""
+            SELECT u.id AS user_id, sg.student_id, s.name AS student_name
+            FROM users u
+            JOIN student_guardians sg ON sg.guardian_id = u.guardian_id
+            JOIN students s ON s.id = sg.student_id
+            WHERE sg.student_id = ANY(%s)
+              AND sg.deleted_at IS NULL
+              AND u.is_active = true
+              AND u.deleted_at IS NULL
+              AND u.id <> %s
+        """, (student_ids, scope.user_id)).fetchall()
+
+        # 2. Student users
+        s_rows = conn.execute("""
+            SELECT u.id AS user_id, u.student_id, s.name AS student_name
+            FROM users u
+            JOIN students s ON s.id = u.student_id
+            WHERE u.student_id = ANY(%s)
+              AND u.is_active = true
+              AND u.deleted_at IS NULL
+              AND u.id <> %s
+        """, (student_ids, scope.user_id)).fetchall()
+
+        ins_notif = """
+            INSERT INTO notifications (
+                branch_id, user_id, kind, title, body, target_type, target_id,
+                priority, sender_user_id, action_url, sent_at
+            ) VALUES (
+                %s, %s, 'assignment', %s, %s, 'assignment', %s,
+                'normal', %s, %s, now()
+            )
+        """
+        seen_targets = set()
+        for r in list(g_rows) + list(s_rows):
+            u_id = r["user_id"]
+            st_id = r["student_id"]
+            st_name = r["student_name"]
+            key = (u_id, st_id)
+            if key in seen_targets:
+                continue
+            seen_targets.add(key)
+
+            notif_title = f"واجب جديد: {body['title']}"
+            notif_body = f"تم إضافة واجب جديد للطالب/ـة {st_name} لمادة {subject}، موعد التسليم: {body['due_date']}"
+            act_url = f"gheras://assignment?id={row['id']}&student_id={st_id}"
+            conn.execute(ins_notif, (
+                branch_id, u_id, notif_title, notif_body, str(row["id"]),
+                scope.user_id, act_url
+            ))
+
     return row
 

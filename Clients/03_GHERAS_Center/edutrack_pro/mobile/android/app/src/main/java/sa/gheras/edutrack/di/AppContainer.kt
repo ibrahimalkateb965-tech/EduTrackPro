@@ -28,7 +28,10 @@ class AppContainer(private val context: Context) {
             context,
             GherasDatabase::class.java,
             GherasDatabase.DATABASE_NAME
-        ).fallbackToDestructiveMigration().build()
+        )
+            .addMigrations(GherasDatabase.MIGRATION_1_2)
+            .fallbackToDestructiveMigrationOnDowngrade()
+            .build()
     }
 
     val sessionStore: SessionStore by lazy {

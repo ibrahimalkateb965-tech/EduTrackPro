@@ -7,6 +7,9 @@ import sa.gheras.edutrack.data.remote.dto.UploadResponseDto
 import sa.gheras.edutrack.data.remote.dto.AttendanceDto
 import sa.gheras.edutrack.data.remote.dto.AttendanceItemBody
 import sa.gheras.edutrack.data.remote.dto.AssignmentDto
+import sa.gheras.edutrack.data.remote.dto.BroadcastBody
+import sa.gheras.edutrack.data.remote.dto.BroadcastResultDto
+import sa.gheras.edutrack.data.remote.dto.ClearReadBody
 import sa.gheras.edutrack.data.remote.dto.CreateAssignmentBody
 import sa.gheras.edutrack.data.remote.dto.DailyEvalItemBody
 import sa.gheras.edutrack.data.remote.dto.Envelope
@@ -39,7 +42,10 @@ class FakeMeApi : MeApi {
     override suspend fun listRooms(limit: Int, offset: Int) = Envelope<RoomDto>()
     override suspend fun listSchedule(limit: Int, offset: Int, day: String?) = Envelope<ScheduleDto>()
     override suspend fun listNotifications(limit: Int, offset: Int, unread: Boolean?) = Envelope<NotificationDto>()
-    override suspend fun markNotificationRead(id: String) = NotificationDto(id, "Title", "Body", readAt = "2026-09-21T08:00:00Z")
+    override suspend fun markNotificationRead(id: String) = NotificationDto(id = id, title = "Title", body = "Body", readAt = "2026-09-21T08:00:00Z")
+    override suspend fun postBroadcast(body: BroadcastBody) = BroadcastResultDto(body.id, recipientCount = 1, createdAt = "2026-09-21T08:00:00Z")
+    override suspend fun deleteNotification(id: String) = Response.success(Unit)
+    override suspend fun clearReadNotifications(body: ClearReadBody) = Response.success(Unit)
     override suspend fun listAttendance(limit: Int, offset: Int, studentId: String?, dateFrom: String?, dateTo: String?) = Envelope<AttendanceDto>()
     override suspend fun listEvaluations(limit: Int, offset: Int, studentId: String?, dateFrom: String?, dateTo: String?) = Envelope<EvaluationDto>()
     override suspend fun listAssignments(limit: Int, offset: Int, studentId: String?, dueFrom: String?, dueTo: String?) = Envelope<AssignmentDto>()

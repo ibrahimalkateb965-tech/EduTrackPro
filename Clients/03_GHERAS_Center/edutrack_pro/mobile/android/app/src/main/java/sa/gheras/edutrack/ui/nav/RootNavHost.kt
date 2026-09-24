@@ -56,6 +56,7 @@ import sa.gheras.edutrack.ui.guardian.GuardianHomeScreen
 import sa.gheras.edutrack.ui.guardian.GuardianHomeViewModel
 import sa.gheras.edutrack.ui.login.LoginScreen
 import sa.gheras.edutrack.ui.login.LoginViewModel
+import sa.gheras.edutrack.ui.notifications.NotificationAction
 import sa.gheras.edutrack.ui.notifications.NotificationsScreen
 import sa.gheras.edutrack.ui.notifications.NotificationsViewModel
 import sa.gheras.edutrack.ui.teacher.AssignmentDetailScreen
@@ -246,11 +247,40 @@ fun RootNavHost(
                             NotificationsViewModel(
                                 sessionStore = container.sessionStore,
                                 notificationsRepository = container.notificationsRepository,
+                                roomDao = container.database.roomDao(),
                                 pullSync = container.pullSync
                             )
                         }
                     )
-                    NotificationsScreen(viewModel = vm)
+                    NotificationsScreen(
+                        viewModel = vm,
+                        onAction = { action ->
+                            when (action) {
+                                is NotificationAction.OpenAssignment -> {
+                                    navController.navigate(AssignmentDetailRoute(action.assignmentId))
+                                }
+                                is NotificationAction.OpenAttendance -> {
+                                    navController.navigate(AttendanceSheetRoute(action.roomId, action.date))
+                                }
+                                is NotificationAction.OpenChildHomework -> {
+                                    navController.navigate(ChildHomeworkRoute(action.studentId))
+                                }
+                                is NotificationAction.OpenChildAttendance -> {
+                                    navController.navigate(ChildAttendanceRoute(action.studentId))
+                                }
+                                is NotificationAction.OpenExternalUrl -> {
+                                    try {
+                                        val intent = android.content.Intent(
+                                            android.content.Intent.ACTION_VIEW,
+                                            android.net.Uri.parse(action.url)
+                                        )
+                                        navController.context.startActivity(intent)
+                                    } catch (_: Exception) {}
+                                }
+                                else -> {}
+                            }
+                        }
+                    )
                 }
 
                 // ---- Teacher Graph ----

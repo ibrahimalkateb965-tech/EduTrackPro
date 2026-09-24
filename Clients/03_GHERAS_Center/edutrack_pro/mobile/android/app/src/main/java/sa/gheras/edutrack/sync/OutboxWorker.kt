@@ -110,6 +110,48 @@ class OutboxWorker(
                 val notifId = json.getString("id")
                 meApi.markNotificationRead(notifId)
             }
+            PendingWriteEntity.KIND_NOTIFICATION_DELETE -> {
+                val notifId = json.getString("id")
+                try {
+                    val resp = meApi.deleteNotification(notifId)
+                    if (!resp.isSuccessful && resp.code() != 404) {
+                        throw HttpException(resp)
+                    }
+                } catch (e: HttpException) {
+                    if (e.code() != 404) throw e
+                }
+            }
+            PendingWriteEntity.KIND_NOTIFICATION_CLEAR_READ -> {
+                val idsList = mutableListOf<String>()
+                val arr = json.optJSONArray("ids")
+                if (arr != null) {
+                    for (i in 0 until arr.length()) idsList.add(arr.getString(i))
+                }
+                if (idsList.isNotEmpty()) {
+                    val resp = meApi.clearReadNotifications(sa.gheras.edutrack.data.remote.dto.ClearReadBody(idsList))
+                    if (!resp.isSuccessful && resp.code() != 404) {
+                        throw HttpException(resp)
+                    }
+                }
+            }
+            PendingWriteEntity.KIND_NOTIFICATION_BROADCAST -> {
+                val studentIdsList = mutableListOf<String>()
+                val arr = json.optJSONArray("student_ids")
+                if (arr != null) {
+                    for (i in 0 until arr.length()) studentIdsList.add(arr.getString(i))
+                }
+                val body = sa.gheras.edutrack.data.remote.dto.BroadcastBody(
+                    id = json.getString("id"),
+                    title = json.getString("title"),
+                    body = json.optString("body").takeIf { it.isNotBlank() },
+                    priority = json.optString("priority", "normal"),
+                    roomId = json.optString("room_id").takeIf { it.isNotBlank() },
+                    studentIds = studentIdsList,
+                    includeGuardians = json.optBoolean("include_guardians", true),
+                    includeStudents = json.optBoolean("include_students", true)
+                )
+                meApi.postBroadcast(body)
+            }
             PendingWriteEntity.KIND_ASSIGNMENT -> {
                 val studentIdsList = mutableListOf<String>()
                 val arr = json.optJSONArray("student_ids")
@@ -202,6 +244,22 @@ class OutboxWorker(
                 val assignmentId = json.optString("assignment_id")
                 db.assignmentStudentDao().deleteByAssignment(assignmentId)
                 db.assignmentDao().deleteById(assignmentId)
+            }
+            PendingWriteEntity.KIND_NOTIFICATION_DELETE -> {
+                val notifId = json.optString("id")
+                if (notifId.isNotBlank()) {
+                    db.notificationDao().restore(listOf(notifId))
+                }
+            }
+            PendingWriteEntity.KIND_NOTIFICATION_CLEAR_READ -> {
+                val idsList = mutableListOf<String>()
+                val arr = json.optJSONArray("ids")
+                if (arr != null) {
+                    for (i in 0 until arr.length()) idsList.add(arr.getString(i))
+                }
+                if (idsList.isNotEmpty()) {
+                    db.notificationDao().restore(idsList)
+                }
             }
         }
     }

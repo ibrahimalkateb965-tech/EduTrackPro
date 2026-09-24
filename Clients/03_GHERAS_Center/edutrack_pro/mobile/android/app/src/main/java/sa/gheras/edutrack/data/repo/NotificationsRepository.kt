@@ -52,4 +52,82 @@ class NotificationsRepository(
             )
         }
     }
+
+    suspend fun softDeleteLocal(id: String) {
+        val now = java.time.Instant.now()
+        notificationDao.softDelete(listOf(id), now)
+    }
+
+    suspend fun restoreLocal(id: String) {
+        notificationDao.restore(listOf(id))
+    }
+
+    suspend fun commitDelete(id: String) {
+        val payload = JSONObject().apply {
+            put("id", id)
+        }.toString()
+
+        outbox.enqueue(
+            kind = PendingWriteEntity.KIND_NOTIFICATION_DELETE,
+            naturalKey = "notif_delete:$id",
+            payloadJson = payload
+        )
+    }
+
+    suspend fun deleteNotification(id: String) {
+        softDeleteLocal(id)
+        commitDelete(id)
+    }
+
+    suspend fun clearRead(userId: String): Int {
+        val readIds = notificationDao.getReadIds(userId)
+        if (readIds.isEmpty()) return 0
+        val now = java.time.Instant.now()
+        notificationDao.softDelete(readIds, now)
+
+        val payload = JSONObject().apply {
+            val arr = org.json.JSONArray()
+            for (id in readIds) arr.put(id)
+            put("ids", arr)
+        }.toString()
+
+        val batchKey = java.util.UUID.randomUUID().toString()
+        outbox.enqueue(
+            kind = PendingWriteEntity.KIND_NOTIFICATION_CLEAR_READ,
+            naturalKey = "notif_clear_read:$batchKey",
+            payloadJson = payload
+        )
+        return readIds.size
+    }
+
+    suspend fun broadcastNotification(
+        title: String,
+        body: String?,
+        priority: String = "normal",
+        roomId: String? = null,
+        studentIds: List<String> = emptyList(),
+        includeGuardians: Boolean = true,
+        includeStudents: Boolean = true
+    ): String {
+        val broadcastId = java.util.UUID.randomUUID().toString()
+        val payload = JSONObject().apply {
+            put("id", broadcastId)
+            put("title", title)
+            if (!body.isNullOrBlank()) put("body", body)
+            put("priority", priority)
+            if (!roomId.isNullOrBlank()) put("room_id", roomId)
+            val arr = org.json.JSONArray()
+            for (sid in studentIds) arr.put(sid)
+            put("student_ids", arr)
+            put("include_guardians", includeGuardians)
+            put("include_students", includeStudents)
+        }.toString()
+
+        outbox.enqueue(
+            kind = PendingWriteEntity.KIND_NOTIFICATION_BROADCAST,
+            naturalKey = "notif_broadcast:$broadcastId",
+            payloadJson = payload
+        )
+        return broadcastId
+    }
 }

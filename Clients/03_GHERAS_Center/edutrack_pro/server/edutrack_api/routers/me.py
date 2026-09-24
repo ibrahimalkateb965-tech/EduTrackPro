@@ -87,12 +87,47 @@ def list_notifications(limit: int = 100, offset: int = 0, unread: bool | None = 
     return _envelope(rows, total, limit, offset)
 
 
+class BroadcastIn(BaseModel):
+    id: UUID
+    title: str
+    body: str | None = None
+    priority: str = "normal"
+    room_id: UUID | None = None
+    student_ids: list[UUID] = []
+    include_guardians: bool = True
+    include_students: bool = True
+
+
+class ClearReadIn(BaseModel):
+    ids: list[UUID]
+
+
 @router.post("/notifications/{notification_id}/read")
 def read_notification(notification_id: UUID, scope: Scope = _SCOPE, conn=_CONN) -> dict:
     row = me_repo.mark_notification_read(conn, scope, notification_id)
     if row is None:
         raise ApiError(404, "not_found")
     return row_to_json(row)
+
+
+@router.post("/notifications/broadcast")
+def post_broadcast(payload: BroadcastIn, scope: Scope = _SCOPE, conn=_CONN) -> dict:
+    _only(scope, "teacher")
+    return row_to_json(me_repo.create_broadcast(conn, scope, payload.model_dump()))
+
+
+@router.delete("/notifications/{notification_id}")
+def delete_notification(notification_id: UUID, scope: Scope = _SCOPE, conn=_CONN) -> dict:
+    res = me_repo.delete_notification(conn, scope, notification_id)
+    if res is None:
+        raise ApiError(404, "not_found", "الإشعار غير موجود")
+    return row_to_json(res)
+
+
+@router.post("/notifications/clear-read")
+def clear_read_notifications(payload: ClearReadIn, scope: Scope = _SCOPE, conn=_CONN) -> dict:
+    cleared = me_repo.clear_read_notifications(conn, scope, payload.ids)
+    return {"cleared": cleared}
 
 
 # ---- batch 2 ---------------------------------------------------------------

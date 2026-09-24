@@ -43,7 +43,44 @@ def _save(conn, items: list[dict], key: str, table: str, actor: dict, scope: Sco
     saved = []
     for item in items:
         params = {key: item[key], "date": item["date"], "status": item["status"], "note": item.get("note"), "actor": actor["id"]}
-        saved.append(row_to_json(conn.execute(sql, params).fetchone()))
+        row = conn.execute(sql, params).fetchone()
+        saved.append(row_to_json(row))
+
+        # Batch B5: Emit attendance notification to guardians on absence
+        if table == "student_attendance" and item["status"] == "غائب":
+            st_id = item[key]
+            att_date = item["date"]
+            st_row = conn.execute("SELECT name, room_id, branch_id FROM students WHERE id = %s", (st_id,)).fetchone()
+            if st_row:
+                st_name = st_row["name"]
+                br_id = st_row.get("branch_id") or actor.get("branch_id")
+                g_users = conn.execute("""
+                    SELECT u.id AS user_id FROM users u
+                    JOIN student_guardians sg ON sg.guardian_id = u.guardian_id
+                    WHERE sg.student_id = %s AND sg.deleted_at IS NULL AND u.is_active = true AND u.deleted_at IS NULL
+                """, (st_id,)).fetchall()
+                act_url = f"gheras://attendance?student_id={st_id}&date={att_date}"
+                for gu in g_users:
+                    existing_notif = conn.execute("""
+                        SELECT id FROM notifications
+                        WHERE user_id = %s AND action_url = %s
+                    """, (gu["user_id"], act_url)).fetchone()
+                    if not existing_notif:
+                        conn.execute("""
+                            INSERT INTO notifications (
+                                branch_id, user_id, kind, title, body, target_type, target_id,
+                                priority, sender_user_id, action_url, sent_at
+                            ) VALUES (
+                                %s, %s, 'attendance', %s, %s, 'attendance', %s,
+                                'urgent', %s, %s, now()
+                            )
+                        """, (
+                            br_id, gu["user_id"], "تسجيل غياب",
+                            f"تم تسجيل غياب الطالب/ـة {st_name} بتاريخ {att_date}",
+                            st_id, actor["id"],
+                            act_url
+                        ))
+
     write_audit(conn, actor["id"], "update", table, None, {"count": len(items), "date": report_date.isoformat() if report_date else None})
     return {"saved": len(saved), "items": saved}
 

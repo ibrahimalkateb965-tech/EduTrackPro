@@ -37,6 +37,9 @@ import sa.gheras.edutrack.data.entity.SubmissionEntity
 import sa.gheras.edutrack.data.entity.SubmissionFileEntity
 import sa.gheras.edutrack.data.entity.SyncStateEntity
 
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
+
 @Database(
     entities = [
         AssignmentEntity::class,
@@ -56,7 +59,7 @@ import sa.gheras.edutrack.data.entity.SyncStateEntity
         SubmissionFileEntity::class,
         SyncStateEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -136,5 +139,18 @@ abstract class GherasDatabase : RoomDatabase() {
 
     companion object {
         const val DATABASE_NAME = "gheras_edutrack"
+
+        val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE notifications ADD COLUMN target_type TEXT")
+                db.execSQL("ALTER TABLE notifications ADD COLUMN target_id TEXT")
+                db.execSQL("ALTER TABLE notifications ADD COLUMN priority TEXT NOT NULL DEFAULT 'normal'")
+                db.execSQL("ALTER TABLE notifications ADD COLUMN action_url TEXT")
+                db.execSQL("ALTER TABLE notifications ADD COLUMN sender_user_id TEXT")
+                db.execSQL("ALTER TABLE notifications ADD COLUMN sender_name TEXT")
+                db.execSQL("ALTER TABLE notifications ADD COLUMN broadcast_id TEXT")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_notifications_user_id_deleted_at ON notifications(user_id, deleted_at)")
+            }
+        }
     }
 }

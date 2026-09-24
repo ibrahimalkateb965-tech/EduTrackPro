@@ -138,6 +138,22 @@ class Outbox(
                     db.notificationDao().upsert(existing.copy(readAt = now, updatedAt = now))
                 }
             }
+            PendingWriteEntity.KIND_NOTIFICATION_DELETE -> {
+                val notifId = json.optString("id")
+                if (notifId.isNotBlank()) {
+                    db.notificationDao().softDelete(listOf(notifId), now)
+                }
+            }
+            PendingWriteEntity.KIND_NOTIFICATION_CLEAR_READ -> {
+                val idsArray = json.optJSONArray("ids")
+                if (idsArray != null && idsArray.length() > 0) {
+                    val ids = (0 until idsArray.length()).map { idsArray.getString(it) }
+                    db.notificationDao().softDelete(ids, now)
+                }
+            }
+            PendingWriteEntity.KIND_NOTIFICATION_BROADCAST -> {
+                // Server fans out to target recipients.
+            }
             PendingWriteEntity.KIND_ASSIGNMENT -> {
                 val assignmentId = json.optString("assignment_id")
                 val title = json.optString("title")

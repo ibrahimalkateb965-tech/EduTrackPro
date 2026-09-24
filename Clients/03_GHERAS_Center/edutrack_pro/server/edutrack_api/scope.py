@@ -25,6 +25,7 @@ MSG_NOT_MOBILE = "هذه الواجهة مخصصة لتطبيق المعلم و�
 MSG_GUARDIAN_UNLINKED = "حساب ولي الأمر غير مرتبط بطالب — راجع إدارة المركز"
 MSG_STUDENT_UNLINKED = "حساب الطالب غير مرتبط بسجل طالب — راجع إدارة المركز"
 MSG_STUDENT_OUT_OF_SCOPE = "الطالب خارج نطاق صلاحيتك"
+MSG_ROOM_OUT_OF_SCOPE = "القاعة خارج نطاق صلاحيتك"
 
 
 @dataclass(frozen=True)
@@ -42,6 +43,15 @@ class Scope:
                 sid = None
             if sid not in self.student_ids:
                 raise ApiError(403, "forbidden", MSG_STUDENT_OUT_OF_SCOPE)
+
+    def assert_rooms(self, ids: Iterable[object]) -> None:
+        for raw in ids:
+            try:
+                rid = UUID(str(raw))
+            except ValueError:
+                rid = None
+            if rid not in self.room_ids:
+                raise ApiError(403, "forbidden", MSG_ROOM_OUT_OF_SCOPE)
 
 
 def _teacher_scope(conn, user: dict) -> Scope:

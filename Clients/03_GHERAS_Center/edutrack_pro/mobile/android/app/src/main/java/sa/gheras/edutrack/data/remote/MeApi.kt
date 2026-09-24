@@ -3,6 +3,7 @@ package sa.gheras.edutrack.data.remote
 import okhttp3.RequestBody
 import retrofit2.Response
 import retrofit2.http.Body
+import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.Header
 import retrofit2.http.POST
@@ -11,6 +12,9 @@ import retrofit2.http.Query
 import sa.gheras.edutrack.data.remote.dto.AttendanceDto
 import sa.gheras.edutrack.data.remote.dto.AttendanceItemBody
 import sa.gheras.edutrack.data.remote.dto.AssignmentDto
+import sa.gheras.edutrack.data.remote.dto.BroadcastBody
+import sa.gheras.edutrack.data.remote.dto.BroadcastResultDto
+import sa.gheras.edutrack.data.remote.dto.ClearReadBody
 import sa.gheras.edutrack.data.remote.dto.CreateAssignmentBody
 import sa.gheras.edutrack.data.remote.dto.DailyEvalItemBody
 import sa.gheras.edutrack.data.remote.dto.Envelope
@@ -62,6 +66,15 @@ interface MeApi {
 
     @POST("me/notifications/{id}/read")
     suspend fun markNotificationRead(@Path("id") id: String): NotificationDto
+
+    @POST("me/notifications/broadcast")
+    suspend fun postBroadcast(@Body body: BroadcastBody): BroadcastResultDto
+
+    @DELETE("me/notifications/{id}")
+    suspend fun deleteNotification(@Path("id") id: String): Response<Unit>
+
+    @POST("me/notifications/clear-read")
+    suspend fun clearReadNotifications(@Body body: ClearReadBody): Response<Unit>
 
     @GET("me/attendance")
     suspend fun listAttendance(

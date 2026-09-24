@@ -56,6 +56,15 @@ interface NotificationDao {
     @Query("DELETE FROM notifications")
     suspend fun clear()
 
+    @Query("UPDATE notifications SET deleted_at = :now, updated_at = :now WHERE id IN (:ids)")
+    suspend fun softDelete(ids: List<String>, now: Instant)
+
+    @Query("UPDATE notifications SET deleted_at = NULL WHERE id IN (:ids)")
+    suspend fun restore(ids: List<String>)
+
+    @Query("SELECT id FROM notifications WHERE user_id = :userId AND deleted_at IS NULL AND read_at IS NOT NULL")
+    suspend fun getReadIds(userId: String): List<String>
+
     @Transaction
     suspend fun replaceScope(userId: String, items: List<NotificationEntity>) {
         clearByUser(userId)

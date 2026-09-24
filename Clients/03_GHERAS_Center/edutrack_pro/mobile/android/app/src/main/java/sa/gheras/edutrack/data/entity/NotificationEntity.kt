@@ -11,7 +11,10 @@ import java.time.Instant
  */
 @Entity(
     tableName = "notifications",
-    indices = [Index("user_id")]
+    indices = [
+        Index("user_id"),
+        Index("user_id", "deleted_at")
+    ]
 )
 data class NotificationEntity(
     @PrimaryKey val id: String,
@@ -20,6 +23,13 @@ data class NotificationEntity(
     val kind: String,
     val title: String,
     val body: String?,
+    @ColumnInfo(name = "target_type") val targetType: String? = null,
+    @ColumnInfo(name = "target_id") val targetId: String? = null,
+    @ColumnInfo(name = "priority", defaultValue = "normal") val priority: String = "normal",
+    @ColumnInfo(name = "action_url") val actionUrl: String? = null,
+    @ColumnInfo(name = "sender_user_id") val senderUserId: String? = null,
+    @ColumnInfo(name = "sender_name") val senderName: String? = null,
+    @ColumnInfo(name = "broadcast_id") val broadcastId: String? = null,
     @ColumnInfo(name = "read_at") val readAt: Instant?,
     @ColumnInfo(name = "sent_at", defaultValue = "(strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))") val sentAt: Instant,
     @ColumnInfo(name = "created_at", defaultValue = "(strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))") val createdAt: Instant,
