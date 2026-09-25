@@ -1,12 +1,15 @@
 package sa.gheras.edutrack.data.remote
 
+import okhttp3.MultipartBody
 import okhttp3.RequestBody
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.Header
+import retrofit2.http.Multipart
 import retrofit2.http.POST
+import retrofit2.http.Part
 import retrofit2.http.Path
 import retrofit2.http.Query
 import sa.gheras.edutrack.data.remote.dto.AttendanceDto
@@ -160,4 +163,19 @@ interface MeApi {
         @Header("X-Filename") filename: String,
         @Body body: RequestBody
     ): UploadResponseDto
+
+    @Multipart
+    @POST("me/submissions")
+    suspend fun submitHomework(
+        @Part("assignment_id") assignmentId: RequestBody,
+        @Part("student_id") studentId: RequestBody,
+        @Part("notes") notes: RequestBody? = null,
+        @Part files: List<MultipartBody.Part>
+    ): SubmissionDto
+
+    @POST("me/submissions/{submissionId}/grade")
+    suspend fun gradeSubmission(
+        @Path("submissionId") submissionId: String,
+        @Body body: sa.gheras.edutrack.data.remote.dto.GradeSubmissionBody
+    ): SubmissionDto
 }

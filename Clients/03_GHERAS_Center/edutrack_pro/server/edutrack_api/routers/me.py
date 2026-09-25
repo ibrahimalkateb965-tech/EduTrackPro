@@ -7,13 +7,15 @@ Manager/supervisor are rejected by require_scope (403); role mismatches per rout
 from __future__ import annotations
 
 import datetime as dt
+import hashlib
 import os
+import struct
 import uuid
 from pathlib import Path
 from typing import Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Request, Form, File, UploadFile
 from pydantic import BaseModel
 
 from edutrack_api.auth import current_user
@@ -195,6 +197,120 @@ def list_submissions(
     filters = {"assignment_id": assignment_id, "student_id": student_id}
     rows, total = me_repo.list_submissions(conn, scope, filters, limit, offset)
     return _envelope(rows, total, limit, offset)
+
+
+class GradeSubmissionIn(BaseModel):
+    grade: float
+    feedback: str | None = None
+
+
+def _extract_image_dimensions(data: bytes) -> tuple[int | None, int | None]:
+    if len(data) < 24:
+        return None, None
+    try:
+        if data.startswith(b"\x89PNG\r\n\x1a\n"):
+            w, h = struct.unpack(">II", data[16:24])
+            return int(w), int(h)
+        if data.startswith((b"GIF87a", b"GIF89a")):
+            w, h = struct.unpack("<HH", data[6:10])
+            return int(w), int(h)
+        if data.startswith(b"\xff\xd8"):
+            i = 2
+            while i < len(data) - 9:
+                if data[i] != 0xFF:
+                    i += 1
+                    continue
+                marker = data[i + 1]
+                if marker in (0xC0, 0xC1, 0xC2, 0xC3, 0xC5, 0xC6, 0xC7, 0xC9, 0xCA, 0xCB, 0xCD, 0xCE, 0xCF):
+                    h, w = struct.unpack(">HH", data[i + 5 : i + 9])
+                    return int(w), int(h)
+                length = struct.unpack(">H", data[i + 2 : i + 4])[0]
+                i += 2 + length
+            return None, None
+        if data.startswith(b"RIFF") and data[8:12] == b"WEBP":
+            if data[12:16] == b"VP8 ":
+                w, h = struct.unpack("<HH", data[26:30])
+                return int(w & 0x3FFF), int(h & 0x3FFF)
+            if data[12:16] == b"VP8L":
+                b0, b1, b2, b3 = data[21:25]
+                w = 1 + (((b1 & 0x3F) << 8) | b0)
+                h = 1 + (((b3 & 0xF) << 10) | (b2 << 2) | ((b1 & 0xC0) >> 6))
+                return int(w), int(h)
+            if data[12:16] == b"VP8X":
+                w = 1 + (data[24] | (data[25] << 8) | (data[26] << 16))
+                h = 1 + (data[27] | (data[28] << 8) | (data[29] << 16))
+                return int(w), int(h)
+    except Exception:
+        pass
+    return None, None
+
+
+@router.post("/submissions")
+async def post_submission(
+    assignment_id: UUID = Form(...),
+    student_id: UUID = Form(...),
+    notes: str | None = Form(None),
+    files: list[UploadFile] = File(...),
+    scope: Scope = _SCOPE,
+    conn=_CONN,
+) -> dict:
+    if not (1 <= len(files) <= 10):
+        raise ApiError(422, "validation_error", "يجب إرفاق ملف واحد على الأقل وبحد أقصى 10 ملفات")
+
+    upload_dir = Path(os.getenv("UPLOAD_DIR", "uploads")).resolve()
+    sub_dir = upload_dir / "submissions"
+    sub_dir.mkdir(parents=True, exist_ok=True)
+
+    allowed_exts = {".jpg", ".jpeg", ".png", ".webp"}
+    files_data = []
+
+    for f in files:
+        filename = f.filename or "page.jpg"
+        ext = Path(filename).suffix.lower()
+        if ext not in allowed_exts and f.content_type not in ["image/jpeg", "image/png", "image/webp"]:
+            raise ApiError(422, "invalid_file_type", f"نوع الملف {filename} غير مسموح به. مسموح بصور JPG و PNG و WEBP فقط")
+
+        content = await f.read()
+        if len(content) > 10 * 1024 * 1024:
+            raise ApiError(413, "file_too_large", f"حجم الملف {filename} يتجاوز الحد المسموح (10 ميجابايت)")
+
+        safe_name = f"{uuid.uuid4().hex}{ext if ext in allowed_exts else '.jpg'}"
+        dest = sub_dir / safe_name
+        dest.write_bytes(content)
+
+        width, height = _extract_image_dimensions(content)
+        sha = hashlib.sha256(content).hexdigest()
+        files_data.append({
+            "storage_key": f"submissions/{safe_name}",
+            "width": width,
+            "height": height,
+            "bytes": len(content),
+            "sha256": sha
+        })
+
+    row = me_repo.create_submission(
+        conn=conn,
+        scope=scope,
+        assignment_id=assignment_id,
+        student_id=student_id,
+        files_data=files_data,
+        notes=notes
+    )
+    return row_to_json(row)
+
+
+@router.post("/submissions/{submission_id}/grade")
+def grade_submission(
+    submission_id: UUID,
+    body: GradeSubmissionIn,
+    scope: Scope = _SCOPE,
+    conn=_CONN,
+) -> dict:
+    _only(scope, "teacher")
+    if not (0 <= body.grade <= 100):
+        raise ApiError(422, "validation_error", "يجب أن تكون الدرجة بين 0 و 100")
+    row = me_repo.grade_submission(conn, scope, submission_id, body.grade, body.feedback)
+    return row_to_json(row)
 
 
 @router.get("/lesson-logs")

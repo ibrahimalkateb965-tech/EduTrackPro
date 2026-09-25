@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -68,6 +69,17 @@ import sa.gheras.edutrack.ui.teacher.media.ShareHelper
 import sa.gheras.edutrack.ui.common.LoadingView
 import sa.gheras.edutrack.ui.common.Num
 import sa.gheras.edutrack.ui.theme.PresentGreen
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.window.Dialog
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
+import sa.gheras.edutrack.BuildConfig
+import sa.gheras.edutrack.data.entity.SubmissionFileEntity
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -78,6 +90,8 @@ fun AssignmentDetailScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
     val context = LocalContext.current
+    var viewingImageUrl by remember { mutableStateOf<String?>(null) }
+    var gradingTarget by remember { mutableStateOf<StudentSubmissionStatus?>(null) }
 
     Scaffold(
         topBar = {
@@ -381,6 +395,43 @@ fun AssignmentDetailScreen(
 
                             // Submission Details if available
                             if (item.submission != null) {
+                                // Homework Submission Photos
+                                if (item.files.isNotEmpty()) {
+                                    Spacer(modifier = Modifier.height(10.dp))
+                                    Text(
+                                        text = "صور الحل (${Num.formatInt(item.files.size)}):",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    LazyRow(
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        items(item.files, key = { it.id }) { file ->
+                                            val resolvedUrl = resolveImageUrl(file.storageKey)
+                                            Surface(
+                                                shape = RoundedCornerShape(8.dp),
+                                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                                                modifier = Modifier
+                                                    .size(64.dp)
+                                                    .clickable { viewingImageUrl = resolvedUrl }
+                                            ) {
+                                                AsyncImage(
+                                                    model = ImageRequest.Builder(context)
+                                                        .data(resolvedUrl)
+                                                        .crossfade(true)
+                                                        .build(),
+                                                    contentDescription = "صورة الواجب",
+                                                    contentScale = ContentScale.Crop,
+                                                    modifier = Modifier.fillMaxSize()
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+
                                 if (item.submission.grade != null || !item.submission.feedback.isNullOrBlank()) {
                                     Spacer(modifier = Modifier.height(8.dp))
                                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -402,12 +453,209 @@ fun AssignmentDetailScreen(
                                         }
                                     }
                                 }
+
+                                Spacer(modifier = Modifier.height(10.dp))
+                                OutlinedButton(
+                                    onClick = { gradingTarget = item },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(if (item.submission.grade != null) "تعديل تقييم الواجب" else "تقييم ورصد درجة الواجب")
+                                }
                             }
                         }
                     }
                 }
             }
         }
+    }
+
+    // Teacher Grading Dialog
+    gradingTarget?.let { target ->
+        target.submission?.let { sub ->
+            TeacherGradingDialog(
+                studentName = target.student.name,
+                currentGrade = sub.grade,
+                currentFeedback = sub.feedback,
+                isGrading = state.isGrading,
+                onDismiss = { if (!state.isGrading) gradingTarget = null },
+                onConfirm = { grade, feedback ->
+                    viewModel.gradeSubmission(sub.id, grade, feedback)
+                    gradingTarget = null
+                }
+            )
+        }
+    }
+
+    // Full-screen Image Viewer Dialog
+    viewingImageUrl?.let { imageUrl ->
+        ImageViewerDialog(
+            imageUrl = imageUrl,
+            onDismiss = { viewingImageUrl = null }
+        )
+    }
+}
+
+@Composable
+private fun TeacherGradingDialog(
+    studentName: String,
+    currentGrade: Double?,
+    currentFeedback: String?,
+    isGrading: Boolean,
+    onDismiss: () -> Unit,
+    onConfirm: (Double, String?) -> Unit
+) {
+    var gradeText by remember { mutableStateOf(currentGrade?.let { Num.formatCurrency(it).replace(" ر.س", "").trim() } ?: "") }
+    var feedbackText by remember { mutableStateOf(currentFeedback ?: "") }
+    var validationError by remember { mutableStateOf<String?>(null) }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = MaterialTheme.colorScheme.surface,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(8.dp)
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    text = "تقييم واجب الطالب: $studentName",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+
+                OutlinedTextField(
+                    value = gradeText,
+                    onValueChange = {
+                        gradeText = it
+                        validationError = null
+                    },
+                    label = { Text("الدرجة (مثال: 10 أو 9.5)") },
+                    isError = validationError != null,
+                    supportingText = validationError?.let { { Text(it, color = MaterialTheme.colorScheme.error) } },
+                    enabled = !isGrading,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp)
+                )
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                OutlinedTextField(
+                    value = feedbackText,
+                    onValueChange = { feedbackText = it },
+                    label = { Text("ملاحظات المعلم والتعليق (اختياري)") },
+                    placeholder = { Text("أحسنت عملاً، أو يرجى مراجعة المسألة الثانية...") },
+                    enabled = !isGrading,
+                    modifier = Modifier.fillMaxWidth(),
+                    maxLines = 3,
+                    shape = RoundedCornerShape(8.dp)
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    OutlinedButton(
+                        onClick = onDismiss,
+                        enabled = !isGrading,
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text("إلغاء")
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(
+                        onClick = {
+                            val gradeVal = gradeText.toDoubleOrNull()
+                            if (gradeVal == null || gradeVal < 0) {
+                                validationError = "يرجى إدخال درجة رقمية صحيحة"
+                            } else {
+                                onConfirm(gradeVal, feedbackText.ifBlank { null })
+                            }
+                        },
+                        enabled = !isGrading && gradeText.isNotBlank(),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        if (isGrading) {
+                            CircularProgressIndicator(
+                                strokeWidth = 2.dp,
+                                modifier = Modifier.size(16.dp),
+                                color = MaterialTheme.colorScheme.onPrimary
+                            )
+                        } else {
+                            Text("حفظ التقييم")
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ImageViewerDialog(
+    imageUrl: String,
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = MaterialTheme.colorScheme.surface,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(8.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "معاينة صفحة الواجب",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                    IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
+                        Icon(Icons.Default.Close, contentDescription = "إغلاق")
+                    }
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                AsyncImage(
+                    model = ImageRequest.Builder(context)
+                        .data(imageUrl)
+                        .crossfade(true)
+                        .build(),
+                    contentDescription = "معاينة الحل",
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(3f / 4f)
+                        .clip(RoundedCornerShape(8.dp))
+                )
+            }
+        }
+    }
+}
+
+private fun resolveImageUrl(storageKeyOrUrl: String?): String {
+    if (storageKeyOrUrl.isNullOrBlank()) return ""
+    if (storageKeyOrUrl.startsWith("http://") || storageKeyOrUrl.startsWith("https://")) {
+        return storageKeyOrUrl
+    }
+    val baseDomain = BuildConfig.BASE_URL.substringBefore("/api/v1")
+    return if (storageKeyOrUrl.startsWith("/")) {
+        "$baseDomain$storageKeyOrUrl"
+    } else {
+        "$baseDomain/api/v1/static/uploads/$storageKeyOrUrl"
     }
 }
 

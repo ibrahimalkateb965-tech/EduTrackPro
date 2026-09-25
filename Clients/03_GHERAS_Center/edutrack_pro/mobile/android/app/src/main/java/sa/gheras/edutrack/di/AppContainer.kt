@@ -122,6 +122,8 @@ class AppContainer(private val context: Context) {
             database.assignmentDao(),
             database.submissionDao(),
             database.assignmentStudentDao(),
+            database.submissionFileDao(),
+            meApi,
             outbox
         )
     }
