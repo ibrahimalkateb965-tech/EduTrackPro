@@ -351,7 +351,7 @@ _LESSON_FROM = "lesson_logs l JOIN schedules sc ON sc.id = l.schedule_id JOIN ro
 
 _SUBMISSION_FILES = (
     "(SELECT COALESCE(json_agg(json_build_object('id', f.id, 'storage_key', f.storage_key, "
-    "'url', CASE WHEN f.storage_key LIKE 'http%' THEN f.storage_key ELSE '/api/v1/static/uploads/' || f.storage_key END, "
+    "'url', CASE WHEN starts_with(f.storage_key, 'http') THEN f.storage_key ELSE '/api/v1/static/uploads/' || f.storage_key END, "
     "'width', f.width, 'height', f.height) ORDER BY f.created_at, f.id), '[]'::json) "
     "FROM submission_files f WHERE f.submission_id = sb.id AND f.deleted_at IS NULL) AS files"
 )
