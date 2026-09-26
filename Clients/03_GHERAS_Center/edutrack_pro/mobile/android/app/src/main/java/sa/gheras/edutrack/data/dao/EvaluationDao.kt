@@ -36,16 +36,19 @@ interface EvaluationDao {
     @Query("SELECT * FROM evaluations WHERE id = :id")
     suspend fun getById(id: String): EvaluationEntity?
 
-    @Query("SELECT * FROM evaluations WHERE deleted_at IS NULL AND student_id = :studentId ORDER BY date DESC")
+    @Query("SELECT * FROM evaluations WHERE student_id = :studentId AND date = :date AND subject = :subject AND eval_type = :evalType AND deleted_at IS NULL LIMIT 1")
+    suspend fun getByStudentDateSubject(studentId: String, date: LocalDate, subject: String, evalType: String = "daily"): EvaluationEntity?
+
+    @Query("SELECT * FROM evaluations WHERE deleted_at IS NULL AND student_id = :studentId ORDER BY date DESC, updated_at DESC")
     fun observeByStudent(studentId: String): Flow<List<EvaluationEntity>>
 
-    @Query("SELECT * FROM evaluations WHERE deleted_at IS NULL AND student_id = :studentId AND subject = :subject ORDER BY date DESC")
+    @Query("SELECT * FROM evaluations WHERE deleted_at IS NULL AND student_id = :studentId AND subject = :subject ORDER BY date DESC, updated_at DESC")
     fun observeByStudentAndSubject(studentId: String, subject: String): Flow<List<EvaluationEntity>>
 
-    @Query("SELECT * FROM evaluations WHERE deleted_at IS NULL AND student_id = :studentId AND eval_type = :evalType ORDER BY date DESC")
+    @Query("SELECT * FROM evaluations WHERE deleted_at IS NULL AND student_id = :studentId AND eval_type = :evalType ORDER BY date DESC, updated_at DESC")
     fun observeByStudentAndType(studentId: String, evalType: String): Flow<List<EvaluationEntity>>
 
-    @Query("SELECT * FROM evaluations WHERE deleted_at IS NULL AND date BETWEEN :from AND :to ORDER BY date")
+    @Query("SELECT * FROM evaluations WHERE deleted_at IS NULL AND date BETWEEN :from AND :to ORDER BY date DESC, updated_at DESC")
     fun observeBetween(from: LocalDate, to: LocalDate): Flow<List<EvaluationEntity>>
 
     @Query("DELETE FROM evaluations WHERE date BETWEEN :from AND :to")

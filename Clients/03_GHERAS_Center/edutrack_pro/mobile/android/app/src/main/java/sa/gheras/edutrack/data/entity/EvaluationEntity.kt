@@ -18,7 +18,11 @@ import java.time.LocalDate
             onDelete = ForeignKey.RESTRICT
         )
     ],
-    indices = [Index("student_id"), Index("teacher_user_id")]
+    indices = [
+        Index(value = ["student_id", "date", "subject", "eval_type"], unique = true),
+        Index("student_id"),
+        Index("teacher_user_id")
+    ]
 )
 data class EvaluationEntity(
     @PrimaryKey val id: String,

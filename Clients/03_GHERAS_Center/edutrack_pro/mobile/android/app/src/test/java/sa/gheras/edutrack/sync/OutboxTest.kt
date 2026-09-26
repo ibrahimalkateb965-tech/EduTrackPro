@@ -8,11 +8,13 @@ import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import sa.gheras.edutrack.data.db.GherasDatabase
+import sa.gheras.edutrack.data.entity.EvaluationEntity
 import sa.gheras.edutrack.data.entity.PendingWriteEntity
 import sa.gheras.edutrack.data.entity.RoomEntity
 import sa.gheras.edutrack.data.entity.StudentEntity
@@ -140,5 +142,108 @@ class OutboxTest {
 
             cancelAndIgnoreRemainingEvents()
         }
+    }
+
+    @Test
+    fun testEnqueue_dailyEval_optimisticProjection_and_deduplication() = runTest {
+        seedStudent("student_1")
+
+        // 1. Initial evaluation enqueue
+        val payload1 = "{\"student_id\":\"student_1\",\"date\":\"2026-09-21\",\"subject\":\"القرآن\",\"score\":10.0}"
+        outbox.enqueue(
+            kind = PendingWriteEntity.KIND_DAILY_EVAL,
+            naturalKey = "eval:student_1:2026-09-21:القرآن",
+            payloadJson = payload1
+        )
+
+        assertEquals(1, countRows("evaluations"))
+        val eval1 = db.evaluationDao().getById("local:student_1:2026-09-21:القرآن")
+        assertNotNull(eval1)
+        assertEquals(10.0, eval1!!.value, 0.001)
+
+        // 2. Updated evaluation for same student, date, and subject
+        val payload2 = "{\"student_id\":\"student_1\",\"date\":\"2026-09-21\",\"subject\":\"القرآن\",\"score\":7.5}"
+        outbox.enqueue(
+            kind = PendingWriteEntity.KIND_DAILY_EVAL,
+            naturalKey = "eval:student_1:2026-09-21:القرآن",
+            payloadJson = payload2
+        )
+
+        // Dedup invariant: exactly 1 row must exist, updated to 7.5
+        assertEquals(1, countRows("evaluations"))
+        val eval2 = db.evaluationDao().getById("local:student_1:2026-09-21:القرآن")
+        assertNotNull(eval2)
+        assertEquals(7.5, eval2!!.value, 0.001)
+    }
+
+    @Test
+    fun testRevertOptimisticProjection_restoresDisplacedServerEvaluation() = runTest {
+        seedStudent("student_1")
+
+        // 1. Seed existing server evaluation
+        val serverEval = EvaluationEntity(
+            id = "server_eval_123",
+            branchId = "branch_1",
+            studentId = "student_1",
+            subject = "القرآن",
+            evalType = "daily",
+            date = LocalDate.parse("2026-09-21"),
+            value = 10.0,
+            teacherUserId = "teacher_1",
+            createdAt = Instant.parse("2026-09-21T08:00:00Z"),
+            updatedAt = Instant.parse("2026-09-21T08:00:00Z")
+        )
+        db.evaluationDao().upsert(serverEval)
+        assertEquals(1, countRows("evaluations"))
+
+        // 2. Teacher updates evaluation optimistically to 7.5
+        val payload = "{\"student_id\":\"student_1\",\"date\":\"2026-09-21\",\"subject\":\"القرآن\",\"score\":7.5}"
+        outbox.enqueue(
+            kind = PendingWriteEntity.KIND_DAILY_EVAL,
+            naturalKey = "eval:student_1:2026-09-21:القرآن",
+            payloadJson = payload
+        )
+
+        // Local row replaced the server row via unique index
+        assertEquals(1, countRows("evaluations"))
+        val localEval = db.evaluationDao().getById("local:student_1:2026-09-21:القرآن")
+        assertNotNull(localEval)
+        assertEquals(7.5, localEval!!.value, 0.001)
+
+        val pending = db.pendingWriteDao().getByNaturalKey("eval:student_1:2026-09-21:القرآن")
+        assertNotNull(pending)
+
+        // 3. Simulate permanent failure (e.g. 422 validation error on server): revert is triggered
+        OutboxWorker.revertOptimisticProjection(pending!!, db)
+
+        // Invariant: local row is removed and original server row is restored with its original ID and score!
+        assertNull(db.evaluationDao().getById("local:student_1:2026-09-21:القرآن"))
+        assertEquals(1, countRows("evaluations"))
+        val restored = db.evaluationDao().getById("server_eval_123")
+        assertNotNull("Original server evaluation must be restored", restored)
+        assertEquals(10.0, restored!!.value, 0.001)
+    }
+
+    @Test
+    fun testRevertOptimisticProjection_freshEvaluation_deletesLocalRow() = runTest {
+        seedStudent("student_1")
+
+        val payload = "{\"student_id\":\"student_1\",\"date\":\"2026-09-21\",\"subject\":\"القرآن\",\"score\":8.0}"
+        outbox.enqueue(
+            kind = PendingWriteEntity.KIND_DAILY_EVAL,
+            naturalKey = "eval:student_1:2026-09-21:القرآن",
+            payloadJson = payload
+        )
+
+        assertEquals(1, countRows("evaluations"))
+        val pending = db.pendingWriteDao().getByNaturalKey("eval:student_1:2026-09-21:القرآن")
+        assertNotNull(pending)
+
+        // Revert fresh evaluation
+        OutboxWorker.revertOptimisticProjection(pending!!, db)
+
+        // Table should be empty again
+        assertEquals(0, countRows("evaluations"))
+        assertNull(db.evaluationDao().getById("local:student_1:2026-09-21:القرآن"))
     }
 }

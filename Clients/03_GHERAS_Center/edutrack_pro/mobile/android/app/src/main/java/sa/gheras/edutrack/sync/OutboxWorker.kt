@@ -14,8 +14,13 @@ import sa.gheras.edutrack.data.remote.dto.DailyEvalItemBody
 import sa.gheras.edutrack.data.remote.dto.LessonLogBody
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.RequestBody.Companion.asRequestBody
+import sa.gheras.edutrack.data.entity.EvaluationEntity
+import sa.gheras.edutrack.data.repo.mappers.DateParsers
 import java.io.File
 import java.io.IOException
+import java.time.Instant
+import java.time.LocalDate
+import kotlinx.coroutines.CancellationException
 
 class OutboxWorker(
     context: Context,
@@ -32,11 +37,13 @@ class OutboxWorker(
         val pendingList = db.pendingWriteDao().listPending()
         if (pendingList.isEmpty()) return Result.success()
 
+        var hadWork = false
         for (item in pendingList) {
             try {
                 flushItem(item, meApi, db)
                 // 2xx success: remove row from pending_writes
                 db.pendingWriteDao().deleteById(item.id)
+                hadWork = true
             } catch (e: HttpException) {
                 val code = e.code()
                 if (code == 401) {
@@ -47,6 +54,7 @@ class OutboxWorker(
                     val error = ErrorMapper.map(e)
                     db.pendingWriteDao().markFailed(item.id, error.userMessage)
                     revertOptimisticProjection(item, db)
+                    hadWork = true
                 } else {
                     // 5xx server error
                     db.pendingWriteDao().recordAttempt(item.id, e.message())
@@ -56,10 +64,21 @@ class OutboxWorker(
                 // Network failure: retry later
                 db.pendingWriteDao().recordAttempt(item.id, e.message)
                 return Result.retry()
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 db.pendingWriteDao().markFailed(item.id, e.message ?: "unknown error")
                 revertOptimisticProjection(item, db)
+                hadWork = true
             }
+        }
+
+        if (hadWork) {
+            try {
+                container.pullSync.requestFull()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {}
         }
 
         return Result.success()
@@ -218,10 +237,11 @@ class OutboxWorker(
         }
     }
 
-    private suspend fun revertOptimisticProjection(
-        item: PendingWriteEntity,
-        db: sa.gheras.edutrack.data.db.GherasDatabase
-    ) {
+    companion object {
+        internal suspend fun revertOptimisticProjection(
+            item: PendingWriteEntity,
+            db: sa.gheras.edutrack.data.db.GherasDatabase
+        ) {
         val json = JSONObject(item.payloadJson)
         when (item.kind) {
             PendingWriteEntity.KIND_ATTENDANCE -> {
@@ -233,7 +253,28 @@ class OutboxWorker(
                 val studentId = json.optString("student_id")
                 val dateStr = json.optString("date")
                 val subject = json.optString("subject", "عام")
+                val date = DateParsers.parseLocalDate(dateStr) ?: LocalDate.now()
+
                 db.evaluationDao().deleteById("local:$studentId:$dateStr:$subject")
+
+                if (json.has("prev_id")) {
+                    try {
+                        val prevEntity = EvaluationEntity(
+                            id = json.getString("prev_id"),
+                            branchId = if (json.has("prev_branch_id")) json.optString("prev_branch_id").takeIf { it.isNotBlank() } else null,
+                            studentId = studentId,
+                            subject = subject,
+                            evalType = "daily",
+                            date = date,
+                            value = json.getDouble("prev_value"),
+                            teacherUserId = if (json.has("prev_teacher_id")) json.optString("prev_teacher_id").takeIf { it.isNotBlank() } else null,
+                            createdAt = Instant.parse(json.getString("prev_created_at")),
+                            updatedAt = Instant.parse(json.getString("prev_updated_at")),
+                            deletedAt = null
+                        )
+                        db.evaluationDao().upsert(prevEntity)
+                    } catch (_: Exception) {}
+                }
             }
             PendingWriteEntity.KIND_LESSON_LOG -> {
                 val scheduleId = json.optString("schedule_id")
@@ -263,4 +304,5 @@ class OutboxWorker(
             }
         }
     }
+}
 }

@@ -29,7 +29,7 @@ class AppContainer(private val context: Context) {
             GherasDatabase::class.java,
             GherasDatabase.DATABASE_NAME
         )
-            .addMigrations(GherasDatabase.MIGRATION_1_2)
+            .addMigrations(GherasDatabase.MIGRATION_1_2, GherasDatabase.MIGRATION_2_3)
             .fallbackToDestructiveMigrationOnDowngrade()
             .build()
     }

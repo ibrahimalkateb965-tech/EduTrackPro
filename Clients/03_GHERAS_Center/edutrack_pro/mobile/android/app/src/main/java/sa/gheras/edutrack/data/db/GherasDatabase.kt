@@ -59,7 +59,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         SubmissionFileEntity::class,
         SyncStateEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -150,6 +150,17 @@ abstract class GherasDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE notifications ADD COLUMN sender_name TEXT")
                 db.execSQL("ALTER TABLE notifications ADD COLUMN broadcast_id TEXT")
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_notifications_user_id_deleted_at ON notifications(user_id, deleted_at)")
+            }
+        }
+
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    DELETE FROM evaluations WHERE rowid NOT IN (
+                        SELECT MAX(rowid) FROM evaluations GROUP BY student_id, date, subject, eval_type
+                    )
+                """.trimIndent())
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_evaluations_student_id_date_subject_eval_type ON evaluations(student_id, date, subject, eval_type)")
             }
         }
     }

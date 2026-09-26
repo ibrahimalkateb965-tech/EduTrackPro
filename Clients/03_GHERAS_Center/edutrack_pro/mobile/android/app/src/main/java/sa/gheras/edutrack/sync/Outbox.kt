@@ -32,11 +32,43 @@ class Outbox(
             val existing = db.pendingWriteDao().getByNaturalKey(naturalKey)
             val id = existing?.id ?: UUID.randomUUID().toString()
 
+            var effectivePayloadJson = payloadJson
+            if (kind == PendingWriteEntity.KIND_DAILY_EVAL) {
+                val json = JSONObject(payloadJson)
+                val studentId = json.optString("student_id")
+                val dateStr = json.optString("date")
+                val subject = json.optString("subject", "عام")
+                val date = DateParsers.parseLocalDate(dateStr) ?: LocalDate.now()
+
+                val existingPendingJson = existing?.payloadJson?.let {
+                    try { JSONObject(it) } catch (_: Exception) { null }
+                }
+                if (existingPendingJson != null && existingPendingJson.has("prev_id")) {
+                    json.put("prev_id", existingPendingJson.getString("prev_id"))
+                    json.put("prev_value", existingPendingJson.getDouble("prev_value"))
+                    if (existingPendingJson.has("prev_teacher_id")) json.put("prev_teacher_id", existingPendingJson.getString("prev_teacher_id"))
+                    if (existingPendingJson.has("prev_created_at")) json.put("prev_created_at", existingPendingJson.getString("prev_created_at"))
+                    if (existingPendingJson.has("prev_updated_at")) json.put("prev_updated_at", existingPendingJson.getString("prev_updated_at"))
+                    if (existingPendingJson.has("prev_branch_id")) json.put("prev_branch_id", existingPendingJson.getString("prev_branch_id"))
+                } else {
+                    val existingEval = db.evaluationDao().getByStudentDateSubject(studentId, date, subject, "daily")
+                    if (existingEval != null && !existingEval.id.startsWith("local:")) {
+                        json.put("prev_id", existingEval.id)
+                        json.put("prev_value", existingEval.value)
+                        existingEval.teacherUserId?.let { json.put("prev_teacher_id", it) }
+                        json.put("prev_created_at", existingEval.createdAt.toString())
+                        json.put("prev_updated_at", existingEval.updatedAt.toString())
+                        existingEval.branchId?.let { json.put("prev_branch_id", it) }
+                    }
+                }
+                effectivePayloadJson = json.toString()
+            }
+
             val writeEntity = PendingWriteEntity(
                 id = id,
                 kind = kind,
                 naturalKey = naturalKey,
-                payloadJson = payloadJson,
+                payloadJson = effectivePayloadJson,
                 createdAt = now,
                 attempts = 0,
                 lastError = null
@@ -44,7 +76,7 @@ class Outbox(
             db.pendingWriteDao().upsert(writeEntity)
 
             // Apply optimistic projection locally
-            applyOptimisticProjection(kind, naturalKey, payloadJson, now)
+            applyOptimisticProjection(kind, naturalKey, effectivePayloadJson, now)
         }
 
         scheduleFlush()
@@ -88,16 +120,21 @@ class Outbox(
                 val score = json.optDouble("score", 0.0)
                 val date = DateParsers.parseLocalDate(dateStr) ?: LocalDate.now()
 
+                val prevBranchId = if (json.has("prev_branch_id")) json.optString("prev_branch_id").takeIf { it.isNotBlank() } else null
+                val prevCreatedAt = if (json.has("prev_created_at")) {
+                    try { Instant.parse(json.getString("prev_created_at")) } catch (_: Exception) { now }
+                } else now
+
                 val entity = EvaluationEntity(
                     id = "local:$studentId:$dateStr:$subject",
-                    branchId = null,
+                    branchId = prevBranchId,
                     studentId = studentId,
                     subject = subject,
                     evalType = "daily",
                     date = date,
                     value = score,
                     teacherUserId = me,
-                    createdAt = now,
+                    createdAt = prevCreatedAt,
                     updatedAt = now,
                     deletedAt = null
                 )

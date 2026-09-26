@@ -77,7 +77,10 @@ class GuardianHomeViewModel(
         ) { attendances, evals, assignments, installments ->
             val today = LocalDate.now()
             val todayAtt = attendances.find { it.date == today }
-            val latestEvals = evals.distinctBy { it.subject }.take(4)
+            val latestEvals = evals
+                .sortedWith(compareByDescending<EvaluationEntity> { it.date }.thenByDescending { it.updatedAt })
+                .distinctBy { it.subject }
+                .take(4)
             val pendingHomework = assignments.count { it.dueDate == null || !it.dueDate.isBefore(today) }
             val nextInstallment = installments
                 .filter { it.status != "paid" }

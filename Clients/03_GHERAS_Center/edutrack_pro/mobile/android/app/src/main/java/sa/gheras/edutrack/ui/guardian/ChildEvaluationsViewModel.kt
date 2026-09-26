@@ -36,11 +36,13 @@ class ChildEvaluationsViewModel(
         val student = studentsRepository.getById(studentId)
         val subjects = evals.map { it.subject }.distinct()
 
-        val filtered = if (subjectFilter == null) {
+        val filtered = (if (subjectFilter == null) {
             evals
         } else {
             evals.filter { it.subject == subjectFilter }
-        }.sortedByDescending { it.date }
+        })
+            .sortedWith(compareByDescending<EvaluationEntity> { it.date }.thenByDescending { it.updatedAt })
+            .distinctBy { "${it.date}:${it.subject}:${it.evalType}" }
 
         ChildEvaluationsUiState(
             studentName = student?.name ?: "الطالب",

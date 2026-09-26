@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import sa.gheras.edutrack.data.dao.RoomDao
+import sa.gheras.edutrack.data.entity.EvaluationEntity
 import sa.gheras.edutrack.data.entity.StudentEntity
 import sa.gheras.edutrack.data.repo.EvaluationRecord
 import sa.gheras.edutrack.data.repo.EvaluationsRepository
@@ -74,6 +75,8 @@ class EvaluationSheetViewModel(
 
             val existingEvals = evaluationsRepository.observeByDate(targetDate).first()
                 .filter { it.subject == currentSubject }
+                .sortedWith(compareByDescending<EvaluationEntity> { it.date }.thenByDescending { it.updatedAt })
+                .distinctBy { it.studentId }
                 .associateBy { it.studentId }
 
             val drafts = students.map { student ->
