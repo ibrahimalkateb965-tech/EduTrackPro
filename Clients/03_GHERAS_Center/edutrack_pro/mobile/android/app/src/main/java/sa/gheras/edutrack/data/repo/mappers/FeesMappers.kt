@@ -11,15 +11,17 @@ object FeesMappers {
 
     fun installmentToEntity(dto: InstallmentDto, defaultBranchId: String? = null): InstallmentEntity {
         val now = Instant.now()
+        val isPaid = dto.status.equals("PAID", ignoreCase = true)
+        val paidAmt = dto.paidAmount ?: if (isPaid) (dto.amount ?: 0.0) else 0.0
         return InstallmentEntity(
             id = dto.id,
-            branchId = defaultBranchId,
+            branchId = dto.branchId ?: defaultBranchId,
             studentId = dto.studentId ?: "",
             feePlanId = dto.feePlanId ?: "default_plan",
-            seqNo = 1,
+            seqNo = dto.seqNo ?: 1,
             dueDate = DateParsers.parseLocalDate(dto.dueDate) ?: LocalDate.now(),
             amount = dto.amount ?: 0.0,
-            paidAmount = if (dto.status == "PAID") (dto.amount ?: 0.0) else 0.0,
+            paidAmount = paidAmt,
             status = dto.status,
             createdAt = DateParsers.parseInstant(dto.createdAt),
             updatedAt = DateParsers.parseInstant(dto.updatedAt),
@@ -29,10 +31,10 @@ object FeesMappers {
 
     fun receiptToEntity(dto: ReceiptDto, defaultBranchId: String? = null): ReceiptEntity {
         val now = Instant.now()
-        val num = dto.receiptNumber?.filter { it.isDigit() }?.toIntOrNull() ?: 1
+        val num = dto.receiptNo ?: dto.receiptNumber?.filter { it.isDigit() }?.toIntOrNull() ?: 1
         return ReceiptEntity(
             id = dto.id,
-            branchId = defaultBranchId,
+            branchId = dto.branchId ?: defaultBranchId,
             paymentId = dto.paymentId ?: dto.id,
             studentId = dto.studentId ?: "",
             installmentId = dto.installmentId,
