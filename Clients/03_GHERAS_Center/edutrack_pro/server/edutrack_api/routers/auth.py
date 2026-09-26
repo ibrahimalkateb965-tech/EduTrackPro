@@ -107,7 +107,7 @@ def login(body: LoginBody, conn=Depends(get_conn)):
 
     if role_filter:
         query = (
-            "SELECT u.id, u.username, u.password_hash, u.role, u.staff_id, u.guardian_id, u.room_id, u.student_id, u.is_active "
+            "SELECT u.id, u.username, u.password_hash, u.role, u.staff_id, u.guardian_id, u.room_id, u.student_id, u.is_active, u.token_version "
             "FROM users u "
             "LEFT JOIN staff s ON s.id = u.staff_id AND s.deleted_at IS NULL "
             "LEFT JOIN guardians g ON g.id = u.guardian_id AND g.deleted_at IS NULL "
@@ -120,7 +120,7 @@ def login(body: LoginBody, conn=Depends(get_conn)):
         params = (ident, ident, phones, phones, phones, role_filter, ident, ident, phones)
     else:
         query = (
-            "SELECT u.id, u.username, u.password_hash, u.role, u.staff_id, u.guardian_id, u.room_id, u.student_id, u.is_active "
+            "SELECT u.id, u.username, u.password_hash, u.role, u.staff_id, u.guardian_id, u.room_id, u.student_id, u.is_active, u.token_version "
             "FROM users u "
             "LEFT JOIN staff s ON s.id = u.staff_id AND s.deleted_at IS NULL "
             "LEFT JOIN guardians g ON g.id = u.guardian_id AND g.deleted_at IS NULL "
@@ -249,7 +249,7 @@ def verify_otp(body: VerifyOtpBody, conn=Depends(get_conn)):
     conn.execute("UPDATE auth_otps SET is_used = true WHERE id = %s", (body.session_id,))
 
     user = conn.execute(
-        "SELECT id, username, role, staff_id, guardian_id, room_id, student_id, is_active "
+        "SELECT id, username, role, staff_id, guardian_id, room_id, student_id, is_active, token_version "
         "FROM users WHERE id = %s AND deleted_at IS NULL",
         (otp["user_id"],),
     ).fetchone()

@@ -37,7 +37,7 @@ def issue_token(user_row: dict, settings) -> str:
         "sub": str(user_row["id"]),
         "role": user_row["role"],
         "jti": str(uuid4()),
-        "ver": user_row.get("token_version", 1),
+        "ver": user_row["token_version"],
         "iat": now,
         "exp": now + timedelta(minutes=token_ttl_minutes(user_row["role"], settings)),
     }

@@ -118,6 +118,12 @@ def test_change_password_revokes_old_tokens(client, db):
     me_after = client.get("/api/v1/me/profile", headers={"Authorization": f"Bearer {token}"})
     assert me_after.status_code == 401
 
+    # Verify newly issued token after password change works!
+    new_login = client.post("/api/v1/auth/login", json={"username": "token_revoke_user", "password": "NewSecurePassword456!"})
+    assert new_login.status_code == 200
+    new_token = new_login.json()["token"]
+    assert client.get("/api/v1/me/profile", headers={"Authorization": f"Bearer {new_token}"}).status_code == 200
+
 
 def test_reset_password_revokes_existing_tokens(client, db):
     mgr_id = make_user(db, "mgr_reset_user", "manager", password="ManagerPass123!")
@@ -140,4 +146,10 @@ def test_reset_password_revokes_existing_tokens(client, db):
 
     # Victim token must now be REVOKED!
     assert client.get("/api/v1/me/profile", headers={"Authorization": f"Bearer {user_token}"}).status_code == 401
+
+    # Verify newly issued token after manager reset works!
+    victim_new_login = client.post("/api/v1/auth/login", json={"username": "victim_reset_user", "password": "BrandNewPassword789!"})
+    assert victim_new_login.status_code == 200
+    victim_new_token = victim_new_login.json()["token"]
+    assert client.get("/api/v1/me/profile", headers={"Authorization": f"Bearer {victim_new_token}"}).status_code == 200
 
