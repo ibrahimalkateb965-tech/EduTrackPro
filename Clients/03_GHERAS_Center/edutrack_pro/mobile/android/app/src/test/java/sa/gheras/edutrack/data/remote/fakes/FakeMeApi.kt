@@ -1,9 +1,11 @@
 package sa.gheras.edutrack.data.remote.fakes
 
+import okhttp3.MultipartBody
 import okhttp3.RequestBody
 import retrofit2.Response
 import sa.gheras.edutrack.data.remote.MeApi
 import sa.gheras.edutrack.data.remote.dto.UploadResponseDto
+import sa.gheras.edutrack.data.remote.dto.GradeSubmissionBody
 import sa.gheras.edutrack.data.remote.dto.AttendanceDto
 import sa.gheras.edutrack.data.remote.dto.AttendanceItemBody
 import sa.gheras.edutrack.data.remote.dto.AssignmentDto
@@ -73,4 +75,33 @@ class FakeMeApi : MeApi {
             size = 1024L
         )
     }
+
+    override suspend fun submitHomework(
+        assignmentId: RequestBody,
+        studentId: RequestBody,
+        notes: RequestBody?,
+        files: List<MultipartBody.Part>
+    ): SubmissionDto {
+        return SubmissionDto(
+            id = "sub_fake",
+            assignmentId = "assign_fake",
+            studentId = "student_fake",
+            status = "submitted"
+        )
+    }
+
+    override suspend fun gradeSubmission(
+        submissionId: String,
+        body: GradeSubmissionBody
+    ): SubmissionDto {
+        return SubmissionDto(
+            id = submissionId,
+            assignmentId = "assign_fake",
+            studentId = "student_fake",
+            status = "graded",
+            grade = body.grade,
+            feedback = body.feedback
+        )
+    }
 }
+

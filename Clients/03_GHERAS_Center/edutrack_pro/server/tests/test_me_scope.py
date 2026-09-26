@@ -392,6 +392,18 @@ def test_b2_evaluations_are_scoped_with_type_filter(client, manager, world):
     assert client.get(f"{ME}/evaluations", headers=world.teacher).json()["total"] == 2
 
 
+def test_b2_daily_evaluations_validation(client, manager, world):
+    # Reject missing score/value
+    res = client.post("/api/v1/evaluations/daily", json=[{"student_id": world.a1, "date": _iso(TODAY)}], headers=manager)
+    assert res.status_code == 422
+    # Reject score > 10
+    res = client.post("/api/v1/evaluations/daily", json=[{"student_id": world.a1, "date": _iso(TODAY), "value": 11}], headers=manager)
+    assert res.status_code == 422
+    # Reject score < 0
+    res = client.post("/api/v1/evaluations/daily", json=[{"student_id": world.a1, "date": _iso(TODAY), "value": -1}], headers=manager)
+    assert res.status_code == 422
+
+
 def test_b2_assignments_teacher_sees_own_or_linked_guardian_sees_children_only(client, db, world):
     other_id = str(make_user(db, "t_other", "teacher"))
     asg1 = _assignment(db, "واجب 1", world.teacher_id, [world.a1, world.b1])
@@ -428,7 +440,7 @@ def test_b2_submissions_never_leak_another_childs_files(client, db, world):
     row = g_view["items"][0]
     assert row["assignment_title"] == "واجب" and row["student_name"] == "طالب أ1"
     assert [f["storage_key"] for f in row["files"]] == ["sub/a1.jpg"]
-    assert set(row["files"][0]) == {"id", "storage_key", "width", "height"}
+    assert set(row["files"][0]) == {"id", "storage_key", "url", "width", "height"}
 
     g2_view = client.get(f"{ME}/submissions", headers=world.guardian2).json()
     assert [r["id"] for r in g2_view["items"]] == [sub_b1]

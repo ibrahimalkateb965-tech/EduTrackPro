@@ -89,3 +89,55 @@ def test_change_password_short_or_mismatch(client, db):
         },
     )
     assert res_mismatch.status_code == 400
+
+
+def test_change_password_revokes_old_tokens(client, db):
+    user_id = make_user(db, "token_revoke_user", "teacher", password="OldPassword123!")
+    db.commit()
+
+    login_res = client.post("/api/v1/auth/login", json={"username": "token_revoke_user", "password": "OldPassword123!"})
+    token = login_res.json()["token"]
+
+    # Verify token works before password change
+    me_res = client.get("/api/v1/me/profile", headers={"Authorization": f"Bearer {token}"})
+    assert me_res.status_code == 200
+
+    # Change password
+    change_res = client.post(
+        "/api/v1/auth/change-password",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "current_password": "OldPassword123!",
+            "new_password": "NewSecurePassword456!",
+            "confirm_password": "NewSecurePassword456!",
+        },
+    )
+    assert change_res.status_code == 200
+
+    # Verify old token is now REVOKED!
+    me_after = client.get("/api/v1/me/profile", headers={"Authorization": f"Bearer {token}"})
+    assert me_after.status_code == 401
+
+
+def test_reset_password_revokes_existing_tokens(client, db):
+    mgr_id = make_user(db, "mgr_reset_user", "manager", password="ManagerPass123!")
+    user_id = make_user(db, "victim_reset_user", "teacher", password="UserPass123!")
+    db.commit()
+
+    mgr_token = client.post("/api/v1/auth/login", json={"username": "mgr_reset_user", "password": "ManagerPass123!"}).json()["token"]
+    user_token = client.post("/api/v1/auth/login", json={"username": "victim_reset_user", "password": "UserPass123!"}).json()["token"]
+
+    # Verify victim token works
+    assert client.get("/api/v1/me/profile", headers={"Authorization": f"Bearer {user_token}"}).status_code == 200
+
+    # Manager resets user's password
+    reset_res = client.post(
+        f"/api/v1/auth/reset-password/{user_id}",
+        headers={"Authorization": f"Bearer {mgr_token}"},
+        json={"new_password": "BrandNewPassword789!"},
+    )
+    assert reset_res.status_code == 200
+
+    # Victim token must now be REVOKED!
+    assert client.get("/api/v1/me/profile", headers={"Authorization": f"Bearer {user_token}"}).status_code == 401
+

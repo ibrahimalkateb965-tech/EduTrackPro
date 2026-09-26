@@ -37,6 +37,7 @@ def issue_token(user_row: dict, settings) -> str:
         "sub": str(user_row["id"]),
         "role": user_row["role"],
         "jti": str(uuid4()),
+        "ver": user_row.get("token_version", 1),
         "iat": now,
         "exp": now + timedelta(minutes=token_ttl_minutes(user_row["role"], settings)),
     }
@@ -64,12 +65,14 @@ def current_user(
         raise ApiError(401, "unauthorized", "غير مصرح")
     revoked = conn.execute("SELECT 1 FROM revoked_tokens WHERE jti = %s", (jti,)).fetchone()
     user = conn.execute(
-        "SELECT id, branch_id, username, role, staff_id, guardian_id, room_id, is_active "
+        "SELECT id, branch_id, username, role, staff_id, guardian_id, room_id, is_active, token_version "
         "FROM users WHERE id = %s AND deleted_at IS NULL",
         (subject,),
     ).fetchone()
     if revoked or not user or not user["is_active"]:
         raise ApiError(401, "unauthorized", "غير مصرح")
+    if claims.get("ver") is not None and user.get("token_version") is not None and claims["ver"] != user["token_version"]:
+        raise ApiError(401, "unauthorized", "انتهت صلاحية الجلسة")
     user = dict(user)
     user["_jti"] = jti
     user["_exp"] = claims["exp"]

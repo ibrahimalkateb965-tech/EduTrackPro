@@ -200,16 +200,16 @@ def save_daily_evaluations(
         if raw_val is None:
             raw_val = item.get("score")
         if raw_val is None:
-            raw_val = 0
+            raise ApiError(422, "validation_error", "درجة التقييم مفقودة")
 
         if not student_id or not eval_date:
             raise ApiError(422, "validation_error", "بيانات التقييم غير مكتملة")
         try:
             val = float(raw_val)
-            if val < 0:
+            if val < 0 or val > 10:
                 raise ValueError()
         except (ValueError, TypeError):
-            raise ApiError(422, "validation_error", "درجة التقييم يجب أن تكون رقماً أكبر من أو يساوي الصفر")
+            raise ApiError(422, "validation_error", "درجة التقييم يجب أن تكون رقماً بين 0 و 10")
 
         # Resolve branch_id from student
         st_row = conn.execute("SELECT branch_id FROM students WHERE id = %s", (student_id,)).fetchone()

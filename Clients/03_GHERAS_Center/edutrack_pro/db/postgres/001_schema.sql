@@ -149,6 +149,7 @@ CREATE TABLE IF NOT EXISTS users (
     staff_id uuid REFERENCES staff(id) ON DELETE RESTRICT,
     guardian_id uuid REFERENCES guardians(id) ON DELETE RESTRICT,
     room_id uuid REFERENCES rooms(id) ON DELETE RESTRICT,
+    token_version integer NOT NULL DEFAULT 1,
     is_active boolean NOT NULL DEFAULT true,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),

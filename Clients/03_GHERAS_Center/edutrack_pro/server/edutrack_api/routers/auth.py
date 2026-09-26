@@ -306,8 +306,13 @@ def change_password(body: ChangePasswordBody, user: dict = Depends(current_user)
 
     new_hash = hash_password(body.new_password)
     conn.execute(
-        "UPDATE users SET password_hash = %s, updated_at = now() WHERE id = %s",
+        "UPDATE users SET password_hash = %s, token_version = token_version + 1, updated_at = now() WHERE id = %s",
         (new_hash, user["id"]),
+    )
+    conn.execute("DELETE FROM revoked_tokens WHERE expires_at < now()")
+    conn.execute(
+        "INSERT INTO revoked_tokens (jti, expires_at) VALUES (%s, %s) ON CONFLICT (jti) DO NOTHING",
+        (user["_jti"], datetime.fromtimestamp(user["_exp"], UTC)),
     )
     write_audit(conn, user["id"], "change_password", "user", user["id"], {"username": user["username"]})
     return {"status": "ok", "message": "تم تغيير كلمة المرور بنجاح"}
@@ -329,7 +334,7 @@ def reset_user_password(user_id: UUID, body: ResetUserPasswordBody, user: dict =
 
     new_hash = hash_password(body.new_password)
     conn.execute(
-        "UPDATE users SET password_hash = %s, updated_at = now() WHERE id = %s",
+        "UPDATE users SET password_hash = %s, token_version = token_version + 1, updated_at = now() WHERE id = %s",
         (new_hash, user_id),
     )
     write_audit(conn, user["id"], "reset_password", "user", user_id, {"username": target_user["username"]})
