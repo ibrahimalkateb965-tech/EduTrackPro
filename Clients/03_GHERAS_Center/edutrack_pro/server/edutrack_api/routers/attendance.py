@@ -196,7 +196,11 @@ def save_daily_evaluations(
         student_id = item.get("student_id")
         eval_date = item.get("date")
         subject = item.get("subject") or "القرآن"
-        raw_val = item.get("value", 0)
+        raw_val = item.get("value")
+        if raw_val is None:
+            raw_val = item.get("score")
+        if raw_val is None:
+            raw_val = 0
 
         if not student_id or not eval_date:
             raise ApiError(422, "validation_error", "بيانات التقييم غير مكتملة")
