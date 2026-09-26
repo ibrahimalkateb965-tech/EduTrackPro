@@ -32,11 +32,11 @@ object AcademicMappers {
             id = dto.id,
             branchId = defaultBranchId,
             studentId = dto.studentId,
-            subject = "عام",
+            subject = dto.subject ?: "عام",
             evalType = dto.evalType ?: "daily",
             date = DateParsers.parseLocalDate(dto.date) ?: LocalDate.now(),
-            value = dto.score ?: 0.0,
-            teacherUserId = dto.recordedByUserId,
+            value = dto.value ?: dto.score ?: 0.0,
+            teacherUserId = dto.teacherUserId ?: dto.recordedByUserId,
             createdAt = DateParsers.parseInstant(dto.createdAt),
             updatedAt = DateParsers.parseInstant(dto.updatedAt),
             deletedAt = dto.deletedAt?.let { DateParsers.parseInstant(it) }
@@ -63,13 +63,13 @@ object AcademicMappers {
     fun skillProgressToEntity(dto: SkillProgressDto, defaultBranchId: String? = null): SkillProgressEntity {
         return SkillProgressEntity(
             id = dto.id,
-            branchId = defaultBranchId,
+            branchId = dto.branchId ?: defaultBranchId,
             studentId = dto.studentId,
             subject = dto.subject,
-            skill = dto.subject,
-            level = dto.score?.toString() ?: "1",
+            skill = dto.skill ?: dto.subject,
+            level = dto.level ?: dto.score?.toString() ?: "متقن",
             date = DateParsers.parseLocalDate(dto.date) ?: LocalDate.now(),
-            note = dto.notes,
+            note = dto.note ?: dto.notes,
             createdAt = DateParsers.parseInstant(dto.createdAt),
             updatedAt = DateParsers.parseInstant(dto.updatedAt),
             deletedAt = null

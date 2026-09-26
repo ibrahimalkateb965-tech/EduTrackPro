@@ -138,12 +138,13 @@ fun ChildEvaluationsScreen(
                                         )
                                     }
 
-                                    Text(
-                                        text = "${Num.formatInt(eval.value.toInt())} / 10",
-                                        style = MaterialTheme.typography.titleLarge,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
+                                        val formattedScore = if (eval.value % 1.0 == 0.0) Num.formatInt(eval.value.toInt()) else String.format(java.util.Locale.US, "%.1f", eval.value)
+                                        Text(
+                                            text = "\u200E$formattedScore / 10\u200E",
+                                            style = MaterialTheme.typography.titleLarge,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
                                 }
                             }
                         }

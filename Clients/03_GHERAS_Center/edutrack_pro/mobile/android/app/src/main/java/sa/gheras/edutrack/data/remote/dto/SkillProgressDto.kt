@@ -13,5 +13,9 @@ data class SkillProgressDto(
     val notes: String? = null,
     @SerialName("student_name") val studentName: String? = null,
     @SerialName("created_at") val createdAt: String? = null,
-    @SerialName("updated_at") val updatedAt: String? = null
+    @SerialName("updated_at") val updatedAt: String? = null,
+    @SerialName("branch_id") val branchId: String? = null,
+    val skill: String? = null,
+    val level: String? = null,
+    val note: String? = null
 )

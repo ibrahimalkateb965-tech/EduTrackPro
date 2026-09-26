@@ -16,5 +16,9 @@ data class EvaluationDto(
     @SerialName("student_name") val studentName: String? = null,
     @SerialName("created_at") val createdAt: String? = null,
     @SerialName("updated_at") val updatedAt: String? = null,
-    @SerialName("deleted_at") val deletedAt: String? = null
+    @SerialName("deleted_at") val deletedAt: String? = null,
+    val subject: String? = null,
+    val value: Double? = null,
+    @SerialName("branch_id") val branchId: String? = null,
+    @SerialName("teacher_user_id") val teacherUserId: String? = null
 )
