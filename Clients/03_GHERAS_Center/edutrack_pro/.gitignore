@@ -1,0 +1,22 @@
+# Gradle & Android builds
+.gradle/
+build/
+**/build/
+*.apk
+*.aab
+
+# IDE & Editor caches
+.idea/
+*.iml
+.vscode/
+
+# Python & Backend
+__pycache__/
+*.pyc
+.env
+venv/
+.pytest_cache/
+
+# OS files
+.DS_Store
+Thumbs.db
