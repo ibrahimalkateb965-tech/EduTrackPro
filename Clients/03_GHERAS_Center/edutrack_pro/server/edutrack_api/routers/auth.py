@@ -111,26 +111,28 @@ def login(body: LoginBody, conn=Depends(get_conn)):
             "FROM users u "
             "LEFT JOIN staff s ON s.id = u.staff_id AND s.deleted_at IS NULL "
             "LEFT JOIN guardians g ON g.id = u.guardian_id AND g.deleted_at IS NULL "
-            "WHERE (u.username = %s OR u.national_id = %s OR u.phone = ANY(%s) OR s.phone = ANY(%s) OR g.phone = ANY(%s)) "
+            "LEFT JOIN students st ON st.id = u.student_id AND st.deleted_at IS NULL "
+            "WHERE (u.username = %s OR u.national_id = %s OR st.national_id = %s OR u.phone = ANY(%s) OR s.phone = ANY(%s) OR g.phone = ANY(%s)) "
             "  AND u.role = %s AND u.deleted_at IS NULL "
-            "ORDER BY CASE WHEN u.username = %s OR u.national_id = %s THEN 0 "
+            "ORDER BY CASE WHEN u.username = %s OR u.national_id = %s OR st.national_id = %s THEN 0 "
             "              WHEN u.phone = ANY(%s) THEN 1 ELSE 2 END, u.id "
             "LIMIT 10"
         )
-        params = (ident, ident, phones, phones, phones, role_filter, ident, ident, phones)
+        params = (ident, ident, ident, phones, phones, phones, role_filter, ident, ident, ident, phones)
     else:
         query = (
             "SELECT u.id, u.username, u.password_hash, u.role, u.staff_id, u.guardian_id, u.room_id, u.student_id, u.is_active, u.token_version "
             "FROM users u "
             "LEFT JOIN staff s ON s.id = u.staff_id AND s.deleted_at IS NULL "
             "LEFT JOIN guardians g ON g.id = u.guardian_id AND g.deleted_at IS NULL "
-            "WHERE (u.username = %s OR u.national_id = %s OR u.phone = ANY(%s) OR s.phone = ANY(%s) OR g.phone = ANY(%s)) "
+            "LEFT JOIN students st ON st.id = u.student_id AND st.deleted_at IS NULL "
+            "WHERE (u.username = %s OR u.national_id = %s OR st.national_id = %s OR u.phone = ANY(%s) OR s.phone = ANY(%s) OR g.phone = ANY(%s)) "
             "  AND u.deleted_at IS NULL "
-            "ORDER BY CASE WHEN u.username = %s OR u.national_id = %s THEN 0 "
+            "ORDER BY CASE WHEN u.username = %s OR u.national_id = %s OR st.national_id = %s THEN 0 "
             "              WHEN u.phone = ANY(%s) THEN 1 ELSE 2 END, u.id "
             "LIMIT 10"
         )
-        params = (ident, ident, phones, phones, phones, ident, ident, phones)
+        params = (ident, ident, ident, phones, phones, phones, ident, ident, ident, phones)
 
     candidates = conn.execute(query, params).fetchall()
 
@@ -161,10 +163,11 @@ def request_otp(body: RequestOtpBody, conn=Depends(get_conn)):
         "FROM users u "
         "LEFT JOIN staff s ON s.id = u.staff_id AND s.deleted_at IS NULL "
         "LEFT JOIN guardians g ON g.id = u.guardian_id AND g.deleted_at IS NULL "
-        "WHERE (u.national_id = %s OR u.username = %s OR u.phone = ANY(%s) OR s.phone = ANY(%s) OR g.phone = ANY(%s)) "
+        "LEFT JOIN students st ON st.id = u.student_id AND st.deleted_at IS NULL "
+        "WHERE (u.national_id = %s OR st.national_id = %s OR u.username = %s OR u.phone = ANY(%s) OR s.phone = ANY(%s) OR g.phone = ANY(%s)) "
         "  AND u.role = %s AND u.deleted_at IS NULL "
         "ORDER BY u.id LIMIT 1",
-        (ident, ident, phones, phones, phones, role_filter),
+        (ident, ident, ident, phones, phones, phones, role_filter),
     ).fetchone()
 
     if not user or not user["is_active"]:

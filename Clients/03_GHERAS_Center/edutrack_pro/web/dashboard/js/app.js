@@ -16,6 +16,8 @@ let loginActive = false;
 let renderId = 0;
 let logoutInFlight = false;
 
+function getToken() { return sessionStorage.getItem('gheras_token') || localStorage.getItem('gheras_token'); }
+
 function currentRoute() {
   const hash = location.hash.replace(/^#\/?/, '');
   const [name, query] = hash.split('?');
@@ -56,7 +58,7 @@ async function showLogin(id) {
   userName.textContent = 'الإدارة';
   loginActive = true;
   document.body.classList.add('auth-locked');
-  const { render } = await import('./views/login.js?v=3.1');
+  const { render } = await import('./views/login.js?v=3.2');
   if (id !== undefined && id !== renderId) return;
   main.replaceChildren();
   await render(main, api);
@@ -64,7 +66,7 @@ async function showLogin(id) {
 
 async function handleRoute() {
   const id = ++renderId;
-  if (!sessionStorage.getItem('gheras_token')) {
+  if (!getToken()) {
     currentUser = null;
     if (!loginActive) await showLogin(id);
     return;
@@ -126,7 +128,7 @@ async function handleRoute() {
   loginActive = false;
   document.body.classList.remove('auth-locked');
   let view;
-  try { view = await import(`./views/${route}.js?v=3.1`); } catch (error) {
+  try { view = await import(`./views/${route}.js?v=3.2`); } catch (error) {
     toast('تعذر تحميل هذه الصفحة', true);
     return;
   }
@@ -138,10 +140,11 @@ async function handleRoute() {
 async function doLogout() {
   if (logoutInFlight) return;
   logoutInFlight = true;
-  if (sessionStorage.getItem('gheras_token')) {
+  if (getToken()) {
     try { await api.post('auth/logout'); } catch (error) {}
   }
   sessionStorage.removeItem('gheras_token');
+  localStorage.removeItem('gheras_token');
   currentUser = null;
   api.currentUser = null;
   logoutInFlight = false;
@@ -150,7 +153,7 @@ async function doLogout() {
 }
 
 function onForcedLogout() {
-  if (!sessionStorage.getItem('gheras_token')) return;
+  if (!getToken()) return;
   doLogout();
 }
 

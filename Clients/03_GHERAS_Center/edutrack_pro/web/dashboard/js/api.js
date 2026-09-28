@@ -1,7 +1,7 @@
 const BASE = '/api/v1';
 
 async function request(path, options = {}) {
-  const token = sessionStorage.getItem('gheras_token');
+  const token = sessionStorage.getItem('gheras_token') || localStorage.getItem('gheras_token');
   const headers = { Accept: 'application/json', ...options.headers };
   if (token) headers.Authorization = `Bearer ${token}`;
   if (options.body !== undefined) headers['Content-Type'] = 'application/json';

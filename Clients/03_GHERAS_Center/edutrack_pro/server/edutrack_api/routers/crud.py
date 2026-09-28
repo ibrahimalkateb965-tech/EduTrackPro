@@ -343,7 +343,13 @@ def _update_hook(conn, repo, table: str, record_id: UUID, data: dict) -> tuple[d
         if row and permissions is not None:
             _permissions(conn, row["id"], row["branch_id"], permissions)
         return row, details
-    return repo.update(record_id, data), details
+    row = repo.update(record_id, data)
+    if table == "students" and row and "national_id" in data:
+        conn.execute(
+            "UPDATE users SET national_id = %s WHERE student_id = %s AND role = 'student' AND deleted_at IS NULL",
+            (row.get("national_id"), record_id),
+        )
+    return row, details
 
 
 def _register(path: str, table: str) -> None:

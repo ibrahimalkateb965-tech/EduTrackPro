@@ -17,6 +17,7 @@ export async function render(container, api) {
       const data = await api.post('auth/login', { username: username.value.trim(), password: password.value });
       if (!data || !data.token) throw new Error('تعذر تسجيل الدخول');
       sessionStorage.setItem('gheras_token', data.token);
+      localStorage.setItem('gheras_token', data.token);
       location.hash = '#/home';
       window.dispatchEvent(new CustomEvent('gheras:login'));
     } catch (error) {
