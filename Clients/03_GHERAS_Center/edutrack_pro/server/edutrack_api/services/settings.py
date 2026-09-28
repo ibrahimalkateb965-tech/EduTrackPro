@@ -6,7 +6,7 @@ import psycopg
 
 DEFAULTS: dict[str, str] = {
     "academic_year": "1447-1448 هـ",
-    "center_name": "مركز غراس للرعاية النهارية والتعليم الذكي",
+    "center_name": "مركز غراس",
     "center_phone": "0550000000",
     "center_address": "حوطة بني تميم",
     "manager_title": "مدير عام المركز",

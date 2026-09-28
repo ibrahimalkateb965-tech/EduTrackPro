@@ -134,7 +134,7 @@ class LoginViewModel(
             val msg = if (state.selectedRole == Role.TEACHER) {
                 "يرجى إدخال رقم الجوال أو رقم الهوية"
             } else {
-                "يرجى إدخال رقم الهوية الوطنية أو الإقامة"
+                "يرجى إدخال رقم الجوال أو رقم الهوية أو الإقامة"
             }
             _uiState.update { it.copy(errorMessage = msg) }
             return
@@ -230,7 +230,7 @@ class LoginViewModel(
             val msg = if (state.selectedRole == Role.TEACHER) {
                 "يرجى إدخال رقم الجوال أو اسم المستخدم أو الهوية"
             } else {
-                "يرجى إدخال رقم الهوية الوطنية أو الإقامة"
+                "يرجى إدخال رقم الجوال أو رقم الهوية أو الإقامة"
             }
             _uiState.update { it.copy(errorMessage = msg) }
             return

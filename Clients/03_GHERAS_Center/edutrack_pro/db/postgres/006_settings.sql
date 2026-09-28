@@ -25,7 +25,7 @@ CREATE TRIGGER trg_system_settings_updated_at BEFORE UPDATE ON system_settings
 -- 2. Defaults. DO NOTHING: never overwrite values the manager already edited.
 INSERT INTO system_settings (key, value, description) VALUES
     ('academic_year', '1447-1448 هـ', 'العام الدراسي المطبوع على الكروت والتقارير'),
-    ('center_name', 'مركز غراس للرعاية النهارية والتعليم الذكي', 'اسم المركز الرسمي'),
+    ('center_name', 'مركز غراس', 'اسم المركز الرسمي'),
     ('center_phone', '0550000000', 'هاتف المركز'),
     ('center_address', 'حوطة بني تميم', 'عنوان المركز'),
     ('manager_title', 'مدير عام المركز', 'المسمى الوظيفي للمدير في المطبوعات'),

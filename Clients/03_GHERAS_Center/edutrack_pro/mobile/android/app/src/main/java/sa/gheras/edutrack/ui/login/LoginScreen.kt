@@ -138,7 +138,7 @@ fun LoginScreen(
                 ) {
                     Image(
                         painter = painterResource(id = R.drawable.gheras_logo),
-                        contentDescription = "شعار مركز غراس للتعليم والتأهيل",
+                        contentDescription = "شعار مركز غراس",
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Fit
                     )
@@ -148,7 +148,7 @@ fun LoginScreen(
             Spacer(modifier = Modifier.height(16.dp))
 
             Text(
-                text = "مركز غراس للتعليم والتأهيل",
+                text = "مركز غراس",
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onBackground
@@ -274,7 +274,7 @@ fun LoginScreen(
                                 when (state.selectedRole) {
                                     Role.TEACHER -> "رقم الجوال أو اسم المستخدم أو الهوية"
                                     Role.GUARDIAN -> "رقم الجوال أو رقم الهوية"
-                                    Role.STUDENT -> "رقم الهوية الوطنية أو الإقامة"
+                                    Role.STUDENT -> "رقم الجوال أو الهوية أو الإقامة"
                                 }
                             )
                         },
@@ -493,7 +493,7 @@ fun LoginScreen(
                             when (state.selectedRole) {
                                 Role.TEACHER -> "رقم الجوال أو اسم المستخدم أو الهوية"
                                 Role.GUARDIAN -> "رقم الجوال أو رقم الهوية"
-                                Role.STUDENT -> "رقم الهوية الوطنية أو الإقامة"
+                                Role.STUDENT -> "رقم الجوال أو الهوية أو الإقامة"
                             }
                         )
                     },

@@ -533,7 +533,7 @@ export async function render(container, api) {
 
   const SETTING_FIELDS = [
     { key: 'academic_year',  label: 'العام الدراسي (يُطبع على الكروت والتقارير)', placeholder: '1447-1448 هـ' },
-    { key: 'center_name',    label: 'اسم المركز الرسمي',                          placeholder: 'مركز غراس للرعاية النهارية والتعليم الذكي' },
+    { key: 'center_name',    label: 'اسم المركز الرسمي',                          placeholder: 'مركز غراس' },
     { key: 'center_phone',   label: 'هاتف المركز',                                placeholder: '05xxxxxxxx' },
     { key: 'center_address', label: 'عنوان المركز',                               placeholder: 'حوطة بني تميم' },
     { key: 'manager_title',  label: 'المسمى الوظيفي للمدير في المطبوعات',         placeholder: 'مدير عام المركز' },
@@ -592,7 +592,7 @@ export async function render(container, api) {
   const centerInfoCard = el('div', { class: 'card', style: 'margin-top:20px;' },
     el('h2', { style: 'margin-top:0; font-size:18px;' }, '🏛️ بيانات المنظومة والنسخ الاحتياطي'),
     el('div', { style: 'line-height:1.8; margin-bottom:14px;' },
-      el('div', {}, el('strong', {}, 'المنشأة: '), settingInputs.center_name.value || 'مركز غراس للرعاية النهارية والتعليم الذكي'),
+      el('div', {}, el('strong', {}, 'المنشأة: '), settingInputs.center_name.value || 'مركز غراس'),
       el('div', {}, el('strong', {}, 'الإصدار البرمجي: '), 'EduTrack Pro v2.5 (Clean VPS Architecture)'),
       el('div', {}, el('strong', {}, 'المستخدم الحالي: '), `${me?.name || me?.username || 'الإدارة'} (${me?.role || 'manager'})`)
     ),

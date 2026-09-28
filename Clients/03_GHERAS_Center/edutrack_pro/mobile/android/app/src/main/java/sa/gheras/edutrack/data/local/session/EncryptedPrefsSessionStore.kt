@@ -70,7 +70,11 @@ class EncryptedPrefsSessionStore(private val context: Context) : SessionStore {
             return try {
                 val orgJson = org.json.JSONObject(userJson)
                 val roleStr = orgJson.optString("role", "TEACHER").uppercase()
-                val role = if (roleStr.contains("GUARDIAN")) Role.GUARDIAN else Role.TEACHER
+                val role = when {
+                    roleStr.contains("STUDENT") -> Role.STUDENT
+                    roleStr.contains("GUARDIAN") -> Role.GUARDIAN
+                    else -> Role.TEACHER
+                }
                 SessionUser(
                     id = orgJson.getString("id"),
                     username = orgJson.getString("username"),

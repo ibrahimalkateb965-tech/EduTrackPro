@@ -193,7 +193,7 @@ fun AccountScreen(
             }
 
             // Center details card
-            val centerName = state.profile?.center?.name ?: "مركز غراس للتعليم والتأهيل"
+            val centerName = state.profile?.center?.name ?: "مركز غراس"
             val centerPhone = state.profile?.center?.phone ?: "0500000000"
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -297,7 +297,7 @@ fun AccountScreen(
                     Box(modifier = Modifier.fillMaxSize().padding(6.dp), contentAlignment = Alignment.Center) {
                         Image(
                             painter = painterResource(id = R.drawable.gheras_logo),
-                            contentDescription = "مركز غراس للتعليم والتأهيل",
+                            contentDescription = "مركز غراس",
                             modifier = Modifier.fillMaxSize(),
                             contentScale = ContentScale.Fit
                         )
@@ -305,7 +305,7 @@ fun AccountScreen(
                 }
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "مركز غراس للتعليم والتأهيل",
+                    text = "مركز غراس",
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface
