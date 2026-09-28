@@ -1,8 +1,10 @@
 package sa.gheras.edutrack.sync
 
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.withContext
 import sa.gheras.edutrack.data.db.GherasDatabase
 import sa.gheras.edutrack.data.db.ScopePayload
 import sa.gheras.edutrack.data.local.session.Role
@@ -37,12 +39,12 @@ class PullSync(
 
     suspend fun sync(): Boolean = requestFull()
 
-    suspend fun requestFull(): Boolean {
-        if (_status.value is SyncStatus.Syncing) return false
+    suspend fun requestFull(): Boolean = withContext(Dispatchers.IO) {
+        if (_status.value is SyncStatus.Syncing) return@withContext false
         _status.value = SyncStatus.Syncing
 
-        return try {
-            val user = sessionStore.user ?: return false
+        return@withContext try {
+            val user = sessionStore.user ?: return@withContext false
             val isTeacher = user.role == Role.TEACHER
 
             // 1. Profile

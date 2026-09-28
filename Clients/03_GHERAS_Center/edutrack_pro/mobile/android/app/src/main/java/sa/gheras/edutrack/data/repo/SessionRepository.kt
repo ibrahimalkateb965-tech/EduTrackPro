@@ -1,9 +1,11 @@
 package sa.gheras.edutrack.data.repo
 
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.withContext
 import sa.gheras.edutrack.data.db.GherasDatabase
 import sa.gheras.edutrack.data.local.session.Role
 import sa.gheras.edutrack.data.local.session.SessionStore
@@ -62,8 +64,8 @@ class SessionRepository(
         }
     }
 
-    suspend fun login(username: String, password: String, roleHint: Role? = null): Result<SessionUser> {
-        return try {
+    suspend fun login(username: String, password: String, roleHint: Role? = null): Result<SessionUser> = withContext(Dispatchers.IO) {
+        try {
             val response = authApi.login(LoginBody(username, password, roleHint?.name?.lowercase()))
             val role = when (response.user.role.lowercase()) {
                 "teacher" -> Role.TEACHER
@@ -71,7 +73,7 @@ class SessionRepository(
                 "student" -> Role.STUDENT
                 else -> {
                     try { authApi.logout() } catch (_: Exception) {}
-                    return Result.failure(IllegalStateException("هذا التطبيق مخصص للطلاب وأولياء الأمور والمعلمين — استخدم لوحة التحكم على الويب"))
+                    return@withContext Result.failure(IllegalStateException("هذا التطبيق مخصص للطلاب وأولياء الأمور والمعلمين — استخدم لوحة التحكم على الويب"))
                 }
             }
             val user = SessionUser(
@@ -97,7 +99,7 @@ class SessionRepository(
                     store.clear()
                     db.clearAllTables()
                     _state.value = SessionState.SignedOut
-                    return Result.failure(e)
+                    return@withContext Result.failure(e)
                 }
             }
 
@@ -109,8 +111,8 @@ class SessionRepository(
         }
     }
 
-    suspend fun requestOtp(nationalId: String, role: Role): Result<RequestOtpResponse> {
-        return try {
+    suspend fun requestOtp(nationalId: String, role: Role): Result<RequestOtpResponse> = withContext(Dispatchers.IO) {
+        try {
             val res = authApi.requestOtp(RequestOtpBody(nationalId, role.name.lowercase()))
             Result.success(res)
         } catch (e: Exception) {
@@ -118,8 +120,8 @@ class SessionRepository(
         }
     }
 
-    suspend fun verifyOtp(sessionId: String, otpCode: String, roleHint: Role? = null): Result<SessionUser> {
-        return try {
+    suspend fun verifyOtp(sessionId: String, otpCode: String, roleHint: Role? = null): Result<SessionUser> = withContext(Dispatchers.IO) {
+        try {
             val response = authApi.verifyOtp(VerifyOtpBody(sessionId, otpCode, roleHint?.name?.lowercase()))
             val role = when (response.user.role.lowercase()) {
                 "teacher" -> Role.TEACHER
@@ -127,7 +129,7 @@ class SessionRepository(
                 "student" -> Role.STUDENT
                 else -> {
                     try { authApi.logout() } catch (_: Exception) {}
-                    return Result.failure(IllegalStateException("هذا التطبيق مخصص للطلاب وأولياء الأمور والمعلمين — استخدم لوحة التحكم على الويب"))
+                    return@withContext Result.failure(IllegalStateException("هذا التطبيق مخصص للطلاب وأولياء الأمور والمعلمين — استخدم لوحة التحكم على الويب"))
                 }
             }
             val user = SessionUser(
@@ -153,7 +155,7 @@ class SessionRepository(
                     store.clear()
                     db.clearAllTables()
                     _state.value = SessionState.SignedOut
-                    return Result.failure(e)
+                    return@withContext Result.failure(e)
                 }
             }
 
@@ -165,7 +167,7 @@ class SessionRepository(
         }
     }
 
-    suspend fun logout() {
+    suspend fun logout() = withContext(Dispatchers.IO) {
         try {
             authApi.logout()
         } catch (_: Exception) {}
@@ -174,8 +176,8 @@ class SessionRepository(
         _state.value = SessionState.SignedOut
     }
 
-    suspend fun changePassword(current: String, newPass: String, confirm: String? = null): Result<Unit> {
-        return try {
+    suspend fun changePassword(current: String, newPass: String, confirm: String? = null): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
             authApi.changePassword(ChangePasswordBody(current, newPass, confirm ?: newPass))
             Result.success(Unit)
         } catch (e: Exception) {
@@ -183,7 +185,7 @@ class SessionRepository(
         }
     }
 
-    fun discardExpiredSession() {
+    suspend fun discardExpiredSession() = withContext(Dispatchers.IO) {
         store.clear()
         db.clearAllTables()
         _state.value = SessionState.SignedOut
