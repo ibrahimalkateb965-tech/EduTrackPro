@@ -100,12 +100,12 @@ class PullSync(
             val notifEntities = notifDtoList.map { NotificationMappers.toEntity(it, user.id) }
 
             // 11. Fees (guardian only)
-            val instEntities = if (!isTeacher) {
+            val instEntities = if (user.role == Role.GUARDIAN) {
                 val instDtoList = meApi.listInstallments(limit = 500).items
                 instDtoList.map { FeesMappers.installmentToEntity(it) }
             } else emptyList()
 
-            val rcptEntities = if (!isTeacher) {
+            val rcptEntities = if (user.role == Role.GUARDIAN) {
                 val rcptDtoList = meApi.listReceipts(limit = 500).items
                 rcptDtoList.map { FeesMappers.receiptToEntity(it) }
             } else emptyList()
