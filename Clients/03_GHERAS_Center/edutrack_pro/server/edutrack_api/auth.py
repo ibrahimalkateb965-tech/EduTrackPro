@@ -65,7 +65,7 @@ def current_user(
         raise ApiError(401, "unauthorized", "غير مصرح")
     revoked = conn.execute("SELECT 1 FROM revoked_tokens WHERE jti = %s", (jti,)).fetchone()
     user = conn.execute(
-        "SELECT id, branch_id, username, role, staff_id, guardian_id, room_id, is_active, token_version "
+        "SELECT id, branch_id, username, role, staff_id, guardian_id, room_id, student_id, national_id, phone, is_active, token_version "
         "FROM users WHERE id = %s AND deleted_at IS NULL",
         (subject,),
     ).fetchone()

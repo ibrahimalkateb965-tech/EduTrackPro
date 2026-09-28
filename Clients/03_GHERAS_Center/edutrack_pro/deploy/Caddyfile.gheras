@@ -31,6 +31,8 @@ __HOST__ {
 		file_server
 	}
 	handle /assets/* {
+		header Content-Disposition "attachment; filename=EduTrackPro.apk"
+		header -Vary
 		file_server
 	}
 	handle {
