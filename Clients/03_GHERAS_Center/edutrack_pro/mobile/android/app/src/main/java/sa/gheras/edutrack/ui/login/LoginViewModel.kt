@@ -36,7 +36,8 @@ data class LoginUiState(
     val otpSessionId: String? = null,
     val phoneMasked: String? = null,
     val otpCode: String = "",
-    val cooldownSeconds: Int = 0
+    val cooldownSeconds: Int = 0,
+    val infoMessage: String? = null
 )
 
 class LoginViewModel(
@@ -123,7 +124,13 @@ class LoginViewModel(
 
     fun resetOtpFlow() {
         _uiState.update {
-            it.copy(isOtpSent = false, otpSessionId = null, otpCode = "", errorMessage = null)
+            it.copy(
+                isOtpSent = false,
+                otpSessionId = null,
+                otpCode = "",
+                infoMessage = null,
+                errorMessage = null
+            )
         }
     }
 
@@ -145,12 +152,17 @@ class LoginViewModel(
             val result = sessionRepository.requestOtp(identity, state.selectedRole)
             result.fold(
                 onSuccess = { res ->
+                    val sandboxCode = res.sandboxCode?.takeIf { it.isNotBlank() }
                     _uiState.update {
                         it.copy(
                             isLoading = false,
                             isOtpSent = true,
                             otpSessionId = res.sessionId,
                             phoneMasked = res.phoneMasked,
+                            otpCode = sandboxCode ?: it.otpCode,
+                            infoMessage = sandboxCode?.let { code ->
+                                "تم استلام رمز التحقق التجريبي: $code (بانتظار ربط بوابة واتساب)"
+                            },
                             cooldownSeconds = res.resendCooldown,
                             errorMessage = null
                         )

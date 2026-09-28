@@ -1,6 +1,8 @@
 package sa.gheras.edutrack.data.repo
 
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.withContext
 import sa.gheras.edutrack.data.dao.AssignmentDao
 import sa.gheras.edutrack.data.dao.SubmissionDao
 import sa.gheras.edutrack.data.entity.AssignmentEntity
@@ -37,7 +39,9 @@ class AssignmentsRepository(
     fun observeByStudent(studentId: String): Flow<List<AssignmentEntity>> =
         assignmentDao.observeByStudent(studentId)
 
-    suspend fun getById(id: String): AssignmentEntity? = assignmentDao.getById(id)
+    suspend fun getById(id: String): AssignmentEntity? = withContext(Dispatchers.IO) {
+        assignmentDao.getById(id)
+    }
 
     fun observeSubmissions(assignmentId: String): Flow<List<SubmissionEntity>> =
         submissionDao.observeByAssignment(assignmentId)
@@ -54,7 +58,7 @@ class AssignmentsRepository(
         teacherUserId: String?,
         studentIds: List<String>,
         branchId: String? = null
-    ): AssignmentEntity {
+    ): AssignmentEntity = withContext(Dispatchers.IO) {
         val now = Instant.now()
         val assignmentId = UUID.randomUUID().toString()
         val assignment = AssignmentEntity(
@@ -109,7 +113,7 @@ class AssignmentsRepository(
                 assignmentStudentDao.upsertAll(links)
             }
         }
-        return assignment
+        assignment
     }
 
     fun observeSubmissionFiles(submissionId: String): Flow<List<SubmissionFileEntity>> =
@@ -119,10 +123,14 @@ class AssignmentsRepository(
         submissionFileDao?.observeAll() ?: kotlinx.coroutines.flow.flowOf(emptyList())
 
     suspend fun getSubmissionForStudent(assignmentId: String, studentId: String): SubmissionEntity? =
-        submissionDao.getByAssignmentAndStudent(assignmentId, studentId)
+        withContext(Dispatchers.IO) {
+            submissionDao.getByAssignmentAndStudent(assignmentId, studentId)
+        }
 
     suspend fun getSubmissionFiles(submissionId: String): List<SubmissionFileEntity> =
-        submissionFileDao?.getBySubmission(submissionId) ?: emptyList()
+        withContext(Dispatchers.IO) {
+            submissionFileDao?.getBySubmission(submissionId) ?: emptyList()
+        }
 
     suspend fun submitHomework(
         assignmentId: String,
@@ -131,38 +139,40 @@ class AssignmentsRepository(
         notes: String? = null
     ): Result<SubmissionDto> {
         val api = meApi ?: return Result.failure(IllegalStateException("MeApi is not configured"))
-        return try {
-            val assignmentIdBody = assignmentId.toRequestBody("text/plain".toMediaTypeOrNull())
-            val studentIdBody = studentId.toRequestBody("text/plain".toMediaTypeOrNull())
-            val notesBody = notes?.toRequestBody("text/plain".toMediaTypeOrNull())
+        return withContext(Dispatchers.IO) {
+            try {
+                val assignmentIdBody = assignmentId.toRequestBody("text/plain".toMediaTypeOrNull())
+                val studentIdBody = studentId.toRequestBody("text/plain".toMediaTypeOrNull())
+                val notesBody = notes?.toRequestBody("text/plain".toMediaTypeOrNull())
 
-            val fileParts = imageBytesList.mapIndexed { index, bytes ->
-                val requestFile = bytes.toRequestBody("image/jpeg".toMediaTypeOrNull())
-                MultipartBody.Part.createFormData(
-                    name = "files",
-                    filename = "page_${index + 1}.jpg",
-                    body = requestFile
+                val fileParts = imageBytesList.mapIndexed { index, bytes ->
+                    val requestFile = bytes.toRequestBody("image/jpeg".toMediaTypeOrNull())
+                    MultipartBody.Part.createFormData(
+                        name = "files",
+                        filename = "page_${index + 1}.jpg",
+                        body = requestFile
+                    )
+                }
+
+                val submissionDto = api.submitHomework(
+                    assignmentId = assignmentIdBody,
+                    studentId = studentIdBody,
+                    notes = notesBody,
+                    files = fileParts
                 )
+
+                // Cache locally in Room
+                val submissionEntity = AssignmentMappers.submissionToEntity(submissionDto)
+                submissionDao.upsert(submissionEntity)
+                if (submissionFileDao != null && submissionDto.files.isNotEmpty()) {
+                    val fileEntities = AssignmentMappers.submissionFilesToEntities(submissionDto)
+                    submissionFileDao.replaceScope(submissionEntity.id, fileEntities)
+                }
+
+                Result.success(submissionDto)
+            } catch (e: Exception) {
+                Result.failure(e)
             }
-
-            val submissionDto = api.submitHomework(
-                assignmentId = assignmentIdBody,
-                studentId = studentIdBody,
-                notes = notesBody,
-                files = fileParts
-            )
-
-            // Cache locally in Room
-            val submissionEntity = AssignmentMappers.submissionToEntity(submissionDto)
-            submissionDao.upsert(submissionEntity)
-            if (submissionFileDao != null && submissionDto.files.isNotEmpty()) {
-                val fileEntities = AssignmentMappers.submissionFilesToEntities(submissionDto)
-                submissionFileDao.replaceScope(submissionEntity.id, fileEntities)
-            }
-
-            Result.success(submissionDto)
-        } catch (e: Exception) {
-            Result.failure(e)
         }
     }
 
@@ -172,17 +182,19 @@ class AssignmentsRepository(
         feedback: String? = null
     ): Result<SubmissionDto> {
         val api = meApi ?: return Result.failure(IllegalStateException("MeApi is not configured"))
-        return try {
-            val body = sa.gheras.edutrack.data.remote.dto.GradeSubmissionBody(
-                grade = grade,
-                feedback = feedback
-            )
-            val submissionDto = api.gradeSubmission(submissionId, body)
-            val submissionEntity = AssignmentMappers.submissionToEntity(submissionDto)
-            submissionDao.upsert(submissionEntity)
-            Result.success(submissionDto)
-        } catch (e: Exception) {
-            Result.failure(e)
+        return withContext(Dispatchers.IO) {
+            try {
+                val body = sa.gheras.edutrack.data.remote.dto.GradeSubmissionBody(
+                    grade = grade,
+                    feedback = feedback
+                )
+                val submissionDto = api.gradeSubmission(submissionId, body)
+                val submissionEntity = AssignmentMappers.submissionToEntity(submissionDto)
+                submissionDao.upsert(submissionEntity)
+                Result.success(submissionDto)
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
         }
     }
 }

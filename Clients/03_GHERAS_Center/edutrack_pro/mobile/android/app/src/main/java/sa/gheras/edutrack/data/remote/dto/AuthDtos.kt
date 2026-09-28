@@ -27,7 +27,8 @@ data class RequestOtpResponse(
     @SerialName("session_id") val sessionId: String,
     @SerialName("phone_masked") val phoneMasked: String,
     @SerialName("expires_in") val expiresIn: Int = 300,
-    @SerialName("resend_cooldown") val resendCooldown: Int = 60
+    @SerialName("resend_cooldown") val resendCooldown: Int = 60,
+    @SerialName("sandbox_code") val sandboxCode: String? = null
 )
 
 @Serializable

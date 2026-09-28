@@ -410,6 +410,17 @@ fun LoginScreen(
                         shape = RoundedCornerShape(12.dp)
                     )
 
+                    if (!state.infoMessage.isNullOrBlank()) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = state.infoMessage ?: "",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+
                     if (!state.errorMessage.isNullOrBlank()) {
                         Spacer(modifier = Modifier.height(12.dp))
                         Text(

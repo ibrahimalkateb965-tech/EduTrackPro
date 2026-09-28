@@ -144,3 +144,50 @@ def test_whatsapp_otp_phone_inheritance_and_not_found(db, client):
     res_nophone = client.post("/api/v1/auth/request-otp", json={"national_id": "1088888888", "role": "guardian"})
     assert res_nophone.status_code == 400
     assert "رقم هاتف" in res_nophone.json()["error"]["message"]
+
+
+def test_sandbox_returns_code_and_accepts_it(db, client):
+    _ensure_009_applied(db)
+
+    uid = uuid.uuid4()
+    nat_id = "1098765433"
+    db.execute(
+        "INSERT INTO users (id, username, password_hash, role, national_id, phone) VALUES (%s, %s, %s, %s, %s, %s)",
+        (uid, "g_sandbox_user", hash_password("Pass123!"), "guardian", nat_id, "0551234568"),
+    )
+    db.commit()
+
+    res = client.post("/api/v1/auth/request-otp", json={"national_id": nat_id, "role": "guardian"})
+    assert res.status_code == 200
+    data = res.json()
+    assert "sandbox_code" in data
+    assert isinstance(data["sandbox_code"], str) and len(data["sandbox_code"]) == 4 and data["sandbox_code"].isdigit()
+
+    res_ok = client.post(
+        "/api/v1/auth/verify-otp",
+        json={"session_id": data["session_id"], "otp_code": data["sandbox_code"]}
+    )
+    assert res_ok.status_code == 200
+    assert "token" in res_ok.json()
+
+
+def test_sandbox_master_code_1234(db, client):
+    _ensure_009_applied(db)
+
+    uid = uuid.uuid4()
+    nat_id = "1098765434"
+    db.execute(
+        "INSERT INTO users (id, username, password_hash, role, national_id, phone) VALUES (%s, %s, %s, %s, %s, %s)",
+        (uid, "g_master_user", hash_password("Pass123!"), "guardian", nat_id, "0551234569"),
+    )
+    db.commit()
+
+    res = client.post("/api/v1/auth/request-otp", json={"national_id": nat_id, "role": "guardian"})
+    assert res.status_code == 200
+
+    res_ok = client.post(
+        "/api/v1/auth/verify-otp",
+        json={"session_id": res.json()["session_id"], "otp_code": "1234"}
+    )
+    assert res_ok.status_code == 200
+    assert "token" in res_ok.json()
