@@ -7,10 +7,8 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import sa.gheras.edutrack.data.dao.RoomDao
 import sa.gheras.edutrack.data.entity.PendingWriteEntity
@@ -22,6 +20,7 @@ import sa.gheras.edutrack.data.repo.LessonLogsRepository
 import sa.gheras.edutrack.data.repo.OutboxRepository
 import sa.gheras.edutrack.data.repo.ScheduleRepository
 import sa.gheras.edutrack.sync.PullSync
+import sa.gheras.edutrack.sync.SyncStatus
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.LocalTime
@@ -56,6 +55,9 @@ class TeacherHomeViewModel(
     val selectedDate: StateFlow<LocalDate> = _selectedDate.asStateFlow()
 
     private val _isRefreshing = MutableStateFlow(false)
+    private val isSyncing = combine(_isRefreshing, pullSync.status) { refreshing, status ->
+        refreshing || status is SyncStatus.Syncing
+    }
 
     val pendingCount: StateFlow<Int> = outboxRepository.pendingCount
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
@@ -72,7 +74,7 @@ class TeacherHomeViewModel(
             roomDao.observeAll(),
             attendanceRepository.observeByDate(date),
             evaluationsRepository.observeByDate(date),
-            _isRefreshing
+            isSyncing
         ) { schedules, rooms, attendances, evals, refreshing ->
             val roomMap = rooms.associateBy { it.id }
             val attendedRooms = attendances.map { it.studentId }.toSet()
@@ -105,10 +107,8 @@ class TeacherHomeViewModel(
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), TeacherHomeUiState())
 
     init {
-        // First launch after login may land here before the initial pull finishes.
-        viewModelScope.launch {
-            if (scheduleRepository.observeAll().first().isEmpty()) refresh()
-        }
+        // Always pull today's records on entry instead of waiting for pull-to-refresh.
+        refresh()
     }
 
     fun selectDate(date: LocalDate) {

@@ -32,6 +32,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.toRoute
+import kotlinx.coroutines.launch
 import sa.gheras.edutrack.data.local.session.Role
 import sa.gheras.edutrack.data.repo.SessionState
 import sa.gheras.edutrack.di.AppContainer
@@ -95,6 +96,8 @@ fun RootNavHost(
                 }
             }
             is SessionState.Active -> {
+                // Proactive full sync on cold start / session restore; launched so navigation is not blocked.
+                launch { container.pullSync.requestFull() }
                 if (state.role == Role.TEACHER) {
                     if (currentDestination?.contains("teacher") != true) {
                         navController.navigate(TeacherHomeRoute) {

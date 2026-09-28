@@ -17,6 +17,7 @@ import sa.gheras.edutrack.data.repo.mappers.NotificationMappers
 import sa.gheras.edutrack.data.repo.mappers.ScheduleMappers
 import sa.gheras.edutrack.data.repo.mappers.StudentMappers
 import java.time.Instant
+import java.util.concurrent.atomic.AtomicBoolean
 
 sealed interface SyncStatus {
     data object Idle : SyncStatus
@@ -37,14 +38,19 @@ class PullSync(
     private val _lastSyncAt = MutableStateFlow<Instant?>(null)
     val lastSyncAt: StateFlow<Instant?> = _lastSyncAt.asStateFlow()
 
+    private val inFlight = AtomicBoolean(false)
+
     suspend fun sync(): Boolean = requestFull()
 
     suspend fun requestFull(): Boolean = withContext(Dispatchers.IO) {
-        if (_status.value is SyncStatus.Syncing) return@withContext false
+        if (!inFlight.compareAndSet(false, true)) return@withContext false
         _status.value = SyncStatus.Syncing
 
         return@withContext try {
-            val user = sessionStore.user ?: return@withContext false
+            val user = sessionStore.user ?: run {
+                _status.value = SyncStatus.Idle
+                return@withContext false
+            }
             val isTeacher = user.role == Role.TEACHER
 
             // 1. Profile
@@ -139,6 +145,8 @@ class PullSync(
         } catch (e: Exception) {
             _status.value = SyncStatus.Error(e.message ?: "فشل التزامن")
             false
+        } finally {
+            inFlight.set(false)
         }
     }
 }

@@ -10,7 +10,6 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import sa.gheras.edutrack.data.entity.EvaluationEntity
 import sa.gheras.edutrack.data.entity.InstallmentEntity
@@ -22,6 +21,7 @@ import sa.gheras.edutrack.data.repo.EvaluationsRepository
 import sa.gheras.edutrack.data.repo.FeesRepository
 import sa.gheras.edutrack.data.repo.StudentsRepository
 import sa.gheras.edutrack.sync.PullSync
+import sa.gheras.edutrack.sync.SyncStatus
 import java.time.LocalDate
 
 data class ChildDashboardSummary(
@@ -48,11 +48,14 @@ class GuardianHomeViewModel(
     val selectedChildId: StateFlow<String?> = _selectedChildId.asStateFlow()
 
     private val _isRefreshing = MutableStateFlow(false)
+    private val isSyncing = combine(_isRefreshing, pullSync.status) { refreshing, status ->
+        refreshing || status is SyncStatus.Syncing
+    }
 
     val uiState: StateFlow<ChildDashboardSummary> = combine(
         studentsRepository.observeAll(),
         _selectedChildId,
-        _isRefreshing
+        isSyncing
     ) { allChildren, selectedId, refreshing ->
         Triple(allChildren, selectedId, refreshing)
     }.flatMapLatest { (children, selectedId, refreshing) ->
@@ -61,7 +64,7 @@ class GuardianHomeViewModel(
                 ChildDashboardSummary(
                     children = emptyList(),
                     isRefreshing = refreshing,
-                    isLoading = false
+                    isLoading = refreshing
                 )
             )
         }
@@ -98,6 +101,10 @@ class GuardianHomeViewModel(
             )
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ChildDashboardSummary(isLoading = true))
+
+    init {
+        refresh()
+    }
 
     fun selectChild(childId: String) {
         _selectedChildId.value = childId
