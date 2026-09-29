@@ -5,7 +5,6 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -18,6 +17,7 @@ import sa.gheras.edutrack.data.entity.SubmissionFileEntity
 import sa.gheras.edutrack.data.repo.AssignmentsRepository
 import sa.gheras.edutrack.data.repo.StudentsRepository
 import sa.gheras.edutrack.sync.PullSync
+import sa.gheras.edutrack.sync.SyncStatus
 
 enum class SubmissionFilter(val title: String) {
     ALL("الكل"),
@@ -60,6 +60,14 @@ class AssignmentDetailViewModel(
     private val _isGrading = MutableStateFlow(false)
     private val _gradingError = MutableStateFlow<String?>(null)
 
+    private val isSyncing = if (pullSync != null) {
+        combine(_isRefreshing, pullSync.status) { refreshing, status ->
+            refreshing || status is SyncStatus.Syncing
+        }
+    } else {
+        _isRefreshing
+    }
+
     private data class CombinedFilterState(
         val filter: SubmissionFilter,
         val isRefreshing: Boolean,
@@ -69,17 +77,17 @@ class AssignmentDetailViewModel(
 
     private val _combinedState = combine(
         _filter,
-        _isRefreshing,
+        isSyncing,
         _isGrading,
         _gradingError
-    ) { filter, refreshing, grading, error ->
-        CombinedFilterState(filter, refreshing, grading, error)
+    ) { filter, syncing, grading, error ->
+        CombinedFilterState(filter, syncing, grading, error)
     }
 
     val uiState: StateFlow<AssignmentDetailUiState> = combine(
         assignmentStudentDao.observeByAssignment(assignmentId),
         assignmentsRepository.observeSubmissions(assignmentId),
-        assignmentsRepository.observeAllSubmissionFiles(),
+        assignmentsRepository.observeSubmissionFilesByAssignment(assignmentId),
         studentsRepository.observeAll(),
         _combinedState
     ) { studentLinks, submissions, allFiles, allStudents, controlState ->
@@ -121,11 +129,15 @@ class AssignmentDetailViewModel(
             pendingCount = pendingCount,
             filter = controlState.filter,
             isRefreshing = controlState.isRefreshing,
-            isLoading = false,
+            isLoading = controlState.isRefreshing && assignment == null,
             isGrading = controlState.isGrading,
             gradingError = controlState.gradingError
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), AssignmentDetailUiState(isLoading = true))
+
+    init {
+        refresh()
+    }
 
     fun setFilter(filter: SubmissionFilter) {
         _filter.value = filter
@@ -140,6 +152,8 @@ class AssignmentDetailViewModel(
                 if (res.isFailure) {
                     _gradingError.value = res.exceptionOrNull()?.message ?: "فشل في تسجيل الدرجة"
                 }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
             } catch (e: Exception) {
                 _gradingError.value = e.message ?: "حدث خطأ غير متوقع أثناء التقييم"
             } finally {

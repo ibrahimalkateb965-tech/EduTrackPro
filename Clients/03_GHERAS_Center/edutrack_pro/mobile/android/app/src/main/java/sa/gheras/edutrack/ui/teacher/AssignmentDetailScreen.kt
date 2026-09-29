@@ -58,10 +58,28 @@ import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import android.app.DownloadManager
+import android.content.Context
+import android.net.Uri
+import android.os.Environment
+import android.widget.Toast
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.rememberTransformableState
+import androidx.compose.foundation.gestures.transformable
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import sa.gheras.edutrack.ui.teacher.media.AssignmentMediaParser
 import sa.gheras.edutrack.ui.teacher.media.AudioPlayerHelper
 import sa.gheras.edutrack.ui.teacher.media.MediaAttachment
@@ -81,6 +99,13 @@ import coil.request.ImageRequest
 import sa.gheras.edutrack.BuildConfig
 import sa.gheras.edutrack.data.entity.SubmissionFileEntity
 
+data class FullScreenViewerTarget(
+    val studentName: String,
+    val fileUrls: List<String>,
+    val initialIndex: Int = 0,
+    val submissionStatus: StudentSubmissionStatus? = null
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AssignmentDetailScreen(
@@ -90,8 +115,14 @@ fun AssignmentDetailScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
     val context = LocalContext.current
-    var viewingImageUrl by remember { mutableStateOf<String?>(null) }
+    var viewingTarget by remember { mutableStateOf<FullScreenViewerTarget?>(null) }
     var gradingTarget by remember { mutableStateOf<StudentSubmissionStatus?>(null) }
+
+    // Pull fresh submissions and files on entry and when resuming
+    LifecycleResumeEffect(viewModel) {
+        viewModel.refresh()
+        onPauseOrDispose { }
+    }
 
     Scaffold(
         topBar = {
@@ -246,7 +277,15 @@ fun AssignmentDetailScreen(
                                 Spacer(modifier = Modifier.height(6.dp))
                                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                     mediaAttachments.forEach { media ->
-                                        MediaAttachmentItemCard(media = media)
+                                        MediaAttachmentItemCard(
+                                            media = media,
+                                            onMediaClick = { title, uri ->
+                                                viewingTarget = FullScreenViewerTarget(
+                                                    studentName = title,
+                                                    fileUrls = listOf(uri)
+                                                )
+                                            }
+                                        )
                                     }
                                 }
                             }
@@ -397,26 +436,57 @@ fun AssignmentDetailScreen(
                             if (item.submission != null) {
                                 // Homework Submission Photos
                                 if (item.files.isNotEmpty()) {
+                                    val allUrls = remember(item.files) { item.files.map { resolveImageUrl(it.storageKey) } }
                                     Spacer(modifier = Modifier.height(10.dp))
-                                    Text(
-                                        text = "صور الحل (${Num.formatInt(item.files.size)}):",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = "صور وملفات الحل (${Num.formatInt(item.files.size)}):",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                        Text(
+                                            text = "عرض بكامل الشاشة ↗",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(4.dp))
+                                                .clickable {
+                                                    viewingTarget = FullScreenViewerTarget(
+                                                        studentName = item.student.name,
+                                                        fileUrls = allUrls,
+                                                        initialIndex = 0,
+                                                        submissionStatus = item
+                                                    )
+                                                }
+                                                .padding(horizontal = 4.dp, vertical = 2.dp)
+                                        )
+                                    }
                                     Spacer(modifier = Modifier.height(6.dp))
                                     LazyRow(
                                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                                         modifier = Modifier.fillMaxWidth()
                                     ) {
-                                        items(item.files, key = { it.id }) { file ->
-                                            val resolvedUrl = resolveImageUrl(file.storageKey)
+                                        itemsIndexed(item.files, key = { _, file -> file.id }) { idx, file ->
+                                            val resolvedUrl = allUrls.getOrElse(idx) { resolveImageUrl(file.storageKey) }
                                             Surface(
                                                 shape = RoundedCornerShape(8.dp),
                                                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                                                 modifier = Modifier
                                                     .size(64.dp)
-                                                    .clickable { viewingImageUrl = resolvedUrl }
+                                                    .clickable {
+                                                        viewingTarget = FullScreenViewerTarget(
+                                                            studentName = item.student.name,
+                                                            fileUrls = allUrls,
+                                                            initialIndex = idx,
+                                                            submissionStatus = item
+                                                        )
+                                                    }
                                             ) {
                                                 AsyncImage(
                                                     model = ImageRequest.Builder(context)
@@ -437,7 +507,7 @@ fun AssignmentDetailScreen(
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         if (item.submission.grade != null) {
                                             Text(
-                                                text = "الدرجة: ${Num.formatCurrency(item.submission.grade).replace(" ر.س", "")}",
+                                                text = "الدرجة: ${Num.formatDecimal(item.submission.grade)}",
                                                 style = MaterialTheme.typography.bodySmall,
                                                 color = MaterialTheme.colorScheme.primary,
                                                 fontWeight = FontWeight.Bold
@@ -489,11 +559,15 @@ fun AssignmentDetailScreen(
         }
     }
 
-    // Full-screen Image Viewer Dialog
-    viewingImageUrl?.let { imageUrl ->
-        ImageViewerDialog(
-            imageUrl = imageUrl,
-            onDismiss = { viewingImageUrl = null }
+    // Full-screen Media Viewer Dialog
+    viewingTarget?.let { target ->
+        FullScreenMediaViewerDialog(
+            target = target,
+            submissions = state.studentSubmissions,
+            onDismiss = { viewingTarget = null },
+            onGradeClick = { targetStatus ->
+                gradingTarget = targetStatus
+            }
         )
     }
 }
@@ -507,7 +581,7 @@ private fun TeacherGradingDialog(
     onDismiss: () -> Unit,
     onConfirm: (Double, String?) -> Unit
 ) {
-    var gradeText by remember { mutableStateOf(currentGrade?.let { Num.formatCurrency(it).replace(" ر.س", "").trim() } ?: "") }
+    var gradeText by remember { mutableStateOf(currentGrade?.let { Num.formatDecimal(it) } ?: "") }
     var feedbackText by remember { mutableStateOf(currentFeedback ?: "") }
     var validationError by remember { mutableStateOf<String?>(null) }
 
@@ -597,51 +671,369 @@ private fun TeacherGradingDialog(
 }
 
 @Composable
-private fun ImageViewerDialog(
-    imageUrl: String,
-    onDismiss: () -> Unit
+private fun FullScreenMediaViewerDialog(
+    target: FullScreenViewerTarget,
+    submissions: List<StudentSubmissionStatus> = emptyList(),
+    onDismiss: () -> Unit,
+    onGradeClick: ((StudentSubmissionStatus) -> Unit)? = null
 ) {
     val context = LocalContext.current
-    Dialog(onDismissRequest = onDismiss) {
+    var currentIndex by remember {
+        mutableIntStateOf(target.initialIndex.coerceIn(0, (target.fileUrls.size - 1).coerceAtLeast(0)))
+    }
+    val currentUrl = target.fileUrls.getOrNull(currentIndex) ?: ""
+
+    // Pinch-to-zoom and pan state
+    var scale by remember(currentIndex) { mutableFloatStateOf(1f) }
+    var offset by remember(currentIndex) { mutableStateOf(Offset.Zero) }
+
+    val transformState = rememberTransformableState { zoomChange, panChange, _ ->
+        val newScale = (scale * zoomChange).coerceIn(1f, 5f)
+        scale = newScale
+        offset = if (newScale > 1f) {
+            Offset(
+                x = offset.x + panChange.x,
+                y = offset.y + panChange.y
+            )
+        } else {
+            Offset.Zero
+        }
+    }
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            dismissOnBackPress = true,
+            dismissOnClickOutside = false
+        )
+    ) {
         Surface(
-            shape = RoundedCornerShape(16.dp),
-            color = MaterialTheme.colorScheme.surface,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(8.dp)
+            modifier = Modifier.fillMaxSize(),
+            color = Color(0xFF0F172A)
         ) {
-            Column(
-                modifier = Modifier.padding(12.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+            Box(modifier = Modifier.fillMaxSize()) {
+                // Interactive media view
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .pointerInput(currentIndex) {
+                            detectTapGestures(
+                                onDoubleTap = {
+                                    if (scale > 1f) {
+                                        scale = 1f
+                                        offset = Offset.Zero
+                                    } else {
+                                        scale = 2.5f
+                                    }
+                                }
+                            )
+                        }
+                        .transformable(state = transformState),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = "معاينة صفحة الواجب",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold
-                    )
-                    IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
-                        Icon(Icons.Default.Close, contentDescription = "إغلاق")
+                    if (currentUrl.isNotBlank()) {
+                        val cleanMediaUrl = currentUrl.substringBefore('?')
+                        val isImage = cleanMediaUrl.endsWith(".png", ignoreCase = true) ||
+                                cleanMediaUrl.endsWith(".jpg", ignoreCase = true) ||
+                                cleanMediaUrl.endsWith(".jpeg", ignoreCase = true) ||
+                                cleanMediaUrl.endsWith(".webp", ignoreCase = true) ||
+                                cleanMediaUrl.endsWith(".gif", ignoreCase = true)
+                        val isPdf = cleanMediaUrl.endsWith(".pdf", ignoreCase = true)
+                        val isAudio = cleanMediaUrl.endsWith(".mp3", ignoreCase = true) ||
+                                cleanMediaUrl.endsWith(".m4a", ignoreCase = true) ||
+                                cleanMediaUrl.endsWith(".aac", ignoreCase = true) ||
+                                cleanMediaUrl.endsWith(".wav", ignoreCase = true) ||
+                                cleanMediaUrl.endsWith(".ogg", ignoreCase = true)
+                        val isDoc = cleanMediaUrl.endsWith(".doc", ignoreCase = true) || cleanMediaUrl.endsWith(".docx", ignoreCase = true)
+
+                        if (!isImage) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center,
+                                modifier = Modifier.padding(24.dp)
+                            ) {
+                                Icon(
+                                    imageVector = when {
+                                        isPdf -> Icons.Default.Description
+                                        isAudio -> Icons.Default.Mic
+                                        else -> Icons.Default.Description
+                                    },
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(72.dp)
+                                )
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Text(
+                                    text = when {
+                                        isPdf -> "ملف مستند PDF"
+                                        isAudio -> "تسجيل صوتي للحل"
+                                        isDoc -> "ملف مستند Word"
+                                        else -> "ملف مرفق"
+                                    },
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = "يمكنك فتح الملف أو تنزيله للمعاينة",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = Color.LightGray
+                                )
+                                Spacer(modifier = Modifier.height(20.dp))
+                                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    Button(
+                                        onClick = { ShareHelper.openAttachment(context, currentUrl) },
+                                        shape = RoundedCornerShape(8.dp)
+                                    ) {
+                                        Text("فتح الملف ↗")
+                                    }
+                                    OutlinedButton(
+                                        onClick = { downloadMediaFile(context, currentUrl, target.studentName) },
+                                        shape = RoundedCornerShape(8.dp)
+                                    ) {
+                                        Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(16.dp))
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("تنزيل")
+                                    }
+                                }
+                            }
+                        } else {
+                            AsyncImage(
+                                model = ImageRequest.Builder(context)
+                                    .data(currentUrl)
+                                    .crossfade(true)
+                                    .build(),
+                                contentDescription = "معاينة الواجب بكامل الشاشة",
+                                contentScale = ContentScale.Fit,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .graphicsLayer {
+                                        scaleX = scale
+                                        scaleY = scale
+                                        translationX = offset.x
+                                        translationY = offset.y
+                                    }
+                            )
+                        }
                     }
                 }
-                Spacer(modifier = Modifier.height(8.dp))
-                AsyncImage(
-                    model = ImageRequest.Builder(context)
-                        .data(imageUrl)
-                        .crossfade(true)
-                        .build(),
-                    contentDescription = "معاينة الحل",
-                    contentScale = ContentScale.Fit,
+
+                // Top Controls Bar
+                Surface(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .aspectRatio(3f / 4f)
-                        .clip(RoundedCornerShape(8.dp))
-                )
+                        .align(Alignment.TopCenter),
+                    color = Color.Black.copy(alpha = 0.75f)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            IconButton(onClick = onDismiss) {
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = "إغلاق",
+                                    tint = Color.White
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column {
+                                Text(
+                                    text = target.studentName.ifBlank { "معاينة الواجب" },
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
+                                if (target.fileUrls.size > 1) {
+                                    Text(
+                                        text = "الملف ${Num.formatInt(currentIndex + 1)} من ${Num.formatInt(target.fileUrls.size)}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = Color.LightGray
+                                    )
+                                }
+                            }
+                        }
+
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            // Download button
+                            IconButton(
+                                onClick = {
+                                    downloadMediaFile(context, currentUrl, target.studentName)
+                                },
+                                enabled = currentUrl.isNotBlank()
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Download,
+                                    contentDescription = "تنزيل الملف",
+                                    tint = if (currentUrl.isNotBlank()) MaterialTheme.colorScheme.primary else Color.Gray
+                                )
+                            }
+
+                            // Share / Open external button
+                            IconButton(
+                                onClick = {
+                                    ShareHelper.openAttachment(context, currentUrl)
+                                },
+                                enabled = currentUrl.isNotBlank()
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Share,
+                                    contentDescription = "مشاركة / فتح خارجي",
+                                    tint = if (currentUrl.isNotBlank()) Color.White else Color.Gray
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Navigation Arrows if multiple files
+                if (target.fileUrls.size > 1) {
+                    if (currentIndex > 0) {
+                        Surface(
+                            shape = CircleShape,
+                            color = Color.Black.copy(alpha = 0.6f),
+                            modifier = Modifier
+                                .align(Alignment.CenterStart)
+                                .padding(16.dp)
+                                .size(48.dp)
+                        ) {
+                            IconButton(onClick = { currentIndex-- }) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                    contentDescription = "السابق",
+                                    tint = Color.White
+                                )
+                            }
+                        }
+                    }
+
+                    if (currentIndex < target.fileUrls.size - 1) {
+                        Surface(
+                            shape = CircleShape,
+                            color = Color.Black.copy(alpha = 0.6f),
+                            modifier = Modifier
+                                .align(Alignment.CenterEnd)
+                                .padding(16.dp)
+                                .size(48.dp)
+                        ) {
+                            IconButton(onClick = { currentIndex++ }) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                                    contentDescription = "التالي",
+                                    tint = Color.White
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Bottom Action Bar: Quick Grade Button
+                if (target.submissionStatus != null && onGradeClick != null) {
+                    val liveStatus = submissions.firstOrNull { it.student.id == target.submissionStatus.student.id } ?: target.submissionStatus
+                    val currentGrade = liveStatus.submission?.grade
+
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .align(Alignment.BottomCenter),
+                        color = Color.Black.copy(alpha = 0.8f)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                if (currentGrade != null) {
+                                    Text(
+                                        text = "الدرجة الحالية: ${Num.formatDecimal(currentGrade)}",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = PresentGreen
+                                    )
+                                } else {
+                                    Text(
+                                        text = "الواجب بانتظار التقييم",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = Color.LightGray
+                                    )
+                                }
+                            }
+
+                            Button(
+                                onClick = { onGradeClick(liveStatus) },
+                                shape = RoundedCornerShape(10.dp)
+                            ) {
+                                Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    if (currentGrade != null) "تعديل الدرجة" else "تقييم الواجب",
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+                }
             }
+        }
+    }
+}
+
+private fun downloadMediaFile(context: Context, fileUrl: String, studentName: String = "") {
+    try {
+        val uri = Uri.parse(fileUrl)
+        val cleanUrl = fileUrl.substringBefore('?')
+        val ext = when {
+            cleanUrl.endsWith(".png", ignoreCase = true) -> ".png"
+            cleanUrl.endsWith(".jpg", ignoreCase = true) || cleanUrl.endsWith(".jpeg", ignoreCase = true) -> ".jpg"
+            cleanUrl.endsWith(".webp", ignoreCase = true) -> ".webp"
+            cleanUrl.endsWith(".gif", ignoreCase = true) -> ".gif"
+            cleanUrl.endsWith(".mp4", ignoreCase = true) -> ".mp4"
+            cleanUrl.endsWith(".mp3", ignoreCase = true) -> ".mp3"
+            cleanUrl.endsWith(".m4a", ignoreCase = true) -> ".m4a"
+            cleanUrl.endsWith(".aac", ignoreCase = true) -> ".aac"
+            cleanUrl.endsWith(".wav", ignoreCase = true) -> ".wav"
+            cleanUrl.endsWith(".ogg", ignoreCase = true) -> ".ogg"
+            cleanUrl.endsWith(".pdf", ignoreCase = true) -> ".pdf"
+            cleanUrl.endsWith(".docx", ignoreCase = true) -> ".docx"
+            cleanUrl.endsWith(".doc", ignoreCase = true) -> ".doc"
+            cleanUrl.endsWith(".xlsx", ignoreCase = true) -> ".xlsx"
+            cleanUrl.endsWith(".xls", ignoreCase = true) -> ".xls"
+            cleanUrl.endsWith(".zip", ignoreCase = true) -> ".zip"
+            else -> ".jpg"
+        }
+        val safeName = if (studentName.isNotBlank()) {
+            studentName.trim().replace(Regex("[^a-zA-Z0-9_\\u0600-\\u06FF]"), "_")
+        } else "homework"
+        val fileName = "${safeName}_${System.currentTimeMillis()}$ext"
+
+        val request = DownloadManager.Request(uri)
+            .setTitle(if (studentName.isNotBlank()) "واجب $studentName" else "ملف الواجب")
+            .setDescription("جاري تنزيل ملف الواجب...")
+            .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+            .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName)
+
+        val dm = context.getSystemService(Context.DOWNLOAD_SERVICE) as? DownloadManager
+        if (dm != null) {
+            dm.enqueue(request)
+            Toast.makeText(context, "بدأ تنزيل الملف إلى مجلد التنزيلات: $fileName", Toast.LENGTH_SHORT).show()
+        } else {
+            ShareHelper.openAttachment(context, fileUrl)
+        }
+    } catch (_: Exception) {
+        try {
+            ShareHelper.openAttachment(context, fileUrl)
+            Toast.makeText(context, "جاري فتح الملف عبر التطبيق الخارجي...", Toast.LENGTH_SHORT).show()
+        } catch (_: Exception) {
+            Toast.makeText(context, "تعذر تنزيل الملف", Toast.LENGTH_SHORT).show()
         }
     }
 }
@@ -662,7 +1054,8 @@ private fun resolveImageUrl(storageKeyOrUrl: String?): String {
 @Composable
 fun MediaAttachmentItemCard(
     media: MediaAttachment,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onMediaClick: ((title: String, uri: String) -> Unit)? = null
 ) {
     val context = LocalContext.current
 
@@ -770,18 +1163,31 @@ fun MediaAttachmentItemCard(
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
-                                text = "اضغط لمشاهدة شرح التكليف",
+                                text = "اضغط لمشاهدة شرح التكليف أو تنزيله",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.outline
                             )
                         }
                     }
 
-                    OutlinedButton(
-                        onClick = { ShareHelper.openAttachment(context, media.uri) },
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
-                    ) {
-                        Text("مشاهدة ↗", style = MaterialTheme.typography.labelMedium)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(
+                            onClick = { downloadMediaFile(context, media.uri, media.title) },
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Download,
+                                contentDescription = "تنزيل",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                        OutlinedButton(
+                            onClick = { ShareHelper.openAttachment(context, media.uri) },
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+                        ) {
+                            Text("مشاهدة ↗", style = MaterialTheme.typography.labelMedium)
+                        }
                     }
                 }
             }
@@ -835,11 +1241,24 @@ fun MediaAttachmentItemCard(
                         }
                     }
 
-                    OutlinedButton(
-                        onClick = { ShareHelper.openAttachment(context, media.uri) },
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
-                    ) {
-                        Text("عرض ↗", style = MaterialTheme.typography.labelMedium)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(
+                            onClick = { downloadMediaFile(context, media.uri, media.title) },
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Download,
+                                contentDescription = "تنزيل",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                        OutlinedButton(
+                            onClick = { ShareHelper.openAttachment(context, media.uri) },
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+                        ) {
+                            Text("عرض ↗", style = MaterialTheme.typography.labelMedium)
+                        }
                     }
                 }
             }
@@ -851,7 +1270,13 @@ fun MediaAttachmentItemCard(
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                 modifier = modifier
                     .fillMaxWidth()
-                    .clickable { ShareHelper.openAttachment(context, media.uri) }
+                    .clickable {
+                        if (onMediaClick != null) {
+                            onMediaClick(media.title.ifBlank { "صورة التكليف" }, media.uri)
+                        } else {
+                            ShareHelper.openAttachment(context, media.uri)
+                        }
+                    }
             ) {
                 Row(
                     modifier = Modifier
@@ -886,18 +1311,37 @@ fun MediaAttachmentItemCard(
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
-                                text = "اضغط لعرض الصورة بحجم كامل",
+                                text = "اضغط لعرض الصورة بحجم كامل أو تنزيلها",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.outline
                             )
                         }
                     }
 
-                    OutlinedButton(
-                        onClick = { ShareHelper.openAttachment(context, media.uri) },
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
-                    ) {
-                        Text("معاينة ↗", style = MaterialTheme.typography.labelMedium)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(
+                            onClick = { downloadMediaFile(context, media.uri, media.title) },
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Download,
+                                contentDescription = "تنزيل",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                        OutlinedButton(
+                            onClick = {
+                                if (onMediaClick != null) {
+                                    onMediaClick(media.title.ifBlank { "صورة التكليف" }, media.uri)
+                                } else {
+                                    ShareHelper.openAttachment(context, media.uri)
+                                }
+                            },
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+                        ) {
+                            Text("معاينة ↗", style = MaterialTheme.typography.labelMedium)
+                        }
                     }
                 }
             }

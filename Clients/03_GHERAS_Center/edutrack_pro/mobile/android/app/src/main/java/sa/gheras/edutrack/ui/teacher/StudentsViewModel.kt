@@ -16,6 +16,7 @@ import sa.gheras.edutrack.data.local.session.Role
 import sa.gheras.edutrack.data.local.session.SessionStore
 import sa.gheras.edutrack.data.repo.StudentsRepository
 import sa.gheras.edutrack.sync.PullSync
+import sa.gheras.edutrack.sync.SyncStatus
 
 data class StudentWithRoom(
     val student: StudentEntity,
@@ -55,14 +56,21 @@ class StudentsViewModel(
     val selectedRoomId: StateFlow<String?> = _selectedRoomId.asStateFlow()
 
     private val _isRefreshing = MutableStateFlow(false)
+    private val isSyncing = if (pullSync != null) {
+        combine(_isRefreshing, pullSync.status) { refreshing, status ->
+            refreshing || status is SyncStatus.Syncing
+        }
+    } else {
+        _isRefreshing
+    }
 
     val uiState: StateFlow<StudentsUiState> = combine(
         studentsRepository.observeAll(),
         roomDao.observeAll(),
         _searchQuery,
         _selectedRoomId,
-        _isRefreshing
-    ) { allStudents, allRooms, query, selectedId, refreshing ->
+        isSyncing
+    ) { allStudents, allRooms, query, selectedId, syncing ->
         val roster = scopeRoster(
             role = sessionStore.user?.role,
             assignedRoomIds = sessionStore.profile?.scope?.roomIds.orEmpty(),
@@ -91,10 +99,14 @@ class StudentsViewModel(
             rooms = rooms,
             students = filtered,
             isScopedToAssigned = roster.isScoped,
-            isRefreshing = refreshing,
-            isLoading = false
+            isRefreshing = syncing,
+            isLoading = syncing && filtered.isEmpty()
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), StudentsUiState(isLoading = true))
+
+    init {
+        refresh()
+    }
 
     fun onSearchQueryChange(query: String) {
         _searchQuery.value = query

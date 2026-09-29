@@ -47,6 +47,9 @@ interface SubmissionFileDao {
     @Query("SELECT * FROM submission_files WHERE deleted_at IS NULL")
     fun observeAll(): Flow<List<SubmissionFileEntity>>
 
+    @Query("SELECT sf.* FROM submission_files sf INNER JOIN submissions s ON sf.submission_id = s.id WHERE s.assignment_id = :assignmentId AND sf.deleted_at IS NULL")
+    fun observeByAssignment(assignmentId: String): Flow<List<SubmissionFileEntity>>
+
     @Query("DELETE FROM submission_files")
     suspend fun clear()
 

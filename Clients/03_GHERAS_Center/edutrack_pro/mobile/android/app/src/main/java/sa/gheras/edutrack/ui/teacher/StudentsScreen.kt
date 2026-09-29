@@ -47,6 +47,7 @@ import androidx.compose.ui.unit.dp
 import sa.gheras.edutrack.ui.common.EmptyView
 import sa.gheras.edutrack.ui.common.LoadingView
 import sa.gheras.edutrack.ui.common.Num
+import androidx.lifecycle.compose.LifecycleResumeEffect
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -56,6 +57,12 @@ fun StudentsScreen(
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.uiState.collectAsState()
+
+    // Pull fresh student roster on first entry and on app resume
+    LifecycleResumeEffect(viewModel) {
+        viewModel.refresh()
+        onPauseOrDispose { }
+    }
 
     Scaffold(
         topBar = {

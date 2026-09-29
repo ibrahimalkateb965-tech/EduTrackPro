@@ -62,6 +62,7 @@ import sa.gheras.edutrack.ui.common.EmptyView
 import sa.gheras.edutrack.ui.common.LoadingView
 import sa.gheras.edutrack.ui.common.Num
 import sa.gheras.edutrack.ui.theme.PresentGreen
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import java.time.LocalDate
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -75,6 +76,12 @@ fun AssignmentsScreen(
     var showCreateDialog by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+
+    // Pull fresh assignments on first entry and whenever app/screen returns to the foreground
+    LifecycleResumeEffect(viewModel) {
+        viewModel.refresh()
+        onPauseOrDispose { }
+    }
 
     Scaffold(
         topBar = {

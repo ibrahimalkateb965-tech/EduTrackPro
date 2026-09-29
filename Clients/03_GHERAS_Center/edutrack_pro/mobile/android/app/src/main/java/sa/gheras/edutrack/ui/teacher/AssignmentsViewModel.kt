@@ -5,7 +5,6 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
@@ -23,6 +22,7 @@ import sa.gheras.edutrack.data.local.session.SessionStore
 import sa.gheras.edutrack.data.repo.AssignmentsRepository
 import sa.gheras.edutrack.data.repo.StudentsRepository
 import sa.gheras.edutrack.sync.PullSync
+import sa.gheras.edutrack.sync.SyncStatus
 import sa.gheras.edutrack.ui.teacher.media.AssignmentMediaParser
 import sa.gheras.edutrack.ui.teacher.media.MediaAttachment
 import kotlinx.coroutines.flow.first
@@ -82,6 +82,14 @@ class AssignmentsViewModel(
     private val _searchQuery = MutableStateFlow("")
     private val _isRefreshing = MutableStateFlow(false)
 
+    private val isSyncing = if (pullSync != null) {
+        combine(_isRefreshing, pullSync.status) { refreshing, status ->
+            refreshing || status is SyncStatus.Syncing
+        }
+    } else {
+        _isRefreshing
+    }
+
     private val assignedRoomIds: List<String> =
         sessionStore?.profile?.scope?.roomIds?.filter { it.isNotBlank() } ?: emptyList()
     private val isTeacher: Boolean =
@@ -104,8 +112,8 @@ class AssignmentsViewModel(
         _selectedRoomId,
         _statusFilter,
         _searchQuery,
-        _isRefreshing
-    ) { data, selectedRoomId, statusFilter, query, isRefreshing ->
+        isSyncing
+    ) { data, selectedRoomId, statusFilter, query, syncing ->
         val assignments = data.assignments
         val allRooms = data.rooms
         val allLinks = data.links
@@ -130,7 +138,7 @@ class AssignmentsViewModel(
 
         // Map all assignments with their rooms and stats
         val mappedItems = assignments.filter {
-            it.dueDate == null || (!it.dueDate.isBefore(sixtyDaysAgo) && !it.dueDate.isAfter(sixtyDaysAhead))
+            !it.dueDate.isBefore(sixtyDaysAgo) && !it.dueDate.isAfter(sixtyDaysAhead)
         }.map { assignment ->
             val links = linksByAssignment[assignment.id] ?: emptyList()
             val linkedStudents = links.mapNotNull { studentMap[it.studentId] }
@@ -180,7 +188,7 @@ class AssignmentsViewModel(
         // Apply Room selection
         val effectiveRoomId = selectedRoomId ?: visibleRooms.singleOrNull()?.takeIf { isScoped }?.id
         val roomFiltered = if (effectiveRoomId != null) {
-            scopedItems.filter { it.roomId == effectiveRoomId }
+            scopedItems.filter { it.roomId == effectiveRoomId || (it.roomId == null && selectedRoomId == null) }
         } else {
             scopedItems
         }
@@ -211,14 +219,18 @@ class AssignmentsViewModel(
             selectedRoomId = effectiveRoomId,
             statusFilter = statusFilter,
             searchQuery = query,
-            isRefreshing = isRefreshing,
-            isLoading = false,
+            isRefreshing = syncing,
+            isLoading = syncing && mappedItems.isEmpty(),
             isScopedToAssigned = isScoped,
-            totalCount = scopedItems.size,
-            activeCount = scopedItems.count { !it.isCompleted && !it.isPastDue },
-            completedCount = scopedItems.count { it.isCompleted }
+            totalCount = roomFiltered.size,
+            activeCount = roomFiltered.count { !it.isCompleted && !it.isPastDue },
+            completedCount = roomFiltered.count { it.isCompleted }
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), AssignmentsUiState(isLoading = true))
+
+    init {
+        refresh()
+    }
 
     fun selectRoom(roomId: String?) {
         _selectedRoomId.value = roomId

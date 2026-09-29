@@ -60,6 +60,7 @@ import sa.gheras.edutrack.R
 import sa.gheras.edutrack.ui.common.EmptyView
 import sa.gheras.edutrack.ui.common.FailedWritesList
 import sa.gheras.edutrack.ui.common.Num
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import java.time.LocalDate
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -74,6 +75,12 @@ fun TeacherHomeScreen(
     val state by viewModel.uiState.collectAsState()
     val pendingCount by viewModel.pendingCount.collectAsState()
     val failedWrites by viewModel.failedWrites.collectAsState()
+
+    // Pull fresh schedules and records on first entry and on app resume
+    LifecycleResumeEffect(viewModel) {
+        viewModel.refresh()
+        onPauseOrDispose { }
+    }
 
     Scaffold(
         topBar = {
@@ -186,7 +193,18 @@ fun TeacherHomeScreen(
                 }
 
                 // Weekend / Empty check
-                if (state.isWeekend && state.slots.isEmpty()) {
+                if (state.isRefreshing && state.slots.isEmpty()) {
+                    item {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 48.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                        }
+                    }
+                } else if (state.isWeekend && state.slots.isEmpty()) {
                     item {
                         EmptyView(
                             message = "لا توجد حصص في عطلة نهاية الأسبوع (${state.selectedDayName})\nاختر يوماً دراسياً آخر من الأعلى",

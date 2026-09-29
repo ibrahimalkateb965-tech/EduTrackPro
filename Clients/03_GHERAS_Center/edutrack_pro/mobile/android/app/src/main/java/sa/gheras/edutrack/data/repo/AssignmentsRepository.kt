@@ -122,6 +122,9 @@ class AssignmentsRepository(
     fun observeAllSubmissionFiles(): Flow<List<SubmissionFileEntity>> =
         submissionFileDao?.observeAll() ?: kotlinx.coroutines.flow.flowOf(emptyList())
 
+    fun observeSubmissionFilesByAssignment(assignmentId: String): Flow<List<SubmissionFileEntity>> =
+        submissionFileDao?.observeByAssignment(assignmentId) ?: kotlinx.coroutines.flow.flowOf(emptyList())
+
     suspend fun getSubmissionForStudent(assignmentId: String, studentId: String): SubmissionEntity? =
         withContext(Dispatchers.IO) {
             submissionDao.getByAssignmentAndStudent(assignmentId, studentId)

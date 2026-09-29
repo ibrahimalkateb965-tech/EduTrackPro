@@ -29,4 +29,14 @@ class NumTest {
         val normalized = Num.enforceWesternNumerals(easternText)
         assertEquals("الدرجة: 95 من 100 والتاريخ 2026/09/21", normalized)
     }
+
+    @Test
+    fun `formatDecimal formats whole numbers without trailing zeros and preserves exact decimals`() {
+        assertEquals("10", Num.formatDecimal(10.0))
+        assertEquals("0", Num.formatDecimal(0.0))
+        assertEquals("9.5", Num.formatDecimal(9.5))
+        assertEquals("9.25", Num.formatDecimal(9.25))
+        assertEquals("9.75", Num.formatDecimal(9.75))
+        assertEquals("9.96", Num.formatDecimal(9.96))
+    }
 }
