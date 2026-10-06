@@ -388,7 +388,7 @@ fun TeacherEvaluationBanner(
                     Text("9.5 / 10", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
                 }
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("تواصل الأولياء", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("المتابعة الإدارية", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text("9.0 / 10", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
                 }
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
