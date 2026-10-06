@@ -34,6 +34,8 @@ import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Videocam
@@ -70,6 +72,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import java.io.File
 import java.time.LocalDate
 import java.util.Locale
@@ -114,6 +117,10 @@ fun CreateAssignmentDialog(
     var linkUrl by remember { mutableStateOf("") }
     var linkTitle by remember { mutableStateOf("") }
     var linkKind by remember { mutableStateOf("google_form") }
+
+    // Image source selection dialog & camera capture state
+    var showImageSourceDialog by remember { mutableStateOf(false) }
+    var tempCameraFile by remember { mutableStateOf<File?>(null) }
 
     // Persistent storage directory for media attachments
     val mediaDir = remember {
@@ -197,6 +204,41 @@ fun CreateAssignmentDialog(
             }
         } else {
             errorMessage = "يرجى منح إذن الميكروفون لتسجيل الصوت"
+        }
+    }
+
+    // Camera capture launcher
+    val cameraLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.TakePicture()
+    ) { success ->
+        if (success) {
+            val file = tempCameraFile
+            if (file != null && file.exists() && file.length() > 0) {
+                attachments.add(
+                    MediaAttachment(
+                        id = UUID.randomUUID().toString(),
+                        kind = "image",
+                        title = "صورة بالكاميرا / ورقة عمل",
+                        uri = file.absolutePath
+                    )
+                )
+            }
+        }
+        tempCameraFile = null
+    }
+
+    val launchCamera: () -> Unit = {
+        try {
+            val file = File(mediaDir, "img_cam_${System.currentTimeMillis()}.jpg")
+            tempCameraFile = file
+            val uri = FileProvider.getUriForFile(
+                context,
+                "${context.packageName}.fileprovider",
+                file
+            )
+            cameraLauncher.launch(uri)
+        } catch (e: Exception) {
+            errorMessage = "تعذر تشغيل الكاميرا: ${e.message}"
         }
     }
 
@@ -493,7 +535,7 @@ fun CreateAssignmentDialog(
 
                     // 3. Image
                     OutlinedButton(
-                        onClick = { imagePickerLauncher.launch("image/*") },
+                        onClick = { showImageSourceDialog = true },
                         contentPadding = PaddingValues(horizontal = 6.dp, vertical = 6.dp),
                         modifier = Modifier.weight(1f)
                     ) {
@@ -722,6 +764,131 @@ fun CreateAssignmentDialog(
             },
             dismissButton = {
                 TextButton(onClick = { showLinkDialog = false }) {
+                    Text("إلغاء")
+                }
+            }
+        )
+    }
+
+    // Image Source Selection Dialog (Camera vs Gallery)
+    if (showImageSourceDialog) {
+        AlertDialog(
+            onDismissRequest = { showImageSourceDialog = false },
+            title = {
+                Text(
+                    text = "إرفاق صورة للواجب",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(
+                        text = "اختر طريقة إرفاق صورة ورقة العمل أو التكليف:",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+
+                    // Option 1: Camera capture
+                    Surface(
+                        onClick = {
+                            showImageSourceDialog = false
+                            launchCamera()
+                        },
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Surface(
+                                shape = CircleShape,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(40.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        imageVector = Icons.Default.PhotoCamera,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onPrimary,
+                                        modifier = Modifier.size(22.dp)
+                                    )
+                                }
+                            }
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "التقاط صورة بالكاميرا 📸",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = "تصوير ورقة العمل أو الكتاب فورياً",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+
+                    // Option 2: Choose from gallery
+                    Surface(
+                        onClick = {
+                            showImageSourceDialog = false
+                            imagePickerLauncher.launch("image/*")
+                        },
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Surface(
+                                shape = CircleShape,
+                                color = MaterialTheme.colorScheme.secondaryContainer,
+                                modifier = Modifier.size(40.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        imageVector = Icons.Default.PhotoLibrary,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                        modifier = Modifier.size(22.dp)
+                                    )
+                                }
+                            }
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "اختيار من المعرض 🖼️",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = "اختيار صورة محفوظة في ألبوم الجهاز",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { showImageSourceDialog = false }) {
                     Text("إلغاء")
                 }
             }
