@@ -643,10 +643,12 @@ fun CreateAssignmentDialog(
                                 errorMessage = "يرجى كتابة عنوان التكليف"
                                 return@Button
                             }
+                            val effectiveSubject = if (selectedSubject == "عام") null else selectedSubject
+                            val effectiveRoomId = selectedRoomId ?: rooms.firstOrNull()?.id
                             onSubmit(
                                 title.trim(),
-                                selectedSubject,
-                                selectedRoomId,
+                                effectiveSubject,
+                                effectiveRoomId,
                                 dueDate,
                                 instructions.trim(),
                                 pageRef.trim().ifBlank { null },

@@ -2,6 +2,7 @@ package sa.gheras.edutrack.ui.teacher
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -38,9 +39,11 @@ data class TeacherHomeUiState(
     val selectedDayName: String = "",
     val slots: List<ScheduleSlotItem> = emptyList(),
     val isWeekend: Boolean = false,
-    val isRefreshing: Boolean = false
+    val isRefreshing: Boolean = false,
+    val isLoading: Boolean = false
 )
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class TeacherHomeViewModel(
     private val scheduleRepository: ScheduleRepository,
     private val roomDao: RoomDao,
@@ -101,10 +104,11 @@ class TeacherHomeViewModel(
                 selectedDayName = dayName,
                 slots = slots,
                 isWeekend = isWeekend,
-                isRefreshing = refreshing
+                isRefreshing = refreshing,
+                isLoading = refreshing && slots.isEmpty()
             )
         }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), TeacherHomeUiState())
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), TeacherHomeUiState(isLoading = true))
 
     init {
         // Always pull today's records on entry instead of waiting for pull-to-refresh.

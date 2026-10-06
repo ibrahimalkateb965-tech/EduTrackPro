@@ -346,14 +346,176 @@ function createModernTimeField(name, labelText, initialVal, onChange) {
 // View Renderers
 // -------------------------------------------------------------
 
+async function openBulkAllocationModal(room) {
+  toast('جاري تحميل قائمة الطلاب...');
+  let allStudents = [];
+  try {
+    const res = await viewApi.fetchAll('students');
+    allStudents = toList(res);
+  } catch (err) {
+    toast('تعذر جلب الطلاب: ' + err.message, true);
+    return;
+  }
+
+  const selectedStudentIds = new Set();
+  allStudents.forEach(st => {
+    if (String(st.room_id) === String(room.id)) {
+      selectedStudentIds.add(st.id);
+    }
+  });
+
+  let filterGroup = 'all';
+  let filterSearch = '';
+  let filterUnassignedOnly = false;
+
+  const countBadge = el('span', { class: 'badge', style: 'background:var(--g-teal); color:#fff; font-size:13px;' }, `${selectedStudentIds.size} طالب محدد`);
+  const listContainer = el('div', { style: 'max-height:380px; overflow-y:auto; border:1px solid #e2e8f0; border-radius:10px; padding:8px; margin:12px 0; background:#f8fafc;' });
+
+  function renderStudentItems() {
+    listContainer.replaceChildren();
+    const filtered = allStudents.filter(st => {
+      if (filterUnassignedOnly && st.room_id) return false;
+      if (filterGroup !== 'all' && st.group_name !== filterGroup) return false;
+      if (filterSearch) {
+        const query = filterSearch.trim();
+        const matches = [st.name, st.national_id, st.guardian_phone].some(val => String(val || '').includes(query));
+        if (!matches) return false;
+      }
+      return true;
+    });
+
+    if (!filtered.length) {
+      listContainer.append(el('div', { style: 'text-align:center; padding:24px; color:#64748b; font-size:13px;' }, 'لا توجد نتائج مطابقة'));
+      return;
+    }
+
+    filtered.forEach(st => {
+      const isChecked = selectedStudentIds.has(st.id);
+      const isCurrent = String(st.room_id) === String(room.id);
+      const rowItem = el('label', {
+        style: `display:flex; align-items:center; justify-content:space-between; padding:8px 12px; margin-bottom:6px; border-radius:8px; background:#fff; border:1px solid ${isChecked ? 'var(--g-teal)' : '#e2e8f0'}; cursor:pointer; transition:all .15s;`
+      });
+
+      const cb = el('input', { type: 'checkbox', style: 'margin-left:10px; width:18px; height:18px; accent-color:var(--g-teal);' });
+      cb.checked = isChecked;
+      cb.onchange = () => {
+        if (cb.checked) selectedStudentIds.add(st.id);
+        else selectedStudentIds.delete(st.id);
+        countBadge.textContent = `${selectedStudentIds.size} طالب محدد`;
+        rowItem.style.borderColor = cb.checked ? 'var(--g-teal)' : '#e2e8f0';
+        rowItem.style.background = cb.checked ? '#f0fdfa' : '#fff';
+      };
+
+      const infoCol = el('div', { style: 'display:flex; align-items:center; gap:8px;' },
+        cb,
+        el('strong', { style: 'font-size:13px;' }, st.name || 'بدون اسم'),
+        st.gender ? el('span', { class: 'badge', style: 'font-size:11px;' }, st.gender) : null,
+        st.group_name ? el('span', { class: 'badge', style: 'font-size:11px; background:#e0f2fe; color:#0369a1;' }, st.group_name) : null
+      );
+
+      const statusCol = el('div', { style: 'font-size:12px; color:#64748b;' },
+        isCurrent ? el('span', { class: 'badge', style: 'background:#dcfce7; color:#166534;' }, 'مسكن في هذه القاعة') :
+        (st.room_name ? el('span', { class: 'badge', style: 'background:#fef3c7; color:#92400e;' }, `في: ${st.room_name}`) : el('span', { class: 'badge' }, 'غير مسكن'))
+      );
+
+      rowItem.append(infoCol, statusCol);
+      listContainer.append(rowItem);
+    });
+  }
+
+  const searchInput = el('input', { type: 'text', placeholder: 'بحث بالاسم أو الهوية...', style: 'flex:1; padding:7px 12px; border-radius:8px; border:1px solid #cbd5e1;' });
+  searchInput.oninput = () => { filterSearch = searchInput.value; renderStudentItems(); };
+
+  const groupFilterSelect = el('select', { style: 'padding:7px; border-radius:8px; border:1px solid #cbd5e1;' },
+    el('option', { value: 'all' }, 'جميع المجموعات'),
+    el('option', { value: 'الصباح' }, 'فترة الصباح'),
+    el('option', { value: 'المساء' }, 'فترة المساء'),
+    el('option', { value: 'القدرات' }, 'القدرات'),
+    el('option', { value: 'الإنجليزي' }, 'الإنجليزي')
+  );
+  groupFilterSelect.onchange = () => { filterGroup = groupFilterSelect.value; renderStudentItems(); };
+
+  const unassignedBtn = el('button', { type: 'button', class: 'button button-outline', style: 'padding:6px 10px; font-size:12px;' }, 'غير المسكنين فقط');
+  unassignedBtn.onclick = () => {
+    filterUnassignedOnly = !filterUnassignedOnly;
+    unassignedBtn.style.background = filterUnassignedOnly ? 'var(--g-teal)' : '#fff';
+    unassignedBtn.style.color = filterUnassignedOnly ? '#fff' : 'var(--g-teal)';
+    renderStudentItems();
+  };
+
+  const selectAllBtn = el('button', { type: 'button', class: 'button button-outline', style: 'padding:6px 10px; font-size:12px;' }, 'تحديد المعروضين');
+  selectAllBtn.onclick = () => {
+    const filtered = allStudents.filter(st => {
+      if (filterUnassignedOnly && st.room_id) return false;
+      if (filterGroup !== 'all' && st.group_name !== filterGroup) return false;
+      return true;
+    });
+    filtered.forEach(st => selectedStudentIds.add(st.id));
+    countBadge.textContent = `${selectedStudentIds.size} طالب محدد`;
+    renderStudentItems();
+  };
+
+  const clearSelectionBtn = el('button', { type: 'button', class: 'button button-outline', style: 'padding:6px 10px; font-size:12px; color:#dc2626; border-color:#fca5a5;' }, 'إلغاء التحديد');
+  clearSelectionBtn.onclick = () => {
+    selectedStudentIds.clear();
+    countBadge.textContent = '0 طالب محدد';
+    renderStudentItems();
+  };
+
+  const confirmBtn = el('button', { class: 'button', type: 'button', style: 'flex:1; padding:10px; font-weight:700;' }, 'حفظ التسكين والنقل للقاعة');
+  const cancelBtn = el('button', { class: 'button button-outline', type: 'button' }, 'إلغاء');
+
+  const modalBody = el('div', {},
+    el('div', { style: 'display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;' },
+      el('p', { style: 'font-size:13px; color:#475569; margin:0;' }, `حدد الطلاب الذين ترغب في تسكينهم أو نقلهم مباشرة إلى: <strong>${room.name}</strong>`),
+      countBadge
+    ),
+    el('div', { style: 'display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px;' },
+      searchInput,
+      groupFilterSelect,
+      unassignedBtn,
+      selectAllBtn,
+      clearSelectionBtn
+    ),
+    listContainer,
+    el('div', { style: 'display:flex; gap:10px; margin-top:14px;' }, confirmBtn, cancelBtn)
+  );
+
+  const dialog = modal(`تسكين ونقل الطلاب — ${room.name}`, modalBody);
+  cancelBtn.onclick = dialog.close;
+  renderStudentItems();
+
+  confirmBtn.onclick = async () => {
+    const studentIds = Array.from(selectedStudentIds);
+    confirmBtn.disabled = true;
+    confirmBtn.textContent = 'جاري التسكين والتحديث...';
+    try {
+      await viewApi.post(`rooms/${room.id}/bulk-enroll`, { student_ids: studentIds });
+      toast(`تم تسكين وتحديث ${studentIds.length} طالب في قاعة ${room.name} بنجاح`);
+      dialog.close();
+      await reload();
+    } catch (err) {
+      toast(err.message || 'فشل التسكين', true);
+      confirmBtn.disabled = false;
+      confirmBtn.textContent = 'حفظ التسكين والنقل للقاعة';
+    }
+  };
+}
+
 function roomRow(room) {
   const edit = el('button', { class: 'button button-outline', type: 'button' }, 'تعديل');
   edit.addEventListener('click', () => openRoomForm(room));
+  const bulkBtn = el('button', {
+    class: 'button',
+    type: 'button',
+    style: 'background:var(--g-teal); padding:4px 10px; font-size:12px; font-weight:700; margin-right:4px;'
+  }, '👥 تسكين ونقل الطلاب');
+  bulkBtn.addEventListener('click', () => openBulkAllocationModal(room));
   return el('tr', {},
-    el('td', {}, room.name || '—'),
-    el('td', {}, room.group_name || '—'),
-    el('td', {}, room.students_count === undefined || room.students_count === null ? '—' : String(room.students_count)),
-    el('td', {}, edit)
+    el('td', {}, el('strong', {}, room.name || '—')),
+    el('td', {}, el('span', { class: 'badge' }, room.group_name || '—')),
+    el('td', {}, el('span', { class: 'badge', style: 'background:#f0fdf4; color:#166534; font-weight:700;' }, room.students_count === undefined || room.students_count === null ? '0 طالب' : `${room.students_count} طالب`)),
+    el('td', {}, edit, ' ', bulkBtn)
   );
 }
 

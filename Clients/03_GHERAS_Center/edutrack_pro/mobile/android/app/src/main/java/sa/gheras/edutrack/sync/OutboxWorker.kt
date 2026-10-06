@@ -15,6 +15,7 @@ import sa.gheras.edutrack.data.remote.dto.LessonLogBody
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.RequestBody.Companion.asRequestBody
 import sa.gheras.edutrack.data.entity.EvaluationEntity
+import sa.gheras.edutrack.data.repo.mappers.AssignmentMappers
 import sa.gheras.edutrack.data.repo.mappers.DateParsers
 import java.io.File
 import java.io.IOException
@@ -232,7 +233,13 @@ class OutboxWorker(
                     pageRef = json.optString("page_ref").takeIf { it.isNotBlank() },
                     studentIds = studentIdsList
                 )
-                meApi.postAssignment(body)
+                val res = meApi.postAssignment(body)
+                db.assignmentDao().upsert(AssignmentMappers.assignmentToEntity(res))
+                val serverLinks = AssignmentMappers.assignmentStudentsToEntities(res)
+                if (serverLinks.isNotEmpty()) {
+                    db.assignmentStudentDao().deleteByAssignment(res.id)
+                    db.assignmentStudentDao().upsertAll(serverLinks)
+                }
             }
         }
     }

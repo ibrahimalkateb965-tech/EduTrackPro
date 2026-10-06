@@ -192,8 +192,13 @@ fun TeacherHomeScreen(
                     }
                 }
 
+                // Supervisor Evaluation & KPI Scorecard Banner
+                item {
+                    TeacherEvaluationBanner()
+                }
+
                 // Weekend / Empty check
-                if (state.isRefreshing && state.slots.isEmpty()) {
+                if ((state.isRefreshing || state.isLoading) && state.slots.isEmpty()) {
                     item {
                         Box(
                             modifier = Modifier
@@ -331,3 +336,86 @@ fun ScheduleSlotCard(
         }
     }
 }
+
+@Composable
+fun TeacherEvaluationBanner(
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f))
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(text = "📊", style = MaterialTheme.typography.titleMedium)
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "تقييم أداء المعلم والتوجيهات الميدانية",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                }
+                Surface(
+                    color = MaterialTheme.colorScheme.primary,
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(
+                        text = "ممتاز (9.4/10)",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // The 4 Evaluation Pillars
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("التفاعل بالقاعة", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("9.5 / 10", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                }
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("تواصل الأولياء", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("9.0 / 10", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                }
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("الانضباط", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("10 / 10", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                }
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("الخطط والمنهج", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("9.2 / 10", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            Surface(
+                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = "💡 توجيهات المشرفة: أداء متميز في إدارة القاعة وتفاعل الطلاب، مع الاستمرار في تعزيز متابعة الحفظ اليومي.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.padding(10.dp)
+                )
+            }
+        }
+    }
+}
+

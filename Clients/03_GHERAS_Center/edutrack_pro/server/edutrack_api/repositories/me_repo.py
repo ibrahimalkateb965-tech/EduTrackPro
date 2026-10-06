@@ -551,8 +551,10 @@ def create_assignment(conn, scope: Scope, body: dict) -> dict:
     if student_ids:
         scope.assert_students(student_ids)
 
-    valid_subjects = ("القرآن", "لغتي", "الإنجليزي", "الرياضيات")
     subject = body.get("subject")
+    if subject == "عام":
+        subject = None
+    valid_subjects = ("القرآن", "لغتي", "الإنجليزي", "الرياضيات")
     if subject is not None and subject not in valid_subjects:
         raise ApiError(422, "invalid_subject", f"المادة غير صالحة. المواد المسموحة هي: {', '.join(valid_subjects)}")
 

@@ -15,6 +15,7 @@ let staff = [];
 let users = [];
 let rooms = [];
 let absences = [];
+let allTeacherEvaluations = [];
 let activeTab = 'all';
 let tbody = null;
 let tabsContainer = null;
@@ -100,6 +101,19 @@ function staffRow(member, api) {
     payroll.addEventListener('click', () => openPayrollForm(api, member));
     actions.push(' ', payroll);
   }
+
+  const isTeacher = (member.role_title || '').includes('معلم') || (member.role_title || '').includes('تحفيظ') || (member.role_title || '').includes('تعليم');
+  if (isTeacher || isManager || api.currentUser?.role === 'supervisor') {
+    const evalBtn = el('button', {
+      class: 'button button-outline',
+      type: 'button',
+      style: 'color:#7c3aed; border-color:#c4b5fd; background:#f5f3ff;',
+      title: 'تقييم أداء المعلم وبطاقة مؤشرات الأداء (KPIs)'
+    }, '📊 تقييم الأداء');
+    evalBtn.addEventListener('click', () => openTeacherEvaluationModal(api, member));
+    actions.push(' ', evalBtn);
+  }
+
   const salaryText = hasFinance && member.base_salary !== null && member.base_salary !== undefined
     ? fmtSAR(member.base_salary)
     : '—';
@@ -129,10 +143,63 @@ function absenceRow(rec) {
   );
 }
 
+function kpiRow(member, api) {
+  const evals = allTeacherEvaluations.filter(e => e.staff_id === member.id || e.teacher_id === member.id);
+  const latest = evals.length ? evals[0] : null;
+  const roomName = member.room_name || rooms.find(r => r.id === member.room_id)?.name || '—';
+
+  const scoreBadge = (score) => {
+    if (score === undefined || score === null) return el('span', { class: 'muted' }, '—');
+    const num = Number(score);
+    const color = num >= 9 ? '#166534' : (num >= 8 ? '#0369a1' : (num >= 7 ? '#854d0e' : '#991b1b'));
+    const bg = num >= 9 ? '#dcfce7' : (num >= 8 ? '#e0f2fe' : (num >= 7 ? '#fef9c3' : '#fee2e2'));
+    return el('span', { class: 'badge', style: `background:${bg}; color:${color}; font-weight:600; font-family:Consolas,monospace; font-size:12px;` }, `${num.toFixed(1)}/10`);
+  };
+
+  const totalScoreBadge = (score, rating) => {
+    if (!score) return el('span', { class: 'muted' }, 'لم يُقيَّم بعد');
+    const num = Number(score);
+    const ratingColor = rating === 'ممتاز' ? 'background:#dcfce7; color:#166534;' : (rating === 'جيد جداً' ? 'background:#e0f2fe; color:#0369a1;' : (rating === 'جيد' ? 'background:#fef3c7; color:#92400e;' : 'background:#fee2e2; color:#991b1b;'));
+    return el('div', { style: 'display:flex; align-items:center; gap:6px;' },
+      el('span', { class: 'badge', style: ratingColor }, rating || 'تقييم'),
+      el('strong', { style: 'font-family:Consolas,monospace; font-size:13px;' }, `${num.toFixed(1)}/10`)
+    );
+  };
+
+  const evalBtn = el('button', {
+    class: 'button button-outline',
+    type: 'button',
+    style: 'color:#7c3aed; border-color:#c4b5fd; background:#f5f3ff;'
+  }, '📊 تقييم / تعديل');
+  evalBtn.addEventListener('click', () => openTeacherEvaluationModal(api, member));
+
+  return el('tr', {},
+    el('td', {}, el('strong', {}, member.name || '—')),
+    el('td', {}, roomName),
+    el('td', {}, scoreBadge(latest?.interaction_score)),
+    el('td', {}, scoreBadge(latest?.guardian_comm_score)),
+    el('td', {}, scoreBadge(latest?.ethics_score || latest?.discipline_score)),
+    el('td', {}, scoreBadge(latest?.curriculum_score)),
+    el('td', {}, totalScoreBadge(latest?.total_score, latest?.rating)),
+    el('td', { style: 'max-width:200px; font-size:12px;' }, latest?.notes || latest?.supervisor_notes || el('span', { class: 'muted' }, 'لا توجد ملاحظات')),
+    el('td', {}, evalBtn)
+  );
+}
+
 function paint(api) {
   if (activeTab === 'absences') {
     const rows = absences.map(absenceRow);
     tbody.replaceChildren(...(rows.length ? rows : [el('tr', {}, el('td', { colspan: '5', class: 'muted', style: 'text-align:center;' }, 'لا توجد سجلات غياب للموظفين بعد'))]));
+    return;
+  }
+
+  if (activeTab === 'kpi_dashboard') {
+    const teachersList = staff.filter(member => {
+      const title = (member.role_title || '').toLowerCase();
+      return title.includes('معلم') || title.includes('تحفيظ') || title.includes('تعليم') || member.role_title === 'teacher';
+    });
+    const rows = teachersList.map(member => kpiRow(member, api));
+    tbody.replaceChildren(...(rows.length ? rows : [el('tr', {}, el('td', { colspan: '9', class: 'muted', style: 'text-align:center;' }, 'لا يوجد معلمون مسجلون لعرض مؤشرات أدائهم'))]));
     return;
   }
 
@@ -213,6 +280,12 @@ async function reload(api) {
       absences = toList(await api.fetchAll('staff-attendance'));
     } catch (error) {
       toast('تعذر تحميل سجلات غياب الموظفين', true);
+    }
+  } else if (activeTab === 'kpi_dashboard') {
+    try {
+      allTeacherEvaluations = toList(await api.fetchAll('teacher-evaluations'));
+    } catch (error) {
+      allTeacherEvaluations = [];
     }
   }
   paint(api);
@@ -558,6 +631,117 @@ function openAbsenceForm(api) {
   });
 }
 
+async function openTeacherEvaluationModal(api, member) {
+  toast('جاري تحميل بطاقة تقييم المعلم...');
+  let evals = [];
+  try {
+    const res = await api.fetchAll(`teacher-evaluations?teacher_id=${member.id}`);
+    evals = toList(res);
+  } catch (err) {
+    evals = [];
+  }
+
+  const historyBox = el('div', { style: 'max-height:220px; overflow-y:auto; border:1px solid #e2e8f0; border-radius:10px; padding:8px; background:#f8fafc; margin-bottom:12px;' });
+
+  function renderEvalHistory() {
+    if (!evals.length) {
+      historyBox.replaceChildren(el('div', { style: 'text-align:center; padding:16px; color:#64748b; font-size:13px;' }, 'لا توجد تقييمات سابقة مسجلة لهذا المعلم'));
+      return;
+    }
+    const cards = evals.map(ev => {
+      const ratingColor = ev.rating === 'ممتاز' ? 'background:#dcfce7; color:#166534;' : (ev.rating === 'جيد جداً' ? 'background:#e0f2fe; color:#0369a1;' : (ev.rating === 'جيد' ? 'background:#fef3c7; color:#92400e;' : 'background:#fee2e2; color:#991b1b;'));
+      return el('div', { style: 'padding:10px; border:1px solid #e2e8f0; border-radius:8px; background:#fff; margin-bottom:8px;' },
+        el('div', { style: 'display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;' },
+          el('div', { style: 'display:flex; align-items:center; gap:8px;' },
+            el('span', { class: 'badge', style: ratingColor }, ev.rating || 'تقييم'),
+            el('strong', { style: 'font-size:14px; color:#1e293b;' }, `الدرجة العامة: ${Number(ev.total_score || 0).toFixed(1)} / 10`)
+          ),
+          el('span', { style: 'font-size:12px; color:#64748b;' }, String(ev.evaluation_date || ev.created_at || '').slice(0, 10))
+        ),
+        el('div', { style: 'display:grid; grid-template-columns:1fr 1fr; gap:6px; font-size:12px; color:#475569; margin-bottom:6px;' },
+          el('div', {}, `🎯 التفاعل بالقاعة: <strong>${ev.interaction_score || 0}/10</strong>`),
+          el('div', {}, `📞 تواصل أولياء الأمور: <strong>${ev.guardian_comm_score || 0}/10</strong>`),
+          el('div', {}, `⚖️ الانضباط والأخلاقيات: <strong>${ev.discipline_score || 0}/10</strong>`),
+          el('div', {}, `📖 الالتزام بالخطط: <strong>${ev.curriculum_score || 0}/10</strong>`)
+        ),
+        ev.supervisor_notes ? el('p', { style: 'margin:4px 0 2px; font-size:12px; color:#334155;' }, `📝 <strong>ملاحظات المشرفة:</strong> ${ev.supervisor_notes}`) : null,
+        ev.improvement_plan ? el('p', { style: 'margin:2px 0 0; font-size:12px; color:#0369a1;' }, `💡 <strong>خطة التحسين:</strong> ${ev.improvement_plan}`) : null
+      );
+    });
+    historyBox.replaceChildren(...cards);
+  }
+
+  renderEvalHistory();
+
+  // New Evaluation Form
+  const s1Input = el('input', { type: 'number', step: '0.5', min: '0', max: '10', value: '9', required: 'required', style: 'padding:6px; border-radius:6px; border:1px solid #cbd5e1;' });
+  const s2Input = el('input', { type: 'number', step: '0.5', min: '0', max: '10', value: '9', required: 'required', style: 'padding:6px; border-radius:6px; border:1px solid #cbd5e1;' });
+  const s3Input = el('input', { type: 'number', step: '0.5', min: '0', max: '10', value: '9.5', required: 'required', style: 'padding:6px; border-radius:6px; border:1px solid #cbd5e1;' });
+  const s4Input = el('input', { type: 'number', step: '0.5', min: '0', max: '10', value: '9', required: 'required', style: 'padding:6px; border-radius:6px; border:1px solid #cbd5e1;' });
+
+  const ratingSelect = el('select', { style: 'padding:6px; border-radius:6px; border:1px solid #cbd5e1;' },
+    el('option', { value: 'ممتاز' }, 'ممتاز (9 - 10)'),
+    el('option', { value: 'جيد جداً' }, 'جيد جداً (8 - 8.9)'),
+    el('option', { value: 'جيد' }, 'جيد (7 - 7.9)'),
+    el('option', { value: 'يحتاج تحسين' }, 'يحتاج تحسين (أقل من 7)')
+  );
+
+  const notesText = el('textarea', { placeholder: 'نقاط القوة لتعزيزها وملاحظات التوجيه الميداني...', style: 'width:100%; min-height:55px; padding:6px; border-radius:6px; border:1px solid #cbd5e1;' });
+  const planText = el('textarea', { placeholder: 'خطة التحسين والتصويب المطلوبة للأسبوع القادم...', style: 'width:100%; min-height:55px; padding:6px; border-radius:6px; border:1px solid #cbd5e1;' });
+
+  const saveBtn = el('button', { class: 'button', type: 'button', style: 'width:100%; padding:9px; font-weight:700; margin-top:8px;' }, 'حفظ واعتماد بطاقة التقييم');
+
+  const formSection = el('div', { style: 'border-top:1.5px solid #e2e8f0; padding-top:10px;' },
+    el('h3', { style: 'font-size:14px; margin:0 0 8px; color:#1e293b;' }, '📝 تسجيل تقييم أداء جديد للمعلم (الأسبوعي / الميداني)'),
+    el('div', { style: 'display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px;' },
+      el('label', {}, el('span', { style: 'display:block; font-size:11px; font-weight:600;' }, '1. التفاعل بالقاعة والتعامل مع الطلاب (من 10)'), s1Input),
+      el('label', {}, el('span', { style: 'display:block; font-size:11px; font-weight:600;' }, '2. التعامل والتواصل مع أولياء الأمور (من 10)'), s2Input),
+      el('label', {}, el('span', { style: 'display:block; font-size:11px; font-weight:600;' }, '3. الأخلاقيات والانضباط الإداري (من 10)'), s3Input),
+      el('label', {}, el('span', { style: 'display:block; font-size:11px; font-weight:600;' }, '4. الحضور والالتزام بالخطط (من 10)'), s4Input)
+    ),
+    el('label', { style: 'display:block; margin-bottom:8px;' }, el('span', { style: 'display:block; font-size:11px; font-weight:600;' }, 'التقدير العام'), ratingSelect),
+    el('label', { style: 'display:block; margin-bottom:8px;' }, el('span', { style: 'display:block; font-size:11px; font-weight:600;' }, 'ملاحظات المشرفة ونقاط القوة والضعف'), notesText),
+    el('label', { style: 'display:block; margin-bottom:8px;' }, el('span', { style: 'display:block; font-size:11px; font-weight:600;' }, 'خطة وتوجيهات التحسين للأسبوع القادم'), planText),
+    saveBtn
+  );
+
+  const modalBody = el('div', {},
+    el('p', { style: 'font-size:13px; color:#475569; margin-top:0;' }, `منظومة إدارة الأداء وتقييم المعلمين — المعلم: <strong>${member.name}</strong> (${member.role_title || 'معلم'})`),
+    historyBox,
+    formSection
+  );
+
+  const dialog = modal(`تقييم أداء المعلم — ${member.name}`, modalBody);
+
+  saveBtn.onclick = async () => {
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'جاري حفظ التقييم...';
+    try {
+      const payload = {
+        teacher_id: member.id,
+        supervisor_id: api.currentUser?.staff_id || member.id,
+        period_type: 'weekly',
+        interaction_score: Number(s1Input.value),
+        guardian_comm_score: Number(s2Input.value),
+        discipline_score: Number(s3Input.value),
+        curriculum_score: Number(s4Input.value),
+        rating: ratingSelect.value,
+        supervisor_notes: notesText.value.trim() || null,
+        improvement_plan: planText.value.trim() || null
+      };
+      const created = await api.post('teacher-evaluations', payload);
+      evals.unshift(created);
+      renderEvalHistory();
+      toast(`تم اعتماد تقييم أداء المعلم ${member.name} بنجاح`);
+    } catch (err) {
+      toast(err.message || 'فشل حفظ التقييم', true);
+    } finally {
+      saveBtn.disabled = false;
+      saveBtn.textContent = 'حفظ واعتماد بطاقة التقييم';
+    }
+  };
+}
+
 export async function render(container, api) {
   staff = [];
   rooms = [];
@@ -568,6 +752,7 @@ export async function render(container, api) {
   const params = getParams();
   const tab = params.get('tab');
   if (tab === 'absences') activeTab = 'absences';
+  else if (tab === 'kpi_dashboard') activeTab = 'kpi_dashboard';
   else if (tab === 'teachers_supervisors') activeTab = 'teachers_supervisors';
   else if (tab === 'teachers') activeTab = 'teachers';
   else if (tab === 'supervisors') activeTab = 'supervisors';
@@ -578,12 +763,13 @@ export async function render(container, api) {
     ['teachers_supervisors', 'المعلمون والمشرفون'],
     ['teachers', 'المعلمون'],
     ['supervisors', 'المشرفون'],
+    ['kpi_dashboard', '📊 مؤشرات تقييم الأداء'],
     ['absences', 'غياب الموظفين والخصومات']
   ];
 
   tabsContainer = el('div', { class: 'toolbar', style: 'margin-bottom:12px; gap:6px;' });
   const theadEl = el('thead');
-  tbody = el('tbody', {}, el('tr', {}, el('td', { colspan: '6', class: 'muted' }, 'جارٍ التحميل...')));
+  tbody = el('tbody', {}, el('tr', {}, el('td', { colspan: '9', class: 'muted' }, 'جارٍ التحميل...')));
 
   function updateTableHeaders() {
     if (activeTab === 'absences') {
@@ -594,6 +780,20 @@ export async function render(container, api) {
           el('th', {}, 'التاريخ'),
           el('th', {}, 'الحالة'),
           el('th', {}, 'الخصم والملاحظة')
+        )
+      );
+    } else if (activeTab === 'kpi_dashboard') {
+      theadEl.replaceChildren(
+        el('tr', {},
+          el('th', {}, 'المعلم'),
+          el('th', {}, 'القاعة / الحلقة'),
+          el('th', {}, 'التفاعل الصفي'),
+          el('th', {}, 'تواصل الأولياء'),
+          el('th', {}, 'الانضباط والأخلاقيات'),
+          el('th', {}, 'إتقان المنهج'),
+          el('th', {}, 'المعدل والتقدير'),
+          el('th', {}, 'ملاحظات المشرفة'),
+          el('th', {}, 'إجراءات')
         )
       );
     } else {

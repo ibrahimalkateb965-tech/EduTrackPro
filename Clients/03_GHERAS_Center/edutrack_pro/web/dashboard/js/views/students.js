@@ -160,6 +160,14 @@ function studentRow(student, api) {
     if (btn) btn.onclick = () => openCreateGuardianModal(api, () => reload(api), student.id);
   }
 
+  const behaviorBtn = el('button', {
+    class: 'button button-outline',
+    type: 'button',
+    style: 'color:#854d0e; border-color:#fde047; background:#fefce8; padding:5px 8px; font-size:12px; margin-right:4px;',
+    title: 'السجل السلوكي وتواصل ولي الأمر'
+  }, '⭐ سلوكي');
+  behaviorBtn.addEventListener('click', () => openBehaviorLogModal(api, student));
+
   return el('tr', {},
     nameCol,
     el('td', {}, student.group_name || '—'),
@@ -167,8 +175,94 @@ function studentRow(student, api) {
     el('td', {}, roomLabel(student)),
     guardianCol,
     el('td', {}, statusBadge(student)),
-    el('td', {}, edit, ' ', printCard, ' ', commBtn)
+    el('td', {}, edit, ' ', printCard, ' ', commBtn, ' ', behaviorBtn)
   );
+}
+
+async function openBehaviorLogModal(api, student) {
+  toast('جاري تحميل السجل السلوكي...');
+  let logs = [];
+  try {
+    const res = await api.fetchAll(`student-behavior-logs?student_id=${student.id}`);
+    logs = toList(res);
+  } catch (err) {
+    logs = [];
+  }
+
+  const historyBody = el('div', { style: 'max-height:220px; overflow-y:auto; border:1px solid #e2e8f0; border-radius:8px; padding:8px; background:#f8fafc; margin-bottom:12px;' });
+
+  function renderHistory() {
+    if (!logs.length) {
+      historyBody.replaceChildren(el('div', { style: 'text-align:center; padding:16px; color:#64748b; font-size:13px;' }, 'لا توجد ملاحظات سلوكية سابقة'));
+      return;
+    }
+    const items = logs.map(l => {
+      const isPos = l.log_type === 'positive';
+      const isComm = l.log_type === 'communication';
+      const badgeColor = isPos ? 'background:#dcfce7; color:#166534;' : (isComm ? 'background:#e0f2fe; color:#0369a1;' : 'background:#fee2e2; color:#991b1b;');
+      const typeLabel = isPos ? '🌟 إيجابي (+نقاط)' : (isComm ? '💬 تواصل' : '⚠️ ملاحظة سلبية');
+      return el('div', { style: 'padding:8px 10px; border-bottom:1px solid #e2e8f0; background:#fff; border-radius:6px; margin-bottom:6px;' },
+        el('div', { style: 'display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;' },
+          el('span', { class: 'badge', style: badgeColor }, typeLabel),
+          el('span', { style: 'font-size:11px; color:#64748b;' }, String(l.logged_at || l.created_at || '').slice(0, 10))
+        ),
+        el('p', { style: 'margin:2px 0 0; font-size:13px; color:#334155;' }, l.note || '—')
+      );
+    });
+    historyBody.replaceChildren(...items);
+  }
+
+  renderHistory();
+
+  // New Note Form
+  const typeSelect = el('select', { name: 'log_type', style: 'padding:8px; border-radius:8px; border:1px solid #cbd5e1; width:100%;' },
+    el('option', { value: 'positive' }, '🌟 نقطة إيجابية / تميز (+1)'),
+    el('option', { value: 'negative' }, '⚠️ ملاحظة سلوكية / انضباط (-1)'),
+    el('option', { value: 'communication' }, '💬 تواصل مباشر مع ولي الأمر')
+  );
+
+  const noteInput = el('textarea', { name: 'note', placeholder: 'اكتب تفاصيل الملاحظة السلوكية أو نتيجة التواصل...', required: 'required', style: 'width:100%; min-height:70px; padding:8px; border-radius:8px; border:1px solid #cbd5e1; margin-top:6px;' });
+  const saveBtn = el('button', { class: 'button', type: 'button', style: 'width:100%; padding:9px; font-weight:700; margin-top:8px;' }, 'تسجيل الملاحظة في السجل');
+
+  const content = el('div', {},
+    el('p', { style: 'font-size:13px; color:#64748b; margin-top:0;' }, `السجل التاريخي للملاحظات والنقاط السلوكية للطالب: <strong>${student.name}</strong>`),
+    historyBody,
+    el('div', { style: 'border-top:1px solid #e2e8f0; padding-top:10px;' },
+      el('label', { style: 'display:block; font-size:12px; font-weight:700; margin-bottom:4px;' }, 'نوع الملاحظة'),
+      typeSelect,
+      el('label', { style: 'display:block; font-size:12px; font-weight:700; margin-top:8px; margin-bottom:4px;' }, 'نص الملاحظة'),
+      noteInput,
+      saveBtn
+    )
+  );
+
+  const dialog = modal(`السجل السلوكي — ${student.name}`, content);
+
+  saveBtn.onclick = async () => {
+    const text = noteInput.value.trim();
+    if (!text) { toast('يرجى كتابة نص الملاحظة', true); return; }
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'جاري الحفظ...';
+    try {
+      const newLog = await api.post('student-behavior-logs', {
+        student_id: student.id,
+        room_id: student.room_id || null,
+        author_id: api.currentUser?.staff_id || api.currentUser?.id,
+        log_type: typeSelect.value,
+        points: typeSelect.value === 'positive' ? 1 : (typeSelect.value === 'negative' ? -1 : 0),
+        note: text
+      });
+      logs.unshift(newLog);
+      renderHistory();
+      noteInput.value = '';
+      toast('تم تسجيل الملاحظة في السجل السلوكي بنجاح');
+    } catch (err) {
+      toast(err.message || 'فشل الحفظ', true);
+    } finally {
+      saveBtn.disabled = false;
+      saveBtn.textContent = 'تسجيل الملاحظة في السجل';
+    }
+  };
 }
 
 const TABS = [
@@ -313,6 +407,7 @@ function openStudentForm(api, student) {
       showAge: true
     }),
     el('label', {}, el('span', {}, 'الجنسية'), el('input', { name: 'nationality', type: 'text', value: value('nationality') || 'سعودي' })),
+    el('label', {}, el('span', {}, 'رابط / صورة الطالب الشخصية 📷'), el('input', { name: 'photo_url', type: 'text', placeholder: 'رابط الصورة أو مسار المعاينة', value: value('photo_url') })),
 
     // --- 2. بيانات ولي الأمر والتواصل ---
     el('div', { class: 'form-section-title', style: 'grid-column: 1 / -1; font-weight: bold; margin: 12px 0 6px; padding-bottom: 4px; border-bottom: 1.5px solid var(--border, #e2e8f0); color: var(--primary, #0284c7); display: flex; align-items: center; gap: 6px;' }, '📞 بيانات ولي الأمر والتواصل'),
@@ -337,7 +432,14 @@ function openStudentForm(api, student) {
     el('label', {}, el('span', {}, 'صعوبات تعلم'), select('has_difficulties', YES_NO, boolValue('has_difficulties'))),
     el('label', {}, el('span', {}, 'تفاصيل الصعوبات'), el('textarea', { name: 'difficulty_notes' }, value('difficulty_notes'))),
     el('label', {}, el('span', {}, 'ملاحظات عن الطالب'), el('textarea', { name: 'child_notes' }, value('child_notes'))),
-    el('label', {}, el('span', {}, 'ملاحظات تعليمية'), el('textarea', { name: 'education_notes' }, value('education_notes')))
+    el('label', {}, el('span', {}, 'ملاحظات تعليمية'), el('textarea', { name: 'education_notes' }, value('education_notes'))),
+
+    // --- 4. الرسوم والتسجيل المالي الفوري (أتمتة الدفعة الأولى) ---
+    el('div', { class: 'form-section-title', style: 'grid-column: 1 / -1; font-weight: bold; margin: 12px 0 6px; padding-bottom: 4px; border-bottom: 1.5px solid var(--border, #e2e8f0); color: #059669; display: flex; align-items: center; gap: 6px;' }, '💰 الرسوم والتسجيل المالي الفوري'),
+
+    el('label', {}, el('span', {}, 'رسوم التسجيل المقررة (ر.س)'), el('input', { name: 'registration_fee', type: 'number', step: '0.01', min: '0', placeholder: 'مثال: 500', value: value('registration_fee') })),
+    el('label', {}, el('span', {}, 'الدفعة الأولى المسددة الآن (ر.س)'), el('input', { name: 'initial_payment_amount', type: 'number', step: '0.01', min: '0', placeholder: 'مثال: 200', value: value('initial_payment_amount') })),
+    el('label', {}, el('span', {}, 'طريقة سداد الدفعة الأولى'), select('payment_method', [['كاش', 'كاش نقدي'], ['مدى', 'مدى / شبكة'], ['تحويل بنكي', 'تحويل بنكي'], ['Apple Pay', 'Apple Pay']], 'كاش'))
   ];
 
   const submit = el('button', { class: 'button', type: 'button', style: 'padding: 10px 24px; font-weight: 700;' }, editing ? 'حفظ التعديلات' : 'إضافة طالب');

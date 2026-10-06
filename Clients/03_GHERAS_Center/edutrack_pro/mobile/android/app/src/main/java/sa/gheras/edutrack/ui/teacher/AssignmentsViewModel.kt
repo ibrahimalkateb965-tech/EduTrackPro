@@ -188,7 +188,9 @@ class AssignmentsViewModel(
         // Apply Room selection
         val effectiveRoomId = selectedRoomId ?: visibleRooms.singleOrNull()?.takeIf { isScoped }?.id
         val roomFiltered = if (effectiveRoomId != null) {
-            scopedItems.filter { it.roomId == effectiveRoomId || (it.roomId == null && selectedRoomId == null) }
+            scopedItems.filter {
+                it.roomId == effectiveRoomId || (selectedRoomId == null && (it.roomId == null || it.assignment.teacherUserId == sessionStore?.user?.id))
+            }
         } else {
             scopedItems
         }
@@ -272,6 +274,7 @@ class AssignmentsViewModel(
     ) {
         viewModelScope.launch {
             try {
+                val effectiveSubject = if (subject == "عام") null else subject
                 val allStudents = studentsRepository?.observeAll()?.first() ?: emptyList()
                 val targetStudentIds = if (!roomId.isNullOrBlank()) {
                     allStudents.filter { it.roomId == roomId }.map { it.id }
@@ -281,17 +284,28 @@ class AssignmentsViewModel(
                     allStudents.map { it.id }
                 }
 
+                val finalStudentIds = if (roomId.isNullOrBlank()) {
+                    val fallback = sessionStore?.profile?.scope?.studentIds?.filter { it.isNotBlank() } ?: emptyList()
+                    if (targetStudentIds.isEmpty()) fallback else targetStudentIds
+                } else {
+                    if (targetStudentIds.isEmpty()) {
+                        onError("القاعة المحددة لا تحتوي على طلاب محلياً. يرجى تحديث البيانات أولاً.")
+                        return@launch
+                    }
+                    targetStudentIds
+                }
+
                 val fullInstructions = AssignmentMediaParser.serialize(instructions.orEmpty(), attachments)
                 val teacherUserId = sessionStore?.user?.id
 
                 assignmentsRepository.createAssignment(
                     title = title,
-                    subject = subject,
+                    subject = effectiveSubject,
                     dueDate = dueDate,
                     instructions = fullInstructions.ifBlank { null },
                     pageRef = pageRef?.ifBlank { null },
                     teacherUserId = teacherUserId,
-                    studentIds = targetStudentIds
+                    studentIds = finalStudentIds
                 )
                 onSuccess()
             } catch (e: kotlinx.coroutines.CancellationException) {

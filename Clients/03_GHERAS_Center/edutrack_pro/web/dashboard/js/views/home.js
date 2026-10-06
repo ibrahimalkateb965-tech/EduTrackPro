@@ -18,10 +18,12 @@ const ALL_SHORTCUTS = [
   { id: 'daily_eval', category: 'شؤون الطلاب والتعليم', label: 'التقييم اليومي', desc: 'تقييم الحفظ والمستوى اليومي', icon: '★', route: '#/attendance?tab=evaluation', perm: 'daily_evaluation' },
   { id: 'monthly_eval', category: 'شؤون الطلاب والتعليم', label: 'التقييم الشهري', desc: 'سجلات التقييم الشهري والنهائي', icon: '▥', route: '#/reports', perm: 'monthly_evaluation' },
   { id: 'rooms', category: 'شؤون الطلاب والتعليم', label: 'القاعات والفصول', desc: 'إدارة القاعات والمجموعات', icon: '▦', route: '#/rooms', perm: 'students' },
+  { id: 'bulk_rooms', category: 'شؤون الطلاب والتعليم', label: 'تسكين القاعات المجمع', desc: 'تسكين ونقل مجموعات الطلاب دفعة واحدة', icon: '👥', route: '#/rooms', perm: 'students' },
   { id: 'schedule', category: 'شؤون الطلاب والتعليم', label: 'الجدول الدراسي', desc: 'توزيع الحصص والفترات', icon: '📅', route: '#/rooms', perm: 'students' },
 
   // --- الشؤون الإدارية والموظفون ---
   { id: 'staff', category: 'الشؤون الإدارية والموظفون', label: 'سجل الموظفين', desc: 'إدارة ملفات الكادر التعليمي والإداري', icon: '▣', route: '#/staff', perm: 'manager_only' },
+  { id: 'teacher_kpis', category: 'الشؤون الإدارية والموظفون', label: 'تقييم أداء المعلمين (KPIs)', desc: 'متابعة مؤشرات أداء الكادر وبطاقات التقييم الأسبوعية', icon: '📊', route: '#/staff?tab=kpi_dashboard', perm: 'manager_only' },
   { id: 'teachers_supervisors', category: 'الشؤون الإدارية والموظفون', label: 'المعلمون والمشرفون', desc: 'الكادر التعليمي وحسابات الدخول', icon: '♙', route: '#/staff?tab=teachers_supervisors', perm: 'manager_only' },
   { id: 'staff_absences', category: 'الشؤون الإدارية والموظفون', label: 'غياب الموظفين والخصم', desc: 'تسجيل غياب الكادر واحتساب الخصومات', icon: '📋', route: '#/staff?tab=absences', perm: 'manager_only' },
   { id: 'reports', category: 'الشؤون الإدارية والموظفون', label: 'التقارير الإدارية', desc: 'تقارير الحضور والطلاب والمستوى', icon: '📊', route: '#/reports', perm: 'manager_only' },

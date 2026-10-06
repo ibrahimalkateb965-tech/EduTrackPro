@@ -75,6 +75,24 @@ class AssignmentsRepository(
             updatedAt = now,
             deletedAt = null
         )
+        // 1. Immediate optimistic local persistence in Room
+        assignmentDao.upsert(assignment)
+        if (studentIds.isNotEmpty() && assignmentStudentDao != null) {
+            val links = studentIds.map { studentId ->
+                AssignmentStudentEntity(
+                    id = "local:$assignmentId:$studentId",
+                    branchId = branchId,
+                    assignmentId = assignmentId,
+                    studentId = studentId,
+                    createdAt = now,
+                    updatedAt = now,
+                    deletedAt = null
+                )
+            }
+            assignmentStudentDao.upsertAll(links)
+        }
+
+        // 2. Enqueue in Outbox for background sync
         if (outbox != null) {
             val payload = JSONObject().apply {
                 put("assignment_id", assignmentId)
@@ -96,22 +114,6 @@ class AssignmentsRepository(
                 naturalKey = naturalKey,
                 payloadJson = payload
             )
-        } else {
-            assignmentDao.upsert(assignment)
-            if (studentIds.isNotEmpty() && assignmentStudentDao != null) {
-                val links = studentIds.map { studentId ->
-                    AssignmentStudentEntity(
-                        id = UUID.randomUUID().toString(),
-                        branchId = branchId,
-                        assignmentId = assignmentId,
-                        studentId = studentId,
-                        createdAt = now,
-                        updatedAt = now,
-                        deletedAt = null
-                    )
-                }
-                assignmentStudentDao.upsertAll(links)
-            }
         }
         assignment
     }

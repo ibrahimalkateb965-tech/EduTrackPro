@@ -33,6 +33,8 @@ RESOURCES = {
     "skill-progress": "skill_progress", "evaluations": "evaluations", "tasks": "tasks", "messages": "messages",
     "message-templates": "message_templates",
     "certificates": "certificates", "dismissals": "dismissals", "branches": "branches", "month-closures": "month_closures",
+    "teacher-evaluations": "teacher_evaluations", "educational-tracks": "educational_tracks",
+    "student-behavior-logs": "student_behavioral_logs", "room-hourly-schedules": "room_hourly_schedules",
 }
 
 router = APIRouter()
@@ -153,17 +155,17 @@ def _allowed(user: dict, table: str, write: bool) -> None:
             if not perms.get("students", False) and not perms.get("attendance", False):
                 raise ApiError(403, "forbidden", "ليس لديك صلاحية الوصول إلى الموظفين والقاعات")
 
-        # Finance resources
+        # Finance resources - Supervisor is strictly quarantined from financial transactions and balances
         finance_tables = {
             "payments", "receipts", "expenses", "expense_categories",
             "payroll_runs", "staff_advances", "ledger_accounts", "ledger_entries",
             "month_closures", "fee_plans", "installments"
         }
         if table in finance_tables and not perms.get("finance", False):
-            raise ApiError(403, "forbidden", "ليس لديك صلاحية الوصول إلى البيانات والعمليات المالية")
+            raise ApiError(403, "forbidden", "ليس لديك صلاحية الوصول إلى البيانات والعمليات المالية (محظورة على المشرفة)")
 
-        # Student resources
-        student_tables = {"students", "guardians", "student_guardians", "dismissals"}
+        # Student resources & Behavioral logs
+        student_tables = {"students", "guardians", "student_guardians", "dismissals", "student_behavioral_logs", "educational_tracks"}
         if table in student_tables and not perms.get("students", False):
             raise ApiError(403, "forbidden", "ليس لديك صلاحية الوصول إلى سجلات الطلاب")
 
@@ -172,10 +174,10 @@ def _allowed(user: dict, table: str, write: bool) -> None:
         if table in attendance_tables and not perms.get("attendance", False):
             raise ApiError(403, "forbidden", "ليس لديك صلاحية الوصول إلى الحضور والغياب")
 
-        # Evaluation & tracking resources
-        evaluation_tables = {"evaluations", "skill_progress", "study_plans"}
-        if table in evaluation_tables and not (perms.get("daily_evaluation", False) or perms.get("monthly_evaluation", False)):
-            raise ApiError(403, "forbidden", "ليس لديك صلاحية الوصول إلى التقييمات ومتابعة الحفظ")
+        # Evaluation & tracking resources (Student & Teacher evaluations)
+        evaluation_tables = {"evaluations", "skill_progress", "study_plans", "teacher_evaluations", "room_hourly_schedules"}
+        if table in evaluation_tables and not (perms.get("daily_evaluation", False) or perms.get("monthly_evaluation", False) or table == "teacher_evaluations"):
+            raise ApiError(403, "forbidden", "ليس لديك صلاحية الوصول إلى التقييمات")
 
         # Write restrictions on sensitive ledger closures
         if write and table in {"ledger_accounts", "ledger_entries", "payroll_runs", "month_closures"}:
@@ -301,6 +303,64 @@ def _create_hook(conn, repo, table: str, data: dict, actor: dict) -> tuple[dict,
         # dashboard transfer form: one request -> transfer_out on the source + transfer_in on the target
         row = transfer_between_accounts(conn, data, actor.get("branch_id"))
         return row, details
+    if table == "students":
+        init_amount = data.get("initial_payment_amount") or data.get("registration_fee")
+        if init_amount:
+            perms = actor.get("permissions") or {}
+            if actor.get("role") != "manager" and not perms.get("finance", False):
+                raise ApiError(403, "forbidden", "ليس لديك صلاحية تسجيل العمليات المالية")
+    elif table == "teacher_evaluations":
+        if "staff_id" in data:
+            data["teacher_id"] = data.pop("staff_id")
+        if "ethics_score" in data:
+            data["discipline_score"] = data.pop("ethics_score")
+        if "notes" in data:
+            data["supervisor_notes"] = data.pop("notes")
+        if not data.get("supervisor_id"):
+            supervisor_id = actor.get("staff_id")
+            if not supervisor_id:
+                s_row = conn.execute(
+                    "SELECT id FROM staff WHERE deleted_at IS NULL ORDER BY created_at, id LIMIT 1"
+                ).fetchone()
+                if s_row:
+                    supervisor_id = s_row["id"]
+                else:
+                    branch_id = actor.get("branch_id") or MAIN_BRANCH_ID
+                    new_staff = conn.execute(
+                        "INSERT INTO staff (branch_id, name, role_title, base_salary) "
+                        "VALUES (%s, %s, %s, 0) RETURNING id",
+                        (branch_id, actor.get("name") or actor.get("username") or "إدارة المركز", "إداري"),
+                    ).fetchone()
+                    supervisor_id = new_staff["id"]
+            if supervisor_id:
+                data["supervisor_id"] = supervisor_id
+    elif table == "student_behavioral_logs":
+        if "type" in data:
+            data["log_type"] = data.pop("type")
+        if "guardian_notified" in data:
+            data["notified_guardian"] = data.pop("guardian_notified")
+        title = data.pop("title", None)
+        if title:
+            note = data.get("note")
+            data["note"] = f"{title}: {note}" if note else title
+        if not data.get("author_id"):
+            author_id = actor.get("staff_id")
+            if not author_id:
+                s_row = conn.execute(
+                    "SELECT id FROM staff WHERE deleted_at IS NULL ORDER BY created_at, id LIMIT 1"
+                ).fetchone()
+                if s_row:
+                    author_id = s_row["id"]
+                else:
+                    branch_id = actor.get("branch_id") or MAIN_BRANCH_ID
+                    new_staff = conn.execute(
+                        "INSERT INTO staff (branch_id, name, role_title, base_salary) "
+                        "VALUES (%s, %s, %s, 0) RETURNING id",
+                        (branch_id, actor.get("name") or actor.get("username") or "إدارة المركز", "إداري"),
+                    ).fetchone()
+                    author_id = new_staff["id"]
+            if author_id:
+                data["author_id"] = author_id
     row = repo.create(data)
     if table == "students":
         g_phone = data.get("guardian_phone") or data.get("father_phone") or data.get("mother_phone")
@@ -314,6 +374,28 @@ def _create_hook(conn, repo, table: str, data: dict, actor: dict) -> tuple[dict,
                 "VALUES (%s, %s, %s, true) ON CONFLICT (student_id, guardian_id) DO NOTHING",
                 (branch_id, row["id"], gid),
             )
+        # Automatic initial down-payment / registration fee processing
+        init_amount = data.get("initial_payment_amount") or data.get("registration_fee")
+        if init_amount:
+            try:
+                amt_val = float(init_amount)
+            except (ValueError, TypeError):
+                raise ApiError(400, "validation_error", "مبلغ الدفعة الأولى غير صالح")
+            if amt_val > 0:
+                method = data.get("payment_method") or "كاش"
+                branch_id = row.get("branch_id") or MAIN_BRANCH_ID
+                pay_row = conn.execute(
+                    "INSERT INTO payments (branch_id, student_id, amount, paid_on, method, note) "
+                    "VALUES (%s, %s, %s, CURRENT_DATE, %s, %s) RETURNING *",
+                    (branch_id, row["id"], amt_val, method, "رسوم تسجيل الطالب / دفعة أولى"),
+                ).fetchone()
+                if pay_row:
+                    allocate_payment(conn, dict(pay_row), pay_row.get("installment_id"))
+                    receipt = issue_receipt(conn, pay_row["id"])
+                    cash_acc = default_cash_account_id(conn, branch_id)
+                    post_ledger_entry(conn, cash_acc, "in", amt_val, "payments", pay_row["id"], pay_row["paid_on"], branch_id)
+                    row["initial_payment"] = dict(pay_row)
+                    row["initial_receipt"] = receipt
     elif table == "fee_plans":
         row["installments"] = generate_installments(conn, row)
     elif table == "payments":
@@ -465,3 +547,41 @@ def _register(path: str, table: str) -> None:
 
 for _path, _table in RESOURCES.items():
     _register(_path, _table)
+
+
+@router.post("/rooms/{room_id}/bulk-enroll")
+def bulk_enroll_students(
+    room_id: UUID,
+    payload: dict,
+    request: Request,
+    conn=Depends(get_conn),
+    user=Depends(require_roles("manager", "supervisor")),
+):
+    _allowed(user, "rooms", True)
+    _allowed(user, "students", True)
+    student_ids = payload.get("student_ids") or []
+    if not student_ids:
+        raise ApiError(400, "validation_error", "يجب تحديد طالب واحد على الأقل")
+
+    room = conn.execute("SELECT id, name, branch_id FROM rooms WHERE id = %s AND deleted_at IS NULL", (room_id,)).fetchone()
+    if not room:
+        raise ApiError(404, "not_found", "القاعة غير موجودة")
+
+    updated = []
+    for sid in student_ids:
+        try:
+            uid = UUID(str(sid))
+            res = conn.execute(
+                "UPDATE students SET room_id = %s, updated_at = NOW() WHERE id = %s AND deleted_at IS NULL RETURNING id, name",
+                (room_id, uid),
+            ).fetchone()
+            if res:
+                updated.append(dict(res))
+        except (ValueError, TypeError):
+            continue
+
+    count_row = conn.execute("SELECT COUNT(*) AS count FROM students WHERE room_id = %s AND deleted_at IS NULL", (room_id,)).fetchone()
+    count = count_row["count"] if count_row else len(updated)
+
+    write_audit(conn, user["id"], "bulk_enroll", "rooms", room_id, {"count": len(updated), "student_ids": [str(s["id"]) for s in updated], "branch_id": str(room["branch_id"])})
+    return {"ok": True, "room_id": str(room_id), "room_name": room["name"], "enrolled_count": len(updated), "total_in_room": count}
