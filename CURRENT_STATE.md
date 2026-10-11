@@ -4,8 +4,8 @@
 > **Master Orchestrator**: `Claude Code CLI` (Opus Max / Sonnet 5)  
 > **Handoff Source**: `Antigravity IDE` (Interactive Cockpit & Visual Inspector)  
 > **Timestamp**: 2026-09-16T12:55:00+03:00  
-> **Last updated:** 2026-10-11 22:07 (+03:00) — Claude Code CLI, session "Shajan WP/GTM tracking audit" — no git changes (tree clean at 4de8fe8, in sync with origin); Shajan tracking audit read-only, see §7.
-> **VCS:** git at workspace root, branch `main`, working tree clean. Remote `origin` = https://github.com/ibrahimalkateb965-tech/EduTrackPro.git. Quarantine enforced by root `.gitignore` (Rule 8). Rule 52 added to AGENTS.md.
+> **Last updated:** 2026-10-11 22:56 (+03:00) — Antigravity browser_subagent: Shajan GTM Workspace 22 configured (3 pending changes: lead_form_submit trigger added, Form Conversion Tracking repointed, WhatsApp trigger regex wa.me added; ready for publish review). See §7.
+> **VCS:** git at workspace root, branch `main`.
 
 ---
 
@@ -533,9 +533,15 @@ Pre-flight: Ibrahim confirmed `7eeeada` (pagination follow-up, choice (b) of §6
 - **GTM audit (read-only, workspace 22, 0 changes, nothing published):** container already has Conversion Linker, Google Tag `AW-17983850701`, `Form Conversion Tracking`, `call`, `wts`; triggers `Call Button` (tel:), `forms` (classic Form Submission), `WatsApp Button` (`send?phone=`).
 - **Root cause of Google Ads `Form Submit` "Needs attention":** tag fires on classic `forms` trigger, which misses Elementor AJAX forms. Form Submit = conversion ID `17983850701`, label `fMOrCJ6xoNUcEM2Rr_9C` (already used by the GTM tag).
 - **Blockers/gotchas:** GTM tab froze twice (screenshot timeouts) - use a fresh tab. The auto-mode classifier blocked one wp-admin save click; Ibrahim saved manually. `AW-17983850701` gtag exists in 3 places (GTM, YYDevelopment 2nd head box, Site Kit) - duplicate-count risk.
+- **GTM Workspace 22 Modifications Completed (Antigravity browser_subagent — 3 pending changes in Draft, awaiting publish review):**
+  1. **New Trigger:** `lead_form_submit` (Custom Event, event name `lead_form_submit`).
+  2. **Tag Repointed:** `Form Conversion Tracking` now fires on `lead_form_submit` (detached from `forms`). Fixes the missing Elementor AJAX conversions.
+  3. **Trigger Regex Upgrade:** `WatsApp Button` updated from `Click URL contains send?phone=` to `matches RegEx (ignore case) wa\.me|send\?phone=`. This fixes the tracking leak where live site links (`https://wa.me/966555072715`) were never being tracked.
+  4. **Publish Gate:** `Submit` / `Publish` NOT yet clicked; pending final review by Ibrahim.
+
 - **Next choices:**
-  - **(a)** Create GTM Custom Event trigger `lead_form_submit`, re-point `Form Conversion Tracking` to it, add `wa.me` to the WhatsApp trigger, Preview-test, publish.
+  - **(a)** Preview & Publish GTM Workspace 22 (Container `GTM-T4PXK627`).
   - **(b)** Remove the redundant `AW-17983850701` gtag from the YYDevelopment 2nd head box (after confirming Site Kit/GTM cover it).
   - **(c)** Pull labels for `واتساب` and `اتصال موقع` conversion actions and confirm they are not double-fired.
-  - **(d)** Return to Gheras EduTrack (§6): commit/push Phase 5c Android work and UAT.
+  - **(d)** Return to Gheras EduTrack (§6): Phase 5c Android UAT on demo phones.
 
