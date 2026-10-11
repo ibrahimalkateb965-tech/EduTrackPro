@@ -238,7 +238,7 @@ fun AssignmentsScreen(
         CreateAssignmentDialog(
             rooms = state.rooms,
             onDismiss = { showCreateDialog = false },
-            onSubmit = { title, subject, roomId, dueDate, instructions, pageRef, attachments ->
+            onSubmit = { title, subject, roomId, dueDate, instructions, pageRef, attachments, onDialogError ->
                 viewModel.createAssignment(
                     title = title,
                     subject = subject,
@@ -252,6 +252,7 @@ fun AssignmentsScreen(
                         scope.launch { snackbarHostState.showSnackbar("تم حفظ التكليف بنجاح") }
                     },
                     onError = { err ->
+                        onDialogError(err)
                         scope.launch { snackbarHostState.showSnackbar(err) }
                     }
                 )

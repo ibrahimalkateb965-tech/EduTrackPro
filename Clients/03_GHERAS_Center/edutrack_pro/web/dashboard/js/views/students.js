@@ -476,7 +476,7 @@ function openStudentForm(api, student) {
     payload.gender = payload.gender || (editing ? (isGirl(student || {}) ? 'بنات' : 'بنين') : defaultGender);
 
     // PostgreSQL nullable & check constraint guarantees
-    ['birth_date', 'group_name', 'guardian_relation', 'national_id', 'father_phone', 'mother_phone', 'pickup_phone'].forEach(k => {
+    ['birth_date', 'group_name', 'guardian_relation', 'national_id', 'father_phone', 'mother_phone', 'pickup_phone', 'registration_fee', 'initial_payment_amount'].forEach(k => {
       if (payload[k] === '') payload[k] = null;
     });
 

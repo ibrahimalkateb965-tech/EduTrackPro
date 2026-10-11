@@ -284,15 +284,10 @@ class AssignmentsViewModel(
                     allStudents.map { it.id }
                 }
 
-                val finalStudentIds = if (roomId.isNullOrBlank()) {
-                    val fallback = sessionStore?.profile?.scope?.studentIds?.filter { it.isNotBlank() } ?: emptyList()
-                    if (targetStudentIds.isEmpty()) fallback else targetStudentIds
-                } else {
-                    if (targetStudentIds.isEmpty()) {
-                        onError("القاعة المحددة لا تحتوي على طلاب محلياً. يرجى تحديث البيانات أولاً.")
-                        return@launch
-                    }
+                val finalStudentIds = if (targetStudentIds.isNotEmpty()) {
                     targetStudentIds
+                } else {
+                    sessionStore?.profile?.scope?.studentIds?.filter { it.isNotBlank() } ?: emptyList()
                 }
 
                 val fullInstructions = AssignmentMediaParser.serialize(instructions.orEmpty(), attachments)

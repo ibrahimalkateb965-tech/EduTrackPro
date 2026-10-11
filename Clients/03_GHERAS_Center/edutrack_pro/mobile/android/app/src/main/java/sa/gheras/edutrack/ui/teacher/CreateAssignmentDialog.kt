@@ -34,9 +34,12 @@ import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Videocam
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -60,6 +63,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -70,11 +74,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import java.io.File
 import java.time.LocalDate
 import java.util.Locale
 import java.util.UUID
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import sa.gheras.edutrack.data.entity.RoomEntity
 import sa.gheras.edutrack.ui.common.Num
 import sa.gheras.edutrack.ui.teacher.media.AudioPlayerHelper
@@ -93,10 +99,13 @@ fun CreateAssignmentDialog(
         dueDate: LocalDate,
         instructions: String?,
         pageRef: String?,
-        attachments: List<MediaAttachment>
+        attachments: List<MediaAttachment>,
+        onError: (String) -> Unit
     ) -> Unit
 ) {
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    val scrollState = rememberScrollState()
 
     var title by remember { mutableStateOf("") }
     var selectedSubject by remember { mutableStateOf("القرآن") }
@@ -105,6 +114,7 @@ fun CreateAssignmentDialog(
     var pageRef by remember { mutableStateOf("") }
     var instructions by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    var isSubmitting by remember { mutableStateOf(false) }
 
     // Attachments list
     val attachments = remember { mutableStateListOf<MediaAttachment>() }
@@ -114,6 +124,10 @@ fun CreateAssignmentDialog(
     var linkUrl by remember { mutableStateOf("") }
     var linkTitle by remember { mutableStateOf("") }
     var linkKind by remember { mutableStateOf("google_form") }
+
+    // Image source selection dialog & camera capture state
+    var showImageSourceDialog by remember { mutableStateOf(false) }
+    var tempCameraFile by remember { mutableStateOf<File?>(null) }
 
     // Persistent storage directory for media attachments
     val mediaDir = remember {
@@ -128,19 +142,21 @@ fun CreateAssignmentDialog(
     var recordDurationSeconds by remember { mutableStateOf(0) }
     var playingVoiceId by remember { mutableStateOf<String?>(null) }
 
-    val saveRecording: (File?, Int) -> Unit = remember {
-        { file, duration ->
-            if (file != null && file.exists() && file.length() > 0) {
-                attachments.add(
-                    MediaAttachment(
-                        id = UUID.randomUUID().toString(),
-                        kind = "voice_note",
-                        title = "تسجيل تلاوة / شرح صوتي",
-                        uri = file.absolutePath,
-                        durationSeconds = duration
-                    )
+    val saveRecording: (File?, Int) -> Unit = { file, duration ->
+        if (file != null && file.exists() && file.length() > 0) {
+            attachments.add(
+                MediaAttachment(
+                    id = UUID.randomUUID().toString(),
+                    kind = "voice_note",
+                    title = "تسجيل تلاوة / شرح صوتي",
+                    uri = file.absolutePath,
+                    durationSeconds = duration
                 )
+            )
+            if (title.isBlank()) {
+                title = "تسجيل صوتي - $selectedSubject"
             }
+            errorMessage = null
         }
     }
 
@@ -200,6 +216,41 @@ fun CreateAssignmentDialog(
         }
     }
 
+    // Camera capture launcher
+    val cameraLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.TakePicture()
+    ) { success ->
+        if (success) {
+            val file = tempCameraFile
+            if (file != null && file.exists() && file.length() > 0) {
+                attachments.add(
+                    MediaAttachment(
+                        id = UUID.randomUUID().toString(),
+                        kind = "image",
+                        title = "صورة بالكاميرا / ورقة عمل",
+                        uri = file.absolutePath
+                    )
+                )
+            }
+        }
+        tempCameraFile = null
+    }
+
+    val launchCamera: () -> Unit = {
+        try {
+            val file = File(mediaDir, "img_cam_${System.currentTimeMillis()}.jpg")
+            tempCameraFile = file
+            val uri = FileProvider.getUriForFile(
+                context,
+                "${context.packageName}.fileprovider",
+                file
+            )
+            cameraLauncher.launch(uri)
+        } catch (e: Exception) {
+            errorMessage = "تعذر تشغيل الكاميرا: ${e.message}"
+        }
+    }
+
     // Pick Image launcher
     val imagePickerLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.GetContent()
@@ -248,7 +299,7 @@ fun CreateAssignmentDialog(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .verticalScroll(rememberScrollState())
+                    .verticalScroll(scrollState)
                     .padding(20.dp)
             ) {
                 // Header
@@ -336,7 +387,15 @@ fun CreateAssignmentDialog(
                     items(subjects) { subj ->
                         FilterChip(
                             selected = selectedSubject == subj,
-                            onClick = { selectedSubject = subj },
+                            onClick = {
+                                val oldSubject = selectedSubject
+                                selectedSubject = subj
+                                if (title.isBlank() || title == "تسجيل صوتي - $oldSubject") {
+                                    if (attachments.any { it.kind == "voice_note" }) {
+                                        title = "تسجيل صوتي - $subj"
+                                    }
+                                }
+                            },
                             label = { Text(subj) }
                         )
                     }
@@ -493,7 +552,7 @@ fun CreateAssignmentDialog(
 
                     // 3. Image
                     OutlinedButton(
-                        onClick = { imagePickerLauncher.launch("image/*") },
+                        onClick = { showImageSourceDialog = true },
                         contentPadding = PaddingValues(horizontal = 6.dp, vertical = 6.dp),
                         modifier = Modifier.weight(1f)
                     ) {
@@ -623,7 +682,35 @@ fun CreateAssignmentDialog(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Bottom Error alert (visible when scrolled to bottom)
+                if (!errorMessage.isNullOrBlank()) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.errorContainer,
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Warning,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Text(
+                                text = errorMessage ?: "",
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(10.dp))
+                }
 
                 // Dialog Buttons
                 Row(
@@ -632,6 +719,7 @@ fun CreateAssignmentDialog(
                 ) {
                     OutlinedButton(
                         onClick = onDismiss,
+                        enabled = !isSubmitting,
                         modifier = Modifier.weight(1f)
                     ) {
                         Text("إلغاء")
@@ -639,25 +727,50 @@ fun CreateAssignmentDialog(
 
                     Button(
                         onClick = {
-                            if (title.isBlank()) {
+                            val effectiveTitle = title.trim().ifBlank {
+                                if (attachments.any { it.kind == "voice_note" }) {
+                                    "تسجيل صوتي - $selectedSubject"
+                                } else {
+                                    "تكليف $selectedSubject"
+                                }
+                            }
+                            if (effectiveTitle.isBlank()) {
                                 errorMessage = "يرجى كتابة عنوان التكليف"
+                                coroutineScope.launch { scrollState.animateScrollTo(0) }
                                 return@Button
                             }
+                            isSubmitting = true
+                            errorMessage = null
                             val effectiveSubject = if (selectedSubject == "عام") null else selectedSubject
                             val effectiveRoomId = selectedRoomId ?: rooms.firstOrNull()?.id
                             onSubmit(
-                                title.trim(),
+                                effectiveTitle,
                                 effectiveSubject,
                                 effectiveRoomId,
                                 dueDate,
                                 instructions.trim(),
                                 pageRef.trim().ifBlank { null },
                                 attachments.toList()
-                            )
+                            ) { err ->
+                                isSubmitting = false
+                                errorMessage = err
+                                coroutineScope.launch { scrollState.animateScrollTo(0) }
+                            }
                         },
+                        enabled = !isSubmitting,
                         modifier = Modifier.weight(1.5f)
                     ) {
-                        Text("حفظ وإسناد التكليف ✨", fontWeight = FontWeight.Bold)
+                        if (isSubmitting) {
+                            CircularProgressIndicator(
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("جاري الحفظ...", fontWeight = FontWeight.Bold)
+                        } else {
+                            Text("حفظ وإسناد التكليف ✨", fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
             }
@@ -722,6 +835,131 @@ fun CreateAssignmentDialog(
             },
             dismissButton = {
                 TextButton(onClick = { showLinkDialog = false }) {
+                    Text("إلغاء")
+                }
+            }
+        )
+    }
+
+    // Image Source Selection Dialog (Camera vs Gallery)
+    if (showImageSourceDialog) {
+        AlertDialog(
+            onDismissRequest = { showImageSourceDialog = false },
+            title = {
+                Text(
+                    text = "إرفاق صورة للواجب",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(
+                        text = "اختر طريقة إرفاق صورة ورقة العمل أو التكليف:",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+
+                    // Option 1: Camera capture
+                    Surface(
+                        onClick = {
+                            showImageSourceDialog = false
+                            launchCamera()
+                        },
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Surface(
+                                shape = CircleShape,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(40.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        imageVector = Icons.Default.PhotoCamera,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onPrimary,
+                                        modifier = Modifier.size(22.dp)
+                                    )
+                                }
+                            }
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "التقاط صورة بالكاميرا 📸",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = "تصوير ورقة العمل أو الكتاب فورياً",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+
+                    // Option 2: Choose from gallery
+                    Surface(
+                        onClick = {
+                            showImageSourceDialog = false
+                            imagePickerLauncher.launch("image/*")
+                        },
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Surface(
+                                shape = CircleShape,
+                                color = MaterialTheme.colorScheme.secondaryContainer,
+                                modifier = Modifier.size(40.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        imageVector = Icons.Default.PhotoLibrary,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                        modifier = Modifier.size(22.dp)
+                                    )
+                                }
+                            }
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "اختيار من المعرض 🖼️",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = "اختيار صورة محفوظة في ألبوم الجهاز",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { showImageSourceDialog = false }) {
                     Text("إلغاء")
                 }
             }
