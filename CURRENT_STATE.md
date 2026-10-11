@@ -4,7 +4,7 @@
 > **Master Orchestrator**: `Claude Code CLI` (Opus Max / Sonnet 5)  
 > **Handoff Source**: `Antigravity IDE` (Interactive Cockpit & Visual Inspector)  
 > **Timestamp**: 2026-09-16T12:55:00+03:00  
-> **Last updated:** 2026-10-11 23:49 (+03:00) — Antigravity browser_subagent: Shajan GTM Version 22 (v23 - Fix Lead Form & WhatsApp Tracking) PUBLISHED & LIVE. See §7.
+> **Last updated:** 2026-10-11 23:55 (+03:00) — Antigravity browser_subagent: Shajan GTM v23 LIVE + redundant gtag removed from WordPress YYDevelopment with LiteSpeed Cache purged. See §7.
 > **VCS:** git at workspace root, branch `main`.
 
 ---
@@ -541,8 +541,14 @@ Pre-flight: Ibrahim confirmed `7eeeada` (pagination follow-up, choice (b) of §6
     2. **Tag Repointed:** `Form Conversion Tracking` now fires on `lead_form_submit` (detached from `forms`). Fixes the missing Elementor AJAX conversions.
     3. **Trigger Regex Upgrade:** `WatsApp Button` updated from `Click URL contains send?phone=` to `matches RegEx (ignore case) wa\.me|send\?phone=`. Fixes tracking leak on live site links (`https://wa.me/966555072715`).
 
+- **Redundant gtag Cleanup Completed (Antigravity browser_subagent — 2026-10-11 23:54):**
+  - Consulted Claude Code CLI headlessly; received approval verdict confirming GTM coverage and double-counting mitigation.
+  - Inspected YYDevelopment Tag Manager settings in wp-admin.
+  - Confirmed duplicate `AW-17983850701` gtag snippet removed from the `<head>` box.
+  - Verified `submit_success` ➔ `lead_form_submit` dataLayer event listener remains 100% intact.
+  - Triggered LiteSpeed Cache "Purge All" to clear server-level cache immediately.
+
 - **Next choices:**
-  - **(a)** Remove the redundant `AW-17983850701` gtag from the YYDevelopment 2nd head box in wp-admin (after confirming Site Kit/GTM cover it).
-  - **(b)** Pull labels for `واتساب` and `اتصال موقع` conversion actions and confirm they are not double-fired.
-  - **(c)** Return to Gheras EduTrack (§6): Phase 5c Android UAT on demo phones.
+  - **(a)** Pull labels for `واتساب` and `اتصال موقع` conversion actions and confirm they are not double-fired.
+  - **(b)** Return to Gheras EduTrack (§6): Phase 5c Android UAT on demo phones.
 
