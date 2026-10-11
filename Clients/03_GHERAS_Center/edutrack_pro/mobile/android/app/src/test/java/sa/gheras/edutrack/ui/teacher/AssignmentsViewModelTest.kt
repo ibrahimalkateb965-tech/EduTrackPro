@@ -235,4 +235,27 @@ class AssignmentsViewModelTest {
         assertEquals(1, state.rooms.size)
         assertEquals("r1", state.rooms.first().id)
     }
+
+    @Test
+    fun `active status filter filters uncompleted future assignments`() = runBlocking {
+        seedData()
+        db.assignmentDao().upsertAll(
+            listOf(assignment("a3", "تسميع جزء عم", "القرآن", today.plusDays(3)))
+        )
+        db.assignmentStudentDao().upsertAll(
+            listOf(AssignmentStudentEntity(id = "as5", branchId = "b1", assignmentId = "a3", studentId = "s1", createdAt = now, updatedAt = now))
+        )
+        val vm = createVm()
+        var state = vm.uiState.first { it.assignments.size == 3 }
+
+        assertEquals(3, state.totalCount)
+        assertEquals(1, state.completedCount)
+        assertEquals(1, state.activeCount)
+
+        vm.setStatusFilter(AssignmentStatusFilter.ACTIVE)
+        state = vm.uiState.first { it.statusFilter == AssignmentStatusFilter.ACTIVE }
+        assertEquals(1, state.assignments.size)
+        assertEquals("a3", state.assignments.first().assignment.id)
+    }
 }
+

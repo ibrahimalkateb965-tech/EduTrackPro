@@ -14,6 +14,7 @@ import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -60,8 +61,8 @@ class StudentsViewModelTest {
         createdAt = now, updatedAt = now
     )
 
-    private fun student(id: String, roomId: String?) = StudentEntity(
-        id = id, branchId = "b1", name = "طالب $id", nationalId = null, birthDate = null,
+    private fun student(id: String, name: String, roomId: String?) = StudentEntity(
+        id = id, branchId = "b1", name = name, nationalId = null, birthDate = null,
         nationality = null, difficultyNotes = null, childNotes = null, fatherName = null,
         fatherPhone = null, motherName = null, motherPhone = null, guardianPhone = null,
         guardianRelation = null, pickupType = null, pickupName = null, pickupRelation = null,
@@ -80,7 +81,12 @@ class StudentsViewModelTest {
     private fun seed() = runBlocking {
         db.roomDao().upsertAll(listOf(room("r1"), room("r2"), room("r3")))
         db.studentDao().upsertAll(
-            listOf(student("s1", "r1"), student("s2", "r2"), student("s3", "r3"), student("s4", null))
+            listOf(
+                student("s1", "أحمد علي", "r1"),
+                student("s2", "سارة محمد", "r2"),
+                student("s3", "خالد يوسف", "r3"),
+                student("s4", "طالب بدون قاعة", null)
+            )
         )
     }
 
@@ -134,9 +140,42 @@ class StudentsViewModelTest {
             StudentsViewModel.scopeRoster(Role.TEACHER, emptyList(), emptyList(), emptyList()).isScoped
         )
         val rooms = listOf(room("r1"), room("r2"))
-        val students = listOf(student("s1", "r1"), student("s2", "r2"))
+        val students = listOf(student("s1", "أحمد علي", "r1"), student("s2", "سارة محمد", "r2"))
         val guardian = StudentsViewModel.scopeRoster(Role.GUARDIAN, listOf("r1"), rooms, students)
         assertFalse(guardian.isScoped)
         assertEquals(2, guardian.students.size)
+    }
+
+    @Test
+    fun `search filters students by name within scope`() = runBlocking {
+        seed()
+        loginAs(Role.TEACHER, listOf("r1", "r2"))
+
+        val vm = newVm()
+        loadedState(vm)
+
+        vm.onSearchQueryChange("سارة")
+        val state = vm.uiState.first { it.searchQuery == "سارة" }
+        assertEquals(1, state.students.size)
+        assertEquals("s2", state.students.first().student.id)
+    }
+
+    @Test
+    fun `selectRoom toggles selected circle filter`() = runBlocking {
+        seed()
+        loginAs(Role.TEACHER, listOf("r1", "r2"))
+
+        val vm = newVm()
+        loadedState(vm)
+
+        vm.selectRoom("r2")
+        var state = vm.uiState.first { it.selectedRoomId == "r2" }
+        assertEquals(1, state.students.size)
+        assertEquals("s2", state.students.first().student.id)
+
+        // Toggle off
+        vm.selectRoom("r2")
+        state = vm.uiState.first { it.selectedRoomId == null }
+        assertEquals(2, state.students.size)
     }
 }
