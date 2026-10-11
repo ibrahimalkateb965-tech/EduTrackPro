@@ -89,11 +89,11 @@ When the user provides a brief or conversational prompt, immediately resolve and
 | **"صفحة هبوط" / "CRO" / "landing page"** | `Clients/<client>/04_Landing_Pages_CRO/` | Mobile-first CRO, WhatsApp/Call sticky buttons, GTM click-to-call triggers. |
 | **"فاتورة" / "عرض سعر" / "quote"** | `Clients/<client>/06_Contracts_Invoices/` | Managed subscription standard (399 SAR/yr for domain+mail). Strict 1-Page A4, Rule 50 zero-pricing. |
 | **"نطاق" / "بريد مهني" / "DNS"** | `.agents/MEMORY_STORE.md` (Decisions 10–13) | Hybrid architecture: DNet/SaudiNIC for `.sa` + Hostinger Enterprise Mail (MX/SPF/DKIM/DMARC). |
-| **"Google Ads API" / "OAuth" / "token"** | `GOOGLE_ADS_API_RESUMPTION.md`, `scripts/` | Follow Passkey resumption protocol for MCC `576-627-3068`. Run `authenticate_google_ads.py`. |
+| **"Google Ads API" / "OAuth" / "token"** | `GOOGLE_ADS_API_RESUMPTION.md`, `tools/google_ads_mcp/` | ✅ **Active & Connected (API v22)**. Managed via FastMCP server (`tools/google_ads_mcp/server.py`). Run `get_api_status` or use `authenticate_google_ads.py` for token refresh. |
 | **"Android" / "APK" / "Play Console"** | Play Console PDFs at root + mobile specs | Review Organization D-U-N-S rules and demo account requirements before submission. |
 | **"iOS" / "TestFlight" / "build ipa"** | `REMOTE_IOS_DEV_PLAYBOOK.md` | Execute fast loop on Linux container; push to GitHub Actions `macos-15` for `.ipa`. |
 | **"مخطط" / "flowchart" / "architecture"** | `tools/flowchart_studio/` | Open studio via `open_flowchart_studio.bat`. Use valid Mermaid syntax and Dark Neon Candy palette. |
-| **"وكيل جديد" / "MCP" / "n8n"** | `.agents/skills/`, `.agents/Sub_Agent/` | Follow YAML frontmatter standard; ensure zero-leak stdio for FastMCP. |
+| **"وكيل جديد" / "MCP" / "n8n"** | `.agents/skills/`, `tools/google_ads_mcp/` | Follow YAML frontmatter standard; ensure zero-leak stdio for FastMCP (`google-ads` server registered). |
 
 ---
 
