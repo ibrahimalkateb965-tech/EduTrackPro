@@ -228,6 +228,13 @@ Governed by [.agents/CONTEXT_GOVERNANCE.md](file:///f:/AI%20PROJECTS/Autovemtech
 13. **Rule 54 (Client-Server DTO Parity & Kotlin optString Sanitization Standard)**:
     - **Full DTO Schema Parity:** When adding or extending fields in server API payloads or database models, mobile Data Transfer Objects (DTOs) and repository mappers must immediately mirror those fields. Never omit newly added server columns or hardcode them to null in client mappers, as this causes silent data loss during background pull synchronization cycles.
     - **Kotlin `optString` Null Invariant:** In Kotlin routines parsing `org.json.JSONObject`, avoid passing `null` as the fallback argument (`json.optString(key, null)`), which risks returning the literal string `"null"`. Always sanitize strings using the idiomatic pattern: `json.optString(key).takeIf { it.isNotBlank() }` to guarantee genuine nullable values.
+14. **Rule 55 (Elementor Pro Form Tracking & CRO Double-Tagging Invariant)**:
+    - **AJAX Form Push:** In WordPress sites built with Elementor Pro, never rely on Form Actions (Webhooks) to push client-side analytics events because they execute server-side (PHP) and cannot access `window.dataLayer`. The canonical standard is attaching a jQuery listener to Elementor's client-side `submit_success` event to cleanly push events to `window.dataLayer`:
+      ```html
+      <script>jQuery(document).on('submit_success',function(){window.dataLayer=window.dataLayer||[];dataLayer.push({event:'lead_form_submit'});});</script>
+      ```
+    - **Double Injection & Cache Bypass Invariant:** When an official connector like Site Kit by Google is active, never manually duplicate GTM containers or Google Ads gtag snippets in secondary injection plugins. Always verify live DOM scripts using a cache-busting query (`?nocache=1`) against edge/server caches (e.g. LiteSpeed Cache) to guarantee `gtm.js` and `AW-` tags load strictly once.
+    - **FastMCP Google Ads API v22 Standard:** FastMCP servers interfacing with Google Ads API must target the active cloud API version (`v22`), strictly isolate stdio JSON-RPC streams by routing all logging to `sys.stderr`, and expose modular tools (`list_customers`, `get_api_status`, `get_campaigns`, `get_conversion_actions`, `run_gaql`).
 
 ---
 
