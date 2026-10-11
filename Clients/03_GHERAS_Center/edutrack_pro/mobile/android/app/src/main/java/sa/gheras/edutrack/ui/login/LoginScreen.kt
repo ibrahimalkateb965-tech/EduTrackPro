@@ -50,7 +50,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
@@ -76,6 +78,7 @@ fun LoginScreen(
     val state by viewModel.uiState.collectAsState()
     val pendingCount by viewModel.pendingCount.collectAsState()
     val keyboardController = LocalSoftwareKeyboardController.current
+    val focusManager = LocalFocusManager.current
     var showSwitchDialog by remember { mutableStateOf(false) }
 
     if (showSwitchDialog) {
@@ -515,6 +518,9 @@ fun LoginScreen(
                         keyboardType = if (isTeacher) KeyboardType.Text else KeyboardType.Number,
                         autoCorrectEnabled = false,
                         imeAction = ImeAction.Next
+                    ),
+                    keyboardActions = KeyboardActions(
+                        onNext = { focusManager.moveFocus(FocusDirection.Down) }
                     ),
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp)

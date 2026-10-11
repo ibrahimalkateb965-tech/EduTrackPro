@@ -48,6 +48,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -297,14 +298,13 @@ fun CreateAssignmentDialog(
                 .padding(vertical = 24.dp)
         ) {
             Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .verticalScroll(scrollState)
-                    .padding(20.dp)
+                modifier = Modifier.fillMaxWidth()
             ) {
-                // Header
+                // Pinned Header
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 16.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -338,7 +338,16 @@ fun CreateAssignmentDialog(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(14.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+
+                // Scrollable Body
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f, fill = false)
+                        .verticalScroll(scrollState)
+                        .padding(horizontal = 20.dp, vertical = 14.dp)
+                ) {
 
                 // Error alert
                 if (!errorMessage.isNullOrBlank()) {
@@ -712,64 +721,76 @@ fun CreateAssignmentDialog(
                     Spacer(modifier = Modifier.height(10.dp))
                 }
 
-                // Dialog Buttons
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    OutlinedButton(
-                        onClick = onDismiss,
-                        enabled = !isSubmitting,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text("إلغاء")
-                    }
+                }
 
-                    Button(
-                        onClick = {
-                            val effectiveTitle = title.trim().ifBlank {
-                                if (attachments.any { it.kind == "voice_note" }) {
-                                    "تسجيل صوتي - $selectedSubject"
-                                } else {
-                                    "تكليف $selectedSubject"
-                                }
-                            }
-                            if (effectiveTitle.isBlank()) {
-                                errorMessage = "يرجى كتابة عنوان التكليف"
-                                coroutineScope.launch { scrollState.animateScrollTo(0) }
-                                return@Button
-                            }
-                            isSubmitting = true
-                            errorMessage = null
-                            val effectiveSubject = if (selectedSubject == "عام") null else selectedSubject
-                            val effectiveRoomId = selectedRoomId ?: rooms.firstOrNull()?.id
-                            onSubmit(
-                                effectiveTitle,
-                                effectiveSubject,
-                                effectiveRoomId,
-                                dueDate,
-                                instructions.trim(),
-                                pageRef.trim().ifBlank { null },
-                                attachments.toList()
-                            ) { err ->
-                                isSubmitting = false
-                                errorMessage = err
-                                coroutineScope.launch { scrollState.animateScrollTo(0) }
-                            }
-                        },
-                        enabled = !isSubmitting,
-                        modifier = Modifier.weight(1.5f)
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+
+                // Pinned Footer Buttons
+                Surface(
+                    color = MaterialTheme.colorScheme.surface,
+                    tonalElevation = 2.dp,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp, vertical = 14.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        if (isSubmitting) {
-                            CircularProgressIndicator(
-                                strokeWidth = 2.dp,
-                                color = MaterialTheme.colorScheme.onPrimary,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("جاري الحفظ...", fontWeight = FontWeight.Bold)
-                        } else {
-                            Text("حفظ وإسناد التكليف ✨", fontWeight = FontWeight.Bold)
+                        OutlinedButton(
+                            onClick = onDismiss,
+                            enabled = !isSubmitting,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("إلغاء")
+                        }
+
+                        Button(
+                            onClick = {
+                                val effectiveTitle = title.trim().ifBlank {
+                                    if (attachments.any { it.kind == "voice_note" }) {
+                                        "تسجيل صوتي - $selectedSubject"
+                                    } else {
+                                        "تكليف $selectedSubject"
+                                    }
+                                }
+                                if (effectiveTitle.isBlank()) {
+                                    errorMessage = "يرجى كتابة عنوان التكليف"
+                                    coroutineScope.launch { scrollState.animateScrollTo(0) }
+                                    return@Button
+                                }
+                                isSubmitting = true
+                                errorMessage = null
+                                val effectiveSubject = if (selectedSubject == "عام") null else selectedSubject
+                                val effectiveRoomId = selectedRoomId ?: rooms.firstOrNull()?.id
+                                onSubmit(
+                                    effectiveTitle,
+                                    effectiveSubject,
+                                    effectiveRoomId,
+                                    dueDate,
+                                    instructions.trim(),
+                                    pageRef.trim().ifBlank { null },
+                                    attachments.toList()
+                                ) { err ->
+                                    isSubmitting = false
+                                    errorMessage = err
+                                    coroutineScope.launch { scrollState.animateScrollTo(0) }
+                                }
+                            },
+                            enabled = !isSubmitting,
+                            modifier = Modifier.weight(1.5f)
+                        ) {
+                            if (isSubmitting) {
+                                CircularProgressIndicator(
+                                    strokeWidth = 2.dp,
+                                    color = MaterialTheme.colorScheme.onPrimary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("جاري الحفظ...", fontWeight = FontWeight.Bold)
+                            } else {
+                                Text("حفظ وإسناد التكليف ✨", fontWeight = FontWeight.Bold)
+                            }
                         }
                     }
                 }

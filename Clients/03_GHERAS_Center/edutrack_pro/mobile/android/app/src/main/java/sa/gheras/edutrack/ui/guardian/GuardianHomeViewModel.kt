@@ -41,15 +41,19 @@ class GuardianHomeViewModel(
     private val evaluationsRepository: EvaluationsRepository,
     private val assignmentsRepository: AssignmentsRepository,
     private val feesRepository: FeesRepository,
-    private val pullSync: PullSync
+    private val pullSync: PullSync?
 ) : ViewModel() {
 
     private val _selectedChildId = MutableStateFlow<String?>(null)
     val selectedChildId: StateFlow<String?> = _selectedChildId.asStateFlow()
 
     private val _isRefreshing = MutableStateFlow(false)
-    private val isSyncing = combine(_isRefreshing, pullSync.status) { refreshing, status ->
-        refreshing || status is SyncStatus.Syncing
+    private val isSyncing = if (pullSync != null) {
+        combine(_isRefreshing, pullSync.status) { refreshing, status ->
+            refreshing || status is SyncStatus.Syncing
+        }
+    } else {
+        _isRefreshing
     }
 
     val uiState: StateFlow<ChildDashboardSummary> = combine(
@@ -87,7 +91,7 @@ class GuardianHomeViewModel(
             val pendingHomework = assignments.count { it.dueDate == null || !it.dueDate.isBefore(today) }
             val nextInstallment = installments
                 .filter { it.status != "paid" }
-                .minByOrNull { it.dueDate ?: LocalDate.MAX }
+                .minByOrNull { it.dueDate }
 
             ChildDashboardSummary(
                 selectedChild = activeChild,
@@ -111,6 +115,7 @@ class GuardianHomeViewModel(
     }
 
     fun refresh() {
+        if (pullSync == null) return
         viewModelScope.launch {
             _isRefreshing.value = true
             try {
