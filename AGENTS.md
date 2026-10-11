@@ -160,6 +160,13 @@ Autovemtech operates an autonomous multi-CLI fleet governed by [fleet_config.jso
 > **Exclusive Testing Rule**: `Claude Code CLI` is the **ONLY** agent authorized to execute test suites (`test`, `analyze`, lint audits) and grant final approval (`[APPROVED]`).
 > Neither Codex, OpenCode, Antigravity CLI (`agcli`), nor Antigravity IDE may run test commands or sign off on feature quality gates.
 
+### Autonomous Consult-and-Execute Fleet Pipeline ([C-25] & Decision 80)
+> [!TIP]
+> **Consult-and-Execute Protocol**: To eliminate manual user copy-pasting and prevent browser automation timeouts in Claude Code CLI:
+> 1. **Antigravity IDE** leads field execution, DOM inspection, complex browser tasks via `browser_subagent`, and local workspace file modifications.
+> 2. **Claude Code CLI** is queried headlessly in the background via `claude -p "..."` for high-level architectural arbitration, edge-case auditing, and exclusive testing/verification gates.
+> 3. Zero manual copy-pasting; saves >80% tokens on Opus Max and guarantees robust browser session stability.
+
 ### Token Conservation & Context Window Sweet Spot Governance (Hook 27 & Hook 25)
 Governed by [.agents/CONTEXT_GOVERNANCE.md](file:///f:/AI%20PROJECTS/Autovemtech/.agents/CONTEXT_GOVERNANCE.md):
 - **Golden Sweet Spot (30,000 – 300,000 tokens):** Peak attention fidelity is strictly confined to this range.
