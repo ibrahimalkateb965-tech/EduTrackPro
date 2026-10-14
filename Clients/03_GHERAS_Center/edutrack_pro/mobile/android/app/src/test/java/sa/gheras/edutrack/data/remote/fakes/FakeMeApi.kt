@@ -90,14 +90,17 @@ class FakeMeApi : MeApi {
         )
     }
 
+    var gradeAssignmentId: String = "a1"
+    var gradeStudentId: String = "s1"
+
     override suspend fun gradeSubmission(
         submissionId: String,
         body: GradeSubmissionBody
     ): SubmissionDto {
         return SubmissionDto(
             id = submissionId,
-            assignmentId = "assign_fake",
-            studentId = "student_fake",
+            assignmentId = gradeAssignmentId,
+            studentId = gradeStudentId,
             status = "graded",
             grade = body.grade,
             feedback = body.feedback

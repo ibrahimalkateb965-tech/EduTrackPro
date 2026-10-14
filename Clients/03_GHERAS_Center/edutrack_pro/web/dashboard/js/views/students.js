@@ -115,6 +115,13 @@ export function openDeleteStudentModal(api, student, onDeleted) {
 const GUARDIAN_RELATIONS = ['الأب', 'الأم', 'ولي الأمر', 'شخص آخر'];
 const STATUS_LABELS = { active: 'نشط', dismissed: 'منسحب', archived: 'مؤرشف' };
 const YES_NO = [['false', 'لا'], ['true', 'نعم']];
+const INTERVAL_OPTIONS = [[30, 'شهري (كل 30 يوم)'], [14, 'كل 14 يوم'], [7, 'أسبوعي (كل 7 أيام)']];
+
+function isoTomorrow() {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
 
 let students = [];
 let users = [];
@@ -662,6 +669,35 @@ function openStudentForm(api, student) {
     photoInput
   );
 
+  const feeInputAttrs = { name: 'registration_fee', type: 'number', step: '0.01', min: '0', placeholder: 'مثال: 500', value: value('registration_fee') };
+  const paidInputAttrs = { name: 'initial_payment_amount', type: 'number', step: '0.01', min: '0', placeholder: 'مثال: 200', value: value('initial_payment_amount') };
+  if (editing) {
+    feeInputAttrs.readonly = 'readonly';
+    paidInputAttrs.readonly = 'readonly';
+  }
+  const feeInput = el('input', feeInputAttrs);
+  const paidInput = el('input', paidInputAttrs);
+  const methodSelect = select('payment_method', [['كاش', 'كاش نقدي'], ['مدى', 'مدى / شبكة'], ['تحويل بنكي', 'تحويل بنكي'], ['Apple Pay', 'Apple Pay']], 'كاش');
+  if (editing) methodSelect.disabled = true;
+
+  // خطة أقساط الرسوم (تظهر فقط عند الإنشاء مع رسوم متبقية غير مسددة)
+  let countInput = null;
+  let dateInput = null;
+  let intervalSelect = null;
+  const planInputs = [];
+  if (!editing) {
+    countInput = el('input', { name: 'installments_count', type: 'number', min: '1', step: '1', value: '1' });
+    dateInput = el('input', { name: 'next_due_date', type: 'date', min: isoTomorrow() });
+    intervalSelect = select('interval_days', INTERVAL_OPTIONS, 30);
+    planInputs.push(
+      el('label', {}, el('span', {}, 'عدد الدفعات المتبقية'), countInput),
+      el('label', {}, el('span', {}, 'تاريخ الدفعة القادمة'), dateInput),
+      el('label', {}, el('span', {}, 'الفاصل بين الدفعات'), intervalSelect)
+    );
+  }
+  const planContainer = el('div', { style: 'grid-column: 1 / -1; display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px;' }, ...planInputs);
+  const planSummary = el('div', { style: 'grid-column: 1 / -1; font-size: 13px; font-weight: 600; display: none;' });
+
   const fields = [
     // --- 1. البيانات الأساسية والأكاديمية ---
     el('div', { class: 'form-section-title', style: 'grid-column: 1 / -1; font-weight: bold; margin: 4px 0 6px; padding-bottom: 4px; border-bottom: 1.5px solid var(--border, #e2e8f0); color: var(--primary, #0284c7); display: flex; align-items: center; gap: 6px;' }, '👤 البيانات الأساسية والأكاديمية'),
@@ -715,9 +751,11 @@ function openStudentForm(api, student) {
     // --- 4. الرسوم والتسجيل المالي الفوري (أتمتة الدفعة الأولى) ---
     el('div', { class: 'form-section-title', style: 'grid-column: 1 / -1; font-weight: bold; margin: 12px 0 6px; padding-bottom: 4px; border-bottom: 1.5px solid var(--border, #e2e8f0); color: #059669; display: flex; align-items: center; gap: 6px;' }, '💰 الرسوم والتسجيل المالي الفوري'),
 
-    el('label', {}, el('span', {}, 'رسوم التسجيل المقررة (ر.س)'), el('input', { name: 'registration_fee', type: 'number', step: '0.01', min: '0', placeholder: 'مثال: 500', value: value('registration_fee') })),
-    el('label', {}, el('span', {}, 'الدفعة الأولى المسددة الآن (ر.س)'), el('input', { name: 'initial_payment_amount', type: 'number', step: '0.01', min: '0', placeholder: 'مثال: 200', value: value('initial_payment_amount') })),
-    el('label', {}, el('span', {}, 'طريقة سداد الدفعة الأولى'), select('payment_method', [['كاش', 'كاش نقدي'], ['مدى', 'مدى / شبكة'], ['تحويل بنكي', 'تحويل بنكي'], ['Apple Pay', 'Apple Pay']], 'كاش'))
+    el('label', {}, el('span', {}, 'رسوم التسجيل المقررة (ر.س)'), feeInput),
+    el('label', {}, el('span', {}, 'الدفعة الأولى المسددة الآن (ر.س)'), paidInput),
+    el('label', {}, el('span', {}, 'طريقة سداد الدفعة الأولى'), methodSelect),
+    planContainer,
+    planSummary
   ];
 
   const submit = el('button', { class: 'button', type: 'button', style: 'padding: 10px 24px; font-weight: 700;' }, editing ? 'حفظ التعديلات' : 'إضافة طالب');
@@ -748,6 +786,47 @@ function openStudentForm(api, student) {
     });
   }
 
+  const updatePlanSummary = () => {
+    if (editing) return;
+    const fee = Number(feeInput.value);
+    const paid = paidInput.value === '' ? 0 : Number(paidInput.value);
+    if (!fee || fee <= 0) {
+      planContainer.style.display = 'none';
+      planSummary.style.display = 'none';
+      submit.disabled = false;
+      return;
+    }
+    planSummary.style.display = '';
+    if (paid > fee) {
+      planContainer.style.display = 'none';
+      planSummary.textContent = '⚠️ المبلغ المسدد أكبر من رسوم التسجيل المقررة';
+      planSummary.style.color = '#b91c1c';
+      submit.disabled = true;
+      return;
+    }
+    submit.disabled = false;
+    if (paid === fee) {
+      planContainer.style.display = 'none';
+      planSummary.textContent = '✅ سيتم تسجيل الرسوم مسددة بالكامل';
+      planSummary.style.color = '#166534';
+      return;
+    }
+    planContainer.style.display = '';
+    const count = Number(countInput && countInput.value) || 1;
+    const each = ((fee - paid) / count).toFixed(2);
+    planSummary.style.color = '#1e40af';
+    planSummary.textContent = `📅 المتبقي ${(fee - paid).toFixed(2)} ر.س على ${count} دفعات، قيمة الدفعة تقريبًا ${each} ر.س، أولها بتاريخ ⁦${(dateInput && dateInput.value) || '—'}⁩`; // LTR isolate keeps YYYY-MM-DD in order
+  };
+
+  if (!editing) {
+    [feeInput, paidInput, countInput, dateInput].forEach(node => {
+      node.addEventListener('input', updatePlanSummary);
+      node.addEventListener('change', updatePlanSummary);
+    });
+    intervalSelect.addEventListener('change', updatePlanSummary);
+  }
+  updatePlanSummary();
+
   const saveStudent = async () => {
     const rawData = new FormData(form);
     const payload = Object.fromEntries(rawData.entries());
@@ -775,9 +854,21 @@ function openStudentForm(api, student) {
     payload.gender = payload.gender || (editing ? (isGirl(student || {}) ? 'بنات' : 'بنين') : defaultGender);
 
     // PostgreSQL nullable & check constraint guarantees
-    ['birth_date', 'group_name', 'guardian_relation', 'national_id', 'father_phone', 'mother_phone', 'pickup_phone'].forEach(k => {
+    ['birth_date', 'group_name', 'guardian_relation', 'national_id', 'father_phone', 'mother_phone', 'pickup_phone', 'registration_fee', 'initial_payment_amount'].forEach(k => {
       if (payload[k] === '') payload[k] = null;
     });
+
+    // حقول خطة الأقساط تُرسل فقط عند الإنشاء مع رسوم متبقية غير مسددة
+    const planFee = Number(feeInput.value);
+    const planPaid = paidInput.value === '' ? 0 : Number(paidInput.value);
+    if (!editing && planFee > 0 && planPaid < planFee) {
+      payload.installments_count = Number(payload.installments_count) || 1;
+      payload.interval_days = Number(payload.interval_days) || 30;
+    } else {
+      delete payload.installments_count;
+      delete payload.next_due_date;
+      delete payload.interval_days;
+    }
 
     submit.disabled = true;
     submit.textContent = 'جاري الحفظ...';

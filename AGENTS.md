@@ -89,11 +89,11 @@ When the user provides a brief or conversational prompt, immediately resolve and
 | **"صفحة هبوط" / "CRO" / "landing page"** | `Clients/<client>/04_Landing_Pages_CRO/` | Mobile-first CRO, WhatsApp/Call sticky buttons, GTM click-to-call triggers. |
 | **"فاتورة" / "عرض سعر" / "quote"** | `Clients/<client>/06_Contracts_Invoices/` | Managed subscription standard (399 SAR/yr for domain+mail). Strict 1-Page A4, Rule 50 zero-pricing. |
 | **"نطاق" / "بريد مهني" / "DNS"** | `.agents/MEMORY_STORE.md` (Decisions 10–13) | Hybrid architecture: DNet/SaudiNIC for `.sa` + Hostinger Enterprise Mail (MX/SPF/DKIM/DMARC). |
-| **"Google Ads API" / "OAuth" / "token"** | `GOOGLE_ADS_API_RESUMPTION.md`, `scripts/` | Follow Passkey resumption protocol for MCC `576-627-3068`. Run `authenticate_google_ads.py`. |
+| **"Google Ads API" / "OAuth" / "token"** | `GOOGLE_ADS_API_RESUMPTION.md`, `tools/google_ads_mcp/` | ✅ **Active & Connected (API v22)**. Managed via FastMCP server (`tools/google_ads_mcp/server.py`). Run `get_api_status` or use `authenticate_google_ads.py` for token refresh. |
 | **"Android" / "APK" / "Play Console"** | Play Console PDFs at root + mobile specs | Review Organization D-U-N-S rules and demo account requirements before submission. |
 | **"iOS" / "TestFlight" / "build ipa"** | `REMOTE_IOS_DEV_PLAYBOOK.md` | Execute fast loop on Linux container; push to GitHub Actions `macos-15` for `.ipa`. |
 | **"مخطط" / "flowchart" / "architecture"** | `tools/flowchart_studio/` | Open studio via `open_flowchart_studio.bat`. Use valid Mermaid syntax and Dark Neon Candy palette. |
-| **"وكيل جديد" / "MCP" / "n8n"** | `.agents/skills/`, `.agents/Sub_Agent/` | Follow YAML frontmatter standard; ensure zero-leak stdio for FastMCP. |
+| **"وكيل جديد" / "MCP" / "n8n"** | `.agents/skills/`, `tools/google_ads_mcp/` | Follow YAML frontmatter standard; ensure zero-leak stdio for FastMCP (`google-ads` server registered). |
 
 ---
 
@@ -159,6 +159,13 @@ Autovemtech operates an autonomous multi-CLI fleet governed by [fleet_config.jso
 > [!CAUTION]
 > **Exclusive Testing Rule**: `Claude Code CLI` is the **ONLY** agent authorized to execute test suites (`test`, `analyze`, lint audits) and grant final approval (`[APPROVED]`).
 > Neither Codex, OpenCode, Antigravity CLI (`agcli`), nor Antigravity IDE may run test commands or sign off on feature quality gates.
+
+### Autonomous Consult-and-Execute Fleet Pipeline ([C-25] & Decision 80)
+> [!TIP]
+> **Consult-and-Execute Protocol**: To eliminate manual user copy-pasting and prevent browser automation timeouts in Claude Code CLI:
+> 1. **Antigravity IDE** leads field execution, DOM inspection, complex browser tasks via `browser_subagent`, and local workspace file modifications.
+> 2. **Claude Code CLI** is queried headlessly in the background via `claude -p "..."` for high-level architectural arbitration, edge-case auditing, and exclusive testing/verification gates.
+> 3. Zero manual copy-pasting; saves >80% tokens on Opus Max and guarantees robust browser session stability.
 
 ### Token Conservation & Context Window Sweet Spot Governance (Hook 27 & Hook 25)
 Governed by [.agents/CONTEXT_GOVERNANCE.md](file:///f:/AI%20PROJECTS/Autovemtech/.agents/CONTEXT_GOVERNANCE.md):
@@ -228,11 +235,18 @@ Governed by [.agents/CONTEXT_GOVERNANCE.md](file:///f:/AI%20PROJECTS/Autovemtech
 13. **Rule 54 (Client-Server DTO Parity & Kotlin optString Sanitization Standard)**:
     - **Full DTO Schema Parity:** When adding or extending fields in server API payloads or database models, mobile Data Transfer Objects (DTOs) and repository mappers must immediately mirror those fields. Never omit newly added server columns or hardcode them to null in client mappers, as this causes silent data loss during background pull synchronization cycles.
     - **Kotlin `optString` Null Invariant:** In Kotlin routines parsing `org.json.JSONObject`, avoid passing `null` as the fallback argument (`json.optString(key, null)`), which risks returning the literal string `"null"`. Always sanitize strings using the idiomatic pattern: `json.optString(key).takeIf { it.isNotBlank() }` to guarantee genuine nullable values.
-14. **Rule 55 (Commercial Contract Hygiene & Anti-Skill Bleed Standard)**:
+14. **Rule 55 (Elementor Pro Form Tracking & CRO Double-Tagging Invariant)**:
+    - **AJAX Form Push:** In WordPress sites built with Elementor Pro, never rely on Form Actions (Webhooks) to push client-side analytics events because they execute server-side (PHP) and cannot access `window.dataLayer`. The canonical standard is attaching a jQuery listener to Elementor's client-side `submit_success` event to cleanly push events to `window.dataLayer`:
+      ```html
+      <script>jQuery(document).on('submit_success',function(){window.dataLayer=window.dataLayer||[];dataLayer.push({event:'lead_form_submit'});});</script>
+      ```
+    - **Double Injection & Cache Bypass Invariant:** When an official connector like Site Kit by Google is active, never manually duplicate GTM containers or Google Ads gtag snippets in secondary injection plugins. Always verify live DOM scripts using a cache-busting query (`?nocache=1`) against edge/server caches (e.g. LiteSpeed Cache) to guarantee `gtm.js` and `AW-` tags load strictly once.
+    - **FastMCP Google Ads API v22 Standard:** FastMCP servers interfacing with Google Ads API must target the active cloud API version (`v22`), strictly isolate stdio JSON-RPC streams by routing all logging to `sys.stderr`, and expose modular tools (`list_customers`, `get_api_status`, `get_campaigns`, `get_conversion_actions`, `run_gaql`).
+15. **Rule 56 (Commercial Contract Hygiene & Anti-Skill Bleed Standard)**:
     - **Strict Anti-Skill Bleed:** When using business, growth, or framework skills (e.g. `hormozi-growth-advisor` or marketing playbooks) to draft commercial contracts, proposals, or Scopes of Work (SOW), apply principles silently in substance. **NEVER** leak skill names, author titles, buzzwords, or marketing hype (e.g. "هورموزي", "Done-For-You", "Grand Slam", "عكس المخاطر 100%") into contract headings or binding clauses. Official contracts must strictly use formal, authoritative Saudi commercial legal terminology.
     - **No Self-Imposed Payment Waivers or Penalties:** Agency payment schedules must strictly follow milestone delivery and client approval ("لا دفع قبل المشاهدة والاعتماد"). AI agents must **NEVER** invent or insert unilateral financial penalties, payment waivers, or delay discounts on the agency unless explicitly directed with exact amounts by the user.
     - **Client Deliverable Precision (Website vs. Landing Page & Manual Entry):** Rigorously distinguish between an official full website and a marketing landing page. When a client opts for manual data entry, configure database UI inputs for manual entry enablement and staff training, omitting backup file migration clauses.
-15. **Rule 56 (Headless PDF Purity & Browser Header-Footer Sanitization Standard)**:
+16. **Rule 57 (Headless PDF Purity & Browser Header-Footer Sanitization Standard)**:
     - **Mandatory Headless Header/Footer Suppression:** When generating or rendering PDF deliverables from HTML via Chromium or Microsoft Edge Headless (`--print-to-pdf`), agents must **ALWAYS** pass `--no-pdf-header-footer`. Never generate or deliver client reports or official documents that contain raw file paths (`file:///...`), execution dates, or browser page counters (`X/Y`) in page margins.
     - **Print CSS Calibration & Page Boundary Invariant:** In HTML documents intended for print or PDF conversion (`@media print`), always configure `@page { size: A4 portrait; margin: 8mm 12mm; }` and `-webkit-print-color-adjust: exact;`. Container heights, margins, and table paddings must be calibrated to ensure documents fit their designated page count without unintended spillover lines onto trailing blank pages.
     - **Bounding Box Margin Redaction Fallback:** When sanitizing existing rendered PDFs containing leaked browser headers or footers, apply non-destructive bounding box redaction via `pymupdf` targeting the top (`y < 30`) and bottom (`y > 810`) strips to erase leaked artifacts while strictly preserving all legitimate document content.

@@ -1,3 +1,5 @@
+from datetime import date
+from decimal import InvalidOperation
 from uuid import UUID
 
 import psycopg
@@ -10,6 +12,7 @@ from edutrack_api.errors import ApiError, map_db_error
 from edutrack_api.repositories.generic import GenericRepository
 from edutrack_api.serializers import row_to_json
 from edutrack_api.services.finance import (
+    _money,
     allocate_payment,
     apply_advance_deduction,
     close_month,
@@ -206,6 +209,84 @@ def _audit_details(data: dict) -> dict:
     return details
 
 
+def _registration_finance(data: dict) -> dict | None:
+    """Parse registration-fee plan inputs (request-only keys, never student columns).
+
+    Returns None when no fee applies (fee empty/0), otherwise a dict with:
+    fee, paid, installments_count, next_due_date, interval_days.
+    Raises 400 validation errors before anything is created.
+    """
+    try:
+        fee = _money(data.get("registration_fee"))
+        paid = _money(data.get("initial_payment_amount"))
+    except InvalidOperation:
+        raise ApiError(400, "validation_error", "مبلغ الرسوم أو الدفعة الأولى غير صالح")
+    if fee <= 0 and paid <= 0:
+        return None
+    if paid > fee:
+        raise ApiError(400, "validation_error", "المبلغ المسدد أكبر من رسوم التسجيل المقررة")
+    installments_count = data.get("installments_count")
+    next_due_date = data.get("next_due_date")
+    interval_days = data.get("interval_days")
+    if paid < fee:
+        raw_count = installments_count if installments_count not in (None, "") else 0
+        try:
+            count_value = int(raw_count)
+        except (TypeError, ValueError):
+            raise ApiError(400, "validation_error", "يجب تحديد عدد الدفعات المتبقية")
+        if count_value < 1:
+            raise ApiError(400, "validation_error", "يجب تحديد عدد الدفعات المتبقية")
+        if not next_due_date:
+            raise ApiError(400, "validation_error", "يجب تحديد تاريخ الدفعة القادمة بعد تاريخ اليوم")
+        try:
+            due_value = date.fromisoformat(str(next_due_date)[:10])
+        except ValueError:
+            raise ApiError(400, "validation_error", "يجب تحديد تاريخ الدفعة القادمة بعد تاريخ اليوم")
+        if due_value <= date.today():
+            raise ApiError(400, "validation_error", "يجب تحديد تاريخ الدفعة القادمة بعد تاريخ اليوم")
+        try:
+            interval_value = int(interval_days if interval_days not in (None, "") else 30)
+        except (TypeError, ValueError):
+            raise ApiError(400, "validation_error", "الفاصل بين الدفعات يجب أن يكون 7 أو 14 أو 30 يوماً")
+        if interval_value not in (7, 14, 30):
+            raise ApiError(400, "validation_error", "الفاصل بين الدفعات يجب أن يكون 7 أو 14 أو 30 يوماً")
+        installments_count, next_due_date, interval_days = count_value, due_value, interval_value
+    else:
+        installments_count, next_due_date, interval_days = None, None, 30
+    return {"fee": fee, "paid": paid, "installments_count": installments_count,
+            "next_due_date": next_due_date, "interval_days": interval_days}
+
+
+def _students_finance_flow(conn, row: dict, plan: dict) -> None:
+    """Create the fee plan, generate installments, and when a down payment exists
+    run payment -> allocate -> receipt -> ledger entry, all on the same conn."""
+    count = (1 if plan["paid"] > 0 else 0) + (plan["installments_count"] if plan["paid"] < plan["fee"] else 0)
+    plan_row = conn.execute(
+        "INSERT INTO fee_plans (branch_id, student_id, total_amount, count, start_date, interval_days) "
+        "VALUES (%s, %s, %s, %s, CURRENT_DATE, %s) RETURNING *",
+        (row["branch_id"], row["id"], plan["fee"], count, plan["interval_days"]),
+    ).fetchone()
+    row["fee_plan"] = dict(plan_row)
+    row["installments"] = generate_installments(
+        conn,
+        dict(plan_row),
+        down_payment=plan["paid"] or None,
+        first_due=plan["next_due_date"],
+    )
+    if plan["paid"] > 0:
+        method = plan.get("method") or "كاش"
+        pay_row = conn.execute(
+            "INSERT INTO payments (branch_id, student_id, amount, paid_on, method, note) "
+            "VALUES (%s, %s, %s, CURRENT_DATE, %s, %s) RETURNING *",
+            (row["branch_id"], row["id"], plan["paid"], method, "رسوم تسجيل الطالب / دفعة أولى"),
+        ).fetchone()
+        allocate_payment(conn, dict(pay_row), pay_row.get("installment_id"))
+        row["initial_payment"] = dict(pay_row)
+        row["initial_receipt"] = issue_receipt(conn, pay_row["id"])
+        cash_acc = default_cash_account_id(conn, row["branch_id"])
+        post_ledger_entry(conn, cash_acc, "in", plan["paid"], "payments", pay_row["id"], pay_row["paid_on"], row["branch_id"])
+
+
 def _create_hook(conn, repo, table: str, data: dict, actor: dict) -> tuple[dict, dict]:
     details = _audit_details(data)
     if table == "users":
@@ -304,18 +385,15 @@ def _create_hook(conn, repo, table: str, data: dict, actor: dict) -> tuple[dict,
         row = transfer_between_accounts(conn, data, actor.get("branch_id"))
         return row, details
     if table == "students":
-        init_amount = data.get("initial_payment_amount")
-        if init_amount is None:
-            init_amount = data.get("registration_fee")
-        if init_amount is not None:
-            try:
-                amt_val = float(init_amount)
-            except (ValueError, TypeError):
-                amt_val = 0.0
-            if amt_val > 0:
-                perms = actor.get("permissions") or {}
-                if actor.get("role") != "manager" and not perms.get("finance", False):
-                    raise ApiError(403, "forbidden", "ليس لديك صلاحية تسجيل العمليات المالية")
+        if data.get("registration_fee") or data.get("initial_payment_amount"):
+            perms = actor.get("permissions") or {}
+            if actor.get("role") != "manager" and not perms.get("finance", False):
+                raise ApiError(403, "forbidden", "ليس لديك صلاحية تسجيل العمليات المالية")
+        registration_plan = _registration_finance(data)
+        if registration_plan:
+            registration_plan["method"] = str(data.get("payment_method") or "كاش")
+        for request_key in ("installments_count", "next_due_date", "interval_days", "payment_method"):
+            data.pop(request_key, None)
     elif table == "teacher_evaluations":
         if "staff_id" in data:
             data["teacher_id"] = data.pop("staff_id")
@@ -381,30 +459,9 @@ def _create_hook(conn, repo, table: str, data: dict, actor: dict) -> tuple[dict,
                 "VALUES (%s, %s, %s, true) ON CONFLICT (student_id, guardian_id) DO NOTHING",
                 (branch_id, row["id"], gid),
             )
-        # Automatic initial down-payment / registration fee processing
-        init_amount = data.get("initial_payment_amount")
-        if init_amount is None:
-            init_amount = data.get("registration_fee")
-        if init_amount is not None:
-            try:
-                amt_val = float(init_amount)
-            except (ValueError, TypeError):
-                raise ApiError(400, "validation_error", "مبلغ الدفعة الأولى غير صالح")
-            if amt_val > 0:
-                method = data.get("payment_method") or "كاش"
-                branch_id = row.get("branch_id") or MAIN_BRANCH_ID
-                pay_row = conn.execute(
-                    "INSERT INTO payments (branch_id, student_id, amount, paid_on, method, note) "
-                    "VALUES (%s, %s, %s, CURRENT_DATE, %s, %s) RETURNING *",
-                    (branch_id, row["id"], amt_val, method, "رسوم تسجيل الطالب / دفعة أولى"),
-                ).fetchone()
-                if pay_row:
-                    allocate_payment(conn, dict(pay_row), pay_row.get("installment_id"))
-                    receipt = issue_receipt(conn, pay_row["id"])
-                    cash_acc = default_cash_account_id(conn, branch_id)
-                    post_ledger_entry(conn, cash_acc, "in", amt_val, "payments", pay_row["id"], pay_row["paid_on"], branch_id)
-                    row["initial_payment"] = dict(pay_row)
-                    row["initial_receipt"] = receipt
+        # Automatic registration fee / installment plan processing
+        if registration_plan:
+            _students_finance_flow(conn, row, registration_plan)
     elif table == "fee_plans":
         row["installments"] = generate_installments(conn, row)
     elif table == "payments":

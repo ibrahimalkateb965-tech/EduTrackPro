@@ -10,9 +10,17 @@ Strictly adheres to Rule 50 (0-9 numerals) and clean architecture invariants.
 
 from __future__ import annotations
 
+import datetime
 import os
 import re
 from pathlib import Path
+
+# Partial payments now open an installment plan (fleet order 02), so the plan terms are required.
+PLAN_TERMS = {
+    "installments_count": 1,
+    "next_due_date": (datetime.date.today() + datetime.timedelta(days=30)).isoformat(),
+    "interval_days": 30,
+}
 
 
 def test_e2e_student_registration_with_receipt_flow(client, db, manager):
@@ -37,6 +45,7 @@ def test_e2e_student_registration_with_receipt_flow(client, db, manager):
         "registration_fee": 600.0,
         "initial_payment_amount": 350.0,
         "payment_method": "كاش",
+        **PLAN_TERMS,
     }
 
     create_res = client.post("/api/v1/students", json=student_payload, headers=manager)
@@ -98,6 +107,7 @@ def test_e2e_student_registration_zero_payment(client, db, manager):
         "registration_fee": 500.0,
         "initial_payment_amount": 0.0,
         "payment_method": "كاش",
+        **PLAN_TERMS,
     }
 
     create_res = client.post("/api/v1/students", json=student_payload, headers=manager)

@@ -102,7 +102,7 @@ class EvaluationSheetViewModel(
 
     fun selectSubject(subject: String) {
         if (_uiState.value.selectedSubject != subject) {
-            _uiState.update { it.copy(selectedSubject = subject) }
+            _uiState.update { it.copy(selectedSubject = subject, drafts = emptyList(), isDirty = false) }
             loadData()
         }
     }

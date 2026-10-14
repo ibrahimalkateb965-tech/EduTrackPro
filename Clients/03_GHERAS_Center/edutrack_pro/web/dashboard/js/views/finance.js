@@ -137,7 +137,7 @@ function openPaymentForm(api, defaultStudentId, onSuccess) {
   const refreshInstallments = () => {
     installmentSelect.replaceChildren(el('option', { value: '' }, 'بدون قسط'));
     const sId = studentSelect.value;
-    const list = sId ? installments.filter(item => planFor(item.fee_plan_id)?.student_id === sId && item.status !== 'مدفوع') : [];
+    const list = sId ? installments.filter(item => planFor(item.fee_plan_id)?.student_id === sId && item.status !== 'paid') : [];
     if (!list.length) {
       installmentSelect.append(el('option', { value: '', disabled: 'disabled' }, sId ? 'لا توجد أقساط معلقة لهذا الطالب' : 'اختر الطالب لعرض أقساطه'));
     } else {
@@ -431,19 +431,52 @@ function renderOverview(api, container, reloadAll) {
   container.append(kpis, grid2, tablesGrid);
 }
 
+function planStats(plan) {
+  const rows = installments.filter(item => String(item.fee_plan_id) === String(plan.id));
+  let paid = 0;
+  let remaining = 0;
+  let nextDue = null;
+  rows.forEach(item => {
+    const amount = Number(item.amount || 0);
+    const paidAmount = Number(item.paid_amount || 0);
+    paid += paidAmount;
+    remaining += Math.max(amount - paidAmount, 0);
+    if (paidAmount < amount) {
+      const due = String(item.due_date || '').slice(0, 10);
+      if (due && (!nextDue || due < nextDue)) nextDue = due;
+    }
+  });
+  return { paid, remaining, nextDue };
+}
+
+function planStatusBadge(stats) {
+  const pill = (bg, color, text) => el('span', { style: `display:inline-block; padding:2px 10px; border-radius:999px; font-weight:700; font-size:12px; background:${bg}; color:${color};` }, text);
+  if (stats.remaining <= 0) return pill('#dcfce7', '#166534', 'مسدد بالكامل');
+  const today = new Intl.DateTimeFormat('en-CA').format(new Date()); // local YYYY-MM-DD, not UTC
+  if (stats.nextDue && stats.nextDue < today) return pill('#fee2e2', '#991b1b', 'متأخر');
+  return pill('#fef3c7', '#92400e', 'خطة أقساط');
+}
+
 function renderPayments(api, container, reloadAll) {
   const toolbar = el('div', { class: 'toolbar' },
     el('button', { class: 'button', type: 'button', onclick: () => openPaymentForm(api, null, reloadAll) }, '＋ تسجيل دفعة جديدة'),
     el('button', { class: 'button button-outline', type: 'button', onclick: () => openPlanForm(api, reloadAll) }, '＋ إضافة خطة أقساط')
   );
 
-  const planRows = feePlans.map(plan => el('tr', {},
-    el('td', {}, studentName(plan)),
-    el('td', { style: 'font-weight:700;' }, fmtSAR(plan.total_amount)),
-    el('td', {}, String(plan.count ?? '1')),
-    el('td', {}, intervalLabel(plan.interval_days)),
-    el('td', {}, fmtDate(plan.start_date))
-  ));
+  const planRows = feePlans.map(plan => {
+    const stats = planStats(plan);
+    return el('tr', {},
+      el('td', {}, studentName(plan)),
+      el('td', { style: 'font-weight:700;' }, fmtSAR(plan.total_amount)),
+      el('td', {}, String(plan.count ?? '1')),
+      el('td', {}, intervalLabel(plan.interval_days)),
+      el('td', {}, fmtDate(plan.start_date)),
+      el('td', {}, fmtSAR(stats.paid)),
+      el('td', {}, fmtSAR(stats.remaining)),
+      el('td', {}, stats.nextDue ? fmtDate(stats.nextDue) : '—'),
+      el('td', {}, planStatusBadge(stats))
+    );
+  });
 
   const paymentRows = payments.map(p => {
     const receipt = el('a', { class: 'button button-outline', href: `../print/templates/receipt.html?payment=${encodeURIComponent(p.id || '')}`, target: '_blank', rel: 'noopener' }, '🧾 طباعة السند');
@@ -468,8 +501,8 @@ function renderPayments(api, container, reloadAll) {
   const sectionPlans = el('div', { class: 'card' },
     el('h3', { style: 'margin-top:0;' }, 'خطط الرسوم والأقساط للطلاب'),
     el('div', { class: 'table-wrap' }, el('table', {},
-      el('thead', {}, el('tr', {}, el('th', {}, 'الطالب'), el('th', {}, 'إجمالي المبلغ'), el('th', {}, 'عدد الأقساط'), el('th', {}, 'الفترة'), el('th', {}, 'تاريخ البدء'))),
-      el('tbody', {}, planRows.length ? planRows : el('tr', {}, el('td', { colspan: '5', class: 'muted' }, 'لا توجد خطط أقساط بعد')))
+      el('thead', {}, el('tr', {}, el('th', {}, 'الطالب'), el('th', {}, 'إجمالي المبلغ'), el('th', {}, 'عدد الأقساط'), el('th', {}, 'الفترة'), el('th', {}, 'تاريخ البدء'), el('th', {}, 'المسدد'), el('th', {}, 'المتبقي'), el('th', {}, 'الدفعة القادمة'), el('th', {}, 'الحالة'))),
+      el('tbody', {}, planRows.length ? planRows : el('tr', {}, el('td', { colspan: '9', class: 'muted' }, 'لا توجد خطط أقساط بعد')))
     ))
   );
 

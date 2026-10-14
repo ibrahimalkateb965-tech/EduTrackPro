@@ -13,19 +13,36 @@ def _money(value) -> Decimal:
     return Decimal(str(value or 0)).quantize(_CENT, rounding=ROUND_HALF_UP)
 
 
-def generate_installments(conn, plan_row: dict) -> list[dict]:
+def generate_installments(conn, plan_row: dict, *, down_payment=None, first_due=None) -> list[dict]:
     total, count = _money(plan_row["total_amount"]), int(plan_row["count"])
-    each = (total / count).quantize(_CENT, rounding=ROUND_HALF_UP)
     start = plan_row["start_date"]
     if isinstance(start, str):
         start = date.fromisoformat(start)
+    interval = int(plan_row["interval_days"])
+    down = _money(down_payment)
+    if down > 0:
+        residual_total, residual_count = total - down, count - 1
+    else:
+        down = Decimal("0.00")
+        residual_total, residual_count = total, count
+    if first_due is not None:
+        first_residual_date = first_due if isinstance(first_due, date) else date.fromisoformat(str(first_due)[:10])
+    else:
+        first_residual_date = start
+    each = (residual_total / residual_count).quantize(_CENT, rounding=ROUND_HALF_UP) if residual_count > 0 else Decimal("0.00")
+    entries: list[tuple[int, Decimal, date]] = []
+    if down > 0:
+        entries.append((1, down, start))
+    for offset in range(residual_count):
+        sequence = (1 if down > 0 else 0) + offset + 1
+        amount = residual_total - each * (residual_count - 1) if offset == residual_count - 1 else each
+        entries.append((sequence, amount, first_residual_date + timedelta(days=offset * interval)))
     rows = []
-    for sequence in range(1, count + 1):
-        amount = total - each * (count - 1) if sequence == count else each
+    for sequence, amount, due_date in entries:
         row = conn.execute(
             "INSERT INTO installments (branch_id, fee_plan_id, seq_no, due_date, amount) "
             "VALUES (%s, %s, %s, %s, %s) RETURNING *",
-            (plan_row["branch_id"], plan_row["id"], sequence, start + timedelta(days=(sequence - 1) * int(plan_row["interval_days"])), amount),
+            (plan_row["branch_id"], plan_row["id"], sequence, due_date, amount),
         ).fetchone()
         rows.append(dict(row))
     return rows

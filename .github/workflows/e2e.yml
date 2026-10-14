@@ -1,0 +1,48 @@
+name: web-e2e
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "Clients/03_GHERAS_Center/edutrack_pro/web/**"
+      - ".github/workflows/e2e.yml"
+  pull_request:
+    paths:
+      - "Clients/03_GHERAS_Center/edutrack_pro/web/**"
+      - ".github/workflows/e2e.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: web-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: Clients/03_GHERAS_Center/edutrack_pro/web
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      APP_URL: https://gheras.autovem.tech/web/dashboard/
+      E2E_USER_ADMIN_USERNAME: ${{ secrets.E2E_USER_ADMIN_USERNAME }}
+      E2E_USER_ADMIN_PASSWORD: ${{ secrets.E2E_USER_ADMIN_PASSWORD }}
+      OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: Clients/03_GHERAS_Center/edutrack_pro/web/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run E2E test suite
+        run: npx e2e run tests/example.e2e.ts tests/rooms.e2e.ts tests/communication.e2e.ts tests/rbac_supervisor.e2e.ts
