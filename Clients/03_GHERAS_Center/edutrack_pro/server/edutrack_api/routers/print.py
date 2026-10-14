@@ -121,6 +121,7 @@ def guardian_card(
         "national_id": s.get("national_id") or "—",
         "date": _today().isoformat(),
         "student_name": s["name"],
+        "photo_url": s.get("photo_url") or "",
         "group_name": s["group_name"] or "—",
         "room_name": s["room_name"] or "—",
         "father_phone": s["father_phone"] or "—",

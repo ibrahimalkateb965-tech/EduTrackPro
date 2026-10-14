@@ -66,6 +66,60 @@ function absenceStatusBadge(status) {
   return el('span', { class: 'badge' }, status || 'حاضر');
 }
 
+export function openDeleteStaffModal(api, member, onDeleted) {
+  const confirmBtn = el('button', {
+    class: 'button',
+    type: 'submit',
+    style: 'background: #dc2626; border-color: #b91c1c; color: #fff; font-weight: 700; padding: 8px 18px;'
+  }, '🗑️ تأكيد الحذف');
+  const cancelBtn = el('button', {
+    class: 'button button-outline',
+    type: 'button',
+    style: 'padding: 8px 16px;'
+  }, 'إلغاء');
+
+  const warningContent = el('div', { style: 'display: flex; flex-direction: column; gap: 12px; min-width: 320px;' },
+    el('div', { style: 'display: flex; align-items: center; gap: 10px;' },
+      el('span', { style: 'font-size: 32px;' }, '⚠️'),
+      el('div', {},
+        el('div', { style: 'font-weight: 700; font-size: 16px; color: #1e293b;' }, `حذف الموظف: ${member.name || '—'}`),
+        el('div', { style: 'font-size: 13px; color: #64748b; margin-top: 2px;' }, member.role_title ? `المسمى الوظيفي: ${member.role_title}` : '')
+      )
+    ),
+    el('p', { style: 'margin: 0; font-size: 14px; line-height: 1.6; color: #334155; background: #fef2f2; border: 1px solid #fee2e2; border-radius: 8px; padding: 12px 14px;' },
+      `هل أنت متأكد من رغبتك في حذف الموظف "${member.name || ''}" نهائياً من النظام؟ سيتم حذف بياناته وإلغاء تفعيل حساب الدخول المرتبط به.`
+    ),
+    el('div', { class: 'form-actions', style: 'display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px;' },
+      cancelBtn,
+      confirmBtn
+    )
+  );
+
+  const modalForm = el('form', {}, warningContent);
+  const { close } = modal('تأكيد حذف الموظف', modalForm);
+  cancelBtn.onclick = () => close();
+
+  modalForm.onsubmit = async ev => {
+    ev.preventDefault();
+    confirmBtn.disabled = true;
+    confirmBtn.textContent = 'جاري الحذف...';
+    try {
+      await api.del(`staff/${member.id}`);
+      toast('تم حذف الموظف بنجاح');
+      close();
+      if (typeof onDeleted === 'function') {
+        onDeleted();
+      } else {
+        await reload(api);
+      }
+    } catch (err) {
+      toast(err.message || 'تعذر حذف الموظف', true);
+      confirmBtn.disabled = false;
+      confirmBtn.textContent = '🗑️ تأكيد الحذف';
+    }
+  };
+}
+
 function staffRow(member, api) {
   const hasFinance = checkHasFinance(api);
   const isManager = checkIsManager(api);
@@ -112,6 +166,17 @@ function staffRow(member, api) {
     }, '📊 تقييم الأداء');
     evalBtn.addEventListener('click', () => openTeacherEvaluationModal(api, member));
     actions.push(' ', evalBtn);
+  }
+
+  if (isManager) {
+    const deleteBtn = el('button', {
+      class: 'button button-outline',
+      type: 'button',
+      style: 'color: #dc2626; border-color: #fca5a5; background: #fff5f5;',
+      title: 'حذف الموظف'
+    }, '🗑️ حذف');
+    deleteBtn.addEventListener('click', () => openDeleteStaffModal(api, member));
+    actions.push(' ', deleteBtn);
   }
 
   const salaryText = hasFinance && member.base_salary !== null && member.base_salary !== undefined
@@ -363,6 +428,7 @@ function openResetPasswordModal(api, user, member) {
 function openStaffForm(api, member) {
   const editing = Boolean(member && member.id);
   const hasFinance = checkHasFinance(api);
+  const isManager = checkIsManager(api);
   const value = key => (member && member[key] !== undefined && member[key] !== null) ? String(member[key]) : '';
   const statusOptions = [['active', 'نشط'], ['on_leave', 'إجازة'], ['terminated', 'منتهي']];
   const fields = [
@@ -404,7 +470,21 @@ function openStaffForm(api, member) {
 
   const submit = el('button', { class: 'button', type: 'submit' }, editing ? 'حفظ التعديلات' : 'إضافة');
   const cancel = el('button', { class: 'button button-outline', type: 'button' }, 'إلغاء');
-  const form = el('form', { class: 'form-grid' }, ...fields, el('div', { class: 'form-actions' }, submit, cancel));
+  const formActions = [submit, cancel];
+  if (editing && isManager) {
+    const deleteBtn = el('button', {
+      class: 'button button-outline',
+      type: 'button',
+      style: 'color: #dc2626; border-color: #fca5a5; background: #fff5f5; margin-right: auto;',
+      title: 'حذف الموظف نهائياً'
+    }, '🗑️ حذف الموظف');
+    deleteBtn.addEventListener('click', () => {
+      dialog.close();
+      openDeleteStaffModal(api, member);
+    });
+    formActions.unshift(deleteBtn);
+  }
+  const form = el('form', { class: 'form-grid' }, ...fields, el('div', { class: 'form-actions', style: 'display: flex; gap: 8px; align-items: center;' }, ...formActions));
   const dialog = modal(editing ? 'تعديل موظف' : 'إضافة موظف', form);
   cancel.addEventListener('click', dialog.close);
 
