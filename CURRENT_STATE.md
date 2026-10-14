@@ -4,7 +4,7 @@
 > **Master Orchestrator**: `Claude Code CLI` (Opus Max / Sonnet 5)  
 > **Handoff Source**: `Antigravity IDE` (Interactive Cockpit & Visual Inspector)  
 > **Timestamp**: 2026-09-16T12:55:00+03:00  
-> **Last updated:** 2026-10-14 21:12 (+03:00) — Claude Code CLI, session "student photo + Antigravity CLI fleet": EduTrack student photo on card/report/certificate DEPLOYED (`47cd020`); Antigravity CLI fleet installed, awaiting Worker 1 login. See §8.
+> **Last updated:** 2026-10-14 21:26 (+03:00) — Claude Code CLI, session "context-budget hook design": global context-budget hook spec APPROVED (Brain `fb50405` + `1853b91`), not implemented. See §9. Previous update 21:12: EduTrack student photo DEPLOYED (`47cd020`); Antigravity CLI fleet awaiting Worker 1 login (§8).
 > **VCS:** git at workspace root, branch `main`.
 
 ---
@@ -518,8 +518,9 @@ Pre-flight: Ibrahim confirmed `7eeeada` (pagination follow-up, choice (b) of §6
 
 ---
 
-## 6. THE ONE THING TO DO NEXT (updated 2026-10-14 21:12)
+## 6. THE ONE THING TO DO NEXT (updated 2026-10-14 21:26)
 
+- Ibrahim picks between §8 choices (a)/(b)/(c) and §9 choice (d) (implement the context-budget hook).
 - Ibrahim: run `D:\FleetProfiles\Login_Agy_1.bat`, sign in Worker 1, `/quit`. Then Claude checks whether Worker 2's isolated home shows as signed in (Windows keyring sharing test) before Workers 2-4 log in. Details and choices in §8.
 - (Superseded 2026-09-21 item: Phase 5c Android commit/push/UAT. Check `git log` before acting on it.)
 
@@ -579,3 +580,22 @@ Pre-flight: Ibrahim confirmed `7eeeada` (pagination follow-up, choice (b) of §6
 - **(a)** Finish the Antigravity CLI fleet: Worker 1 login, keyring isolation test, then Workers 2-4 and a smoke task per worker.
 - **(b)** EduTrack phase 2 of the photo: move photos out of the DB into the private folder (spec `78d42c1`), then Android display.
 - **(c)** Push the 2 local root-repo commits (governance + Brain plan) and the Brain vault (`git push` in both), when Ibrahim says "push".
+
+---
+
+## 9. Session 2026-10-14 — Context-budget hook design (Claude Code CLI, `superpowers:brainstorming`, no code, no fleet)
+
+### Execution log
+| Step | Result | Evidence |
+| :--- | :--- | :--- |
+| Brainstorming + design | Approved by Ibrahim: global hook `~/.claude/hooks/context-budget.js`; warn 120k/135k, lock 150k (handoff-only allowlist), emergency 170k; handoff to Brain; resume prompt auto-delivered via `SessionStart` (`clear`/`startup`) | Brain `05_Fleet/Context_Budget_Hook_Spec.md` @ `fb50405`, `1853b91` |
+| Baseline measurement | Every session starts at ~85k tokens (first transcript `usage`), so ~65k usable under 150k | Brain `05_Fleet/Lessons.md` (UNVERIFIED breakdown) |
+| Quality Gate | n/a (design only, no code) | — |
+
+### Open items
+1. Nothing implemented yet: hook, tests, `statusline.ps1` colours, `settings.json` registration, `/strategic-clear` STEP 4 resume-file write, Brain `Context_Governance.md` zone table.
+2. Brain vault is `[ahead 3]` (not pushed). Root repo `[ahead 2]` (see §8 item 5).
+3. Follow-up chip offered: reduce the ~85k session baseline (AGENTS.md import, unused MCP/plugins).
+
+### Next choices
+- **(d)** Implement the context-budget hook: `superpowers:writing-plans` from the spec, then TDD (`node:test`), then Ibrahim reviews the `~/.claude/settings.json` diff.
