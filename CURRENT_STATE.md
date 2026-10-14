@@ -4,7 +4,7 @@
 > **Master Orchestrator**: `Claude Code CLI` (Opus Max / Sonnet 5)  
 > **Handoff Source**: `Antigravity IDE` (Interactive Cockpit & Visual Inspector)  
 > **Timestamp**: 2026-09-16T12:55:00+03:00  
-> **Last updated:** 2026-10-15 00:07 (+03:00) — Claude Code CLI, session "receipt installment breakdown": receipt voucher installment breakdown [APPROVED] `cdc1c3d`, pushed (origin/main = `cdc1c3d`), NOT deployed; fleet order 10 ready (§12). Order 08 photo storage DEPLOYED via order 09 (§11). Previous update 2026-10-14 23:15: fleet order 08 [APPROVED] `e7cf93d`. 22:27: Antigravity CLI 4-worker fleet DONE (§10). Previous update 21:26, session "context-budget hook design": global context-budget hook spec APPROVED (Brain `fb50405` + `1853b91`), not implemented. See §9. Previous update 21:12: EduTrack student photo DEPLOYED (`47cd020`); Antigravity CLI fleet awaiting Worker 1 login (§8).
+> **Last updated:** 2026-10-15 00:40 (+03:00) — Claude Code CLI, session "receipt date format": receipt date fix [APPROVED] `dac9938`, pushed and DEPLOYED via fleet order 11; order 10 (installment breakdown `cdc1c3d`) also DEPLOYED; public side verified (§13). Ibrahim's receipt reprint pending. Previous update 00:07: receipt voucher installment breakdown [APPROVED] `cdc1c3d`, fleet order 10 ready (§12). Order 08 photo storage DEPLOYED via order 09 (§11). Previous update 2026-10-14 23:15: fleet order 08 [APPROVED] `e7cf93d`. 22:27: Antigravity CLI 4-worker fleet DONE (§10). Previous update 21:26, session "context-budget hook design": global context-budget hook spec APPROVED (Brain `fb50405` + `1853b91`), not implemented. See §9. Previous update 21:12: EduTrack student photo DEPLOYED (`47cd020`); Antigravity CLI fleet awaiting Worker 1 login (§8).
 > **VCS:** git at workspace root, branch `main`.
 
 ---
@@ -518,9 +518,10 @@ Pre-flight: Ibrahim confirmed `7eeeada` (pagination follow-up, choice (b) of §6
 
 ---
 
-## 6. THE ONE THING TO DO NEXT (updated 2026-10-15 00:07)
+## 6. THE ONE THING TO DO NEXT (updated 2026-10-15 00:40)
 
-- Finish fleet order 10 (receipt installment breakdown, `cdc1c3d` [APPROVED], §12): Step 2 push is already done; run Steps 1, 3-6 (backup, WSL ff-only sync, `push.sh`, static greps, `10_REPORT.md`). Other open choice: §9 (d) context-budget hook.
+- Ibrahim reprints two receipts from the dashboard (installment plan + fully paid): `التاريخ:` reads `YYYY-MM-DD`, each fits on one A5 landscape page (§13). Then pick from §13 next choices.
+- (Done 2026-10-15 00:07 / 00:30: fleet orders 10 and 11 deployed `cdc1c3d` + `dac9938`, §12-§13.)
 - (Done 2026-10-14 23:29: order 08 photo storage deployed via order 09, §11.)
 - (Superseded 2026-09-21 item: Phase 5c Android commit/push/UAT. Check `git log` before acting on it.)
 
@@ -653,7 +654,7 @@ Request: enrich `/api/v1/print/receipt` + `web/print/templates/receipt.html` (A5
 | Draft | fleet worker (found uncommitted in the tree) | `_installment_breakdown()` in `print.py`, 2 new tests in `test_print.py`, e2e assertions, template rows | `cdc1c3d` |
 | Gate | Claude | Draft passed tests but printed **2 pages** (HEAD template = 1). Fixed: receipt-scoped compact CSS in `print.css` (only `receipt.html` uses `page-a5-landscape`), installment rows as 2x2, `<bdi>` around both dates (header date rendered reversed `14-10-2026`). **[APPROVED]**: server 176/176, receipt suites 18/18, Edge PDF render 1 page for installment and fully-paid variants | `cdc1c3d` |
 | Push | Antigravity / Ibrahim | origin/main = `cdc1c3d` | `git log origin/main -1` |
-| Deploy | — | **NOT done**: production still serves the old `receipt.html` (`الرصيد المتبقي`), new `print.css` rule absent (curl 2026-10-15 00:05) | fleet order 10 |
+| Deploy | Antigravity (WSL) / Ibrahim | **DONE** 2026-10-15 00:07 via fleet order 10 (backup ok, `push.sh`, both static greps = 1; re-checked by Claude) | `fleet_orders/10_REPORT.md` |
 
 ### Open items
 - Fleet order 10: `edutrack_pro/fleet_orders/10_RECEIPT_INSTALLMENT_PUSH_DEPLOY.md` (quarantined). No migration; full `push.sh` needed (`print.py` is in the API image). Step 2 push already happened, so its `0   1` check will now read `0   0`: skip Step 2 and resume at Step 3.
@@ -664,3 +665,28 @@ Request: enrich `/api/v1/print/receipt` + `web/print/templates/receipt.html` (A5
 - **(a)** Finish fleet order 10 from Step 3 (backup, WSL sync, deploy, static greps), then Claude verifies the public side and Ibrahim prints two receipts.
 - **(b)** Fix the two receipt nits (plan-scoped remaining balance, singular wording) as a small follow-up before or after deploy.
 - **(c)** Implement the context-budget hook (§9 (d)).
+
+---
+
+## 13. Session 2026-10-15 ~00:15 → 00:40 — Receipt date format fix (Claude Code CLI, TDD)
+
+Bug: the receipt voucher printed `2026-10-14T23:47:16.242906+03:00` as its date. `row_to_json` turns `timestamptz` into an ISO string and `print._date()` returned strings untouched.
+
+| Step | Who | Result | Evidence |
+| :--- | :--- | :--- | :--- |
+| RED | Claude | New `test_print_receipt_date_is_riyadh_calendar_day` (21:47 UTC on 10-14 must print `2026-10-15`) failed with the raw ISO string | `server/tests/test_print.py` |
+| Fix | Claude | `_date()` parses ISO strings, converts aware values to Asia/Riyadh, returns `YYYY-MM-DD` (split on `T`/space only as fallback). Deviation from the request: a plain `split("T")` would print the UTC day for receipts issued 00:00-03:00 Riyadh | `dac9938` |
+| Gate | Claude | **[APPROVED]**: full suite 177/177 with `PGTZ='<+03>-03'` (production-like); `test_print.py` 17/17 in UTC and +03; ruff delta 0. Without PGTZ, 176/177: `test_registration_installments` primary scenario fails 00:00-03:00 Riyadh only (test `date.today()` vs UTC `CURRENT_DATE` in the pgserver DB), unrelated, production unaffected | Brain `EduTrack_Lessons_Testing` `93b1d38` |
+| Push + deploy | Antigravity (WSL) / Ibrahim | origin/main = `dac9938`; backup ok; `push.sh` rebuilt the API; `moved 0, skipped 0`; container grep `fromisoformat(value)` = 1 | `fleet_orders/11_REPORT.md` |
+| Public check | Claude | health 200; `/print/receipt` without token 401; `/students/<id>/photo` without token 401; dashboard 200; `/server/` 404; `receipt.html` has `دورية الأقساط` and `<bdi>{{date}}</bdi>` | curl 2026-10-15 00:40 |
+
+### Open items
+- Ibrahim reprints two receipts (installment + fully paid): date `YYYY-MM-DD`, one A5 landscape page each. The payload itself is behind auth, so this is the only end-to-end check left.
+- Receipt nits from §12 still open: plan-scoped `remaining_balance` vs student-wide balance; `على 1 دفعات` singular wording (payload only).
+- Test flake: `test_registration_installments` fails 00:00-03:00 Riyadh in a UTC test DB. Fix options: test uses DB `CURRENT_DATE`, or the gate always sets `PGTZ`.
+- Repos: root `[ahead 1]` (this note); Brain `[ahead 5]`. Push is Ibrahim's call.
+
+### Next choices
+- **(a)** Fix the two receipt nits (§12) with TDD, one more `push.sh`.
+- **(b)** Implement the context-budget hook (§9 (d)).
+- **(c)** Photo phase 2 on Android: display student photos via `/api/v1/students/<id>/photo` (good agy fleet order).
