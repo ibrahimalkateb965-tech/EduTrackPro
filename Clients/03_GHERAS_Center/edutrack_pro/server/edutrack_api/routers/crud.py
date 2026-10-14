@@ -304,11 +304,18 @@ def _create_hook(conn, repo, table: str, data: dict, actor: dict) -> tuple[dict,
         row = transfer_between_accounts(conn, data, actor.get("branch_id"))
         return row, details
     if table == "students":
-        init_amount = data.get("initial_payment_amount") or data.get("registration_fee")
-        if init_amount:
-            perms = actor.get("permissions") or {}
-            if actor.get("role") != "manager" and not perms.get("finance", False):
-                raise ApiError(403, "forbidden", "ليس لديك صلاحية تسجيل العمليات المالية")
+        init_amount = data.get("initial_payment_amount")
+        if init_amount is None:
+            init_amount = data.get("registration_fee")
+        if init_amount is not None:
+            try:
+                amt_val = float(init_amount)
+            except (ValueError, TypeError):
+                amt_val = 0.0
+            if amt_val > 0:
+                perms = actor.get("permissions") or {}
+                if actor.get("role") != "manager" and not perms.get("finance", False):
+                    raise ApiError(403, "forbidden", "ليس لديك صلاحية تسجيل العمليات المالية")
     elif table == "teacher_evaluations":
         if "staff_id" in data:
             data["teacher_id"] = data.pop("staff_id")
@@ -375,8 +382,10 @@ def _create_hook(conn, repo, table: str, data: dict, actor: dict) -> tuple[dict,
                 (branch_id, row["id"], gid),
             )
         # Automatic initial down-payment / registration fee processing
-        init_amount = data.get("initial_payment_amount") or data.get("registration_fee")
-        if init_amount:
+        init_amount = data.get("initial_payment_amount")
+        if init_amount is None:
+            init_amount = data.get("registration_fee")
+        if init_amount is not None:
             try:
                 amt_val = float(init_amount)
             except (ValueError, TypeError):
@@ -522,6 +531,8 @@ def _register(path: str, table: str) -> None:
         _allowed(user, table, True)
         if table == "users" and record_id == user["id"]:
             raise ApiError(400, "bad_request", "لا يمكن للمستخدم حذف حسابه الحالي")
+        if table == "staff" and user.get("staff_id") and record_id == user["staff_id"]:
+            raise ApiError(400, "bad_request", "لا يمكن للمستخدم حذف حسابه الوظيفي الحالي")
         if table == "evaluations" and user.get("role") == "supervisor":
             perms = user.get("permissions", {})
             existing = _repo(request, conn, table).get(record_id)
@@ -534,6 +545,12 @@ def _register(path: str, table: str) -> None:
         try:
             if not _repo(request, conn, table).soft_delete(record_id):
                 raise ApiError(404, "not_found", "السجل غير موجود")
+            if table == "staff":
+                conn.execute(
+                    "UPDATE users SET deleted_at = now(), is_active = false "
+                    "WHERE staff_id = %s AND deleted_at IS NULL",
+                    (record_id,)
+                )
             write_audit(conn, user["id"], "delete", table, record_id, {})
         except psycopg.Error as exc:
             raise map_db_error(exc) from exc

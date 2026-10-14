@@ -22,7 +22,12 @@
 
   <main class="doc-body">
     <div class="card-row">
+      {{#photo_url}}
+      <div class="photo-box" style="padding:0; overflow:hidden;"><img src="{{photo_url}}" alt="صورة الطالب" style="width:100%; height:100%; object-fit:cover;"></div>
+      {{/photo_url}}
+      {{^photo_url}}
       <div class="photo-box">صورة الطالب</div>
+      {{/photo_url}}
       <table>
         <tbody>
           <tr>

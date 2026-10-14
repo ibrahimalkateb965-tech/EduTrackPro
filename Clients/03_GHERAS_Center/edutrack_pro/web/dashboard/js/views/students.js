@@ -1,7 +1,117 @@
 import { el, toast, modal, createDatePicker } from '../ui.js';
 import { openCreateStudentModal, openCreateGuardianModal } from '../account_modals.js';
 
-const GROUPS = ['الصباح', 'المساء', 'الإنجليزي', 'القدرات'];
+const DEFAULT_GROUPS = ['الصباح', 'المساء', 'الإنجليزي', 'القدرات'];
+
+export function getCustomGroups() {
+  try {
+    const raw = localStorage.getItem('gheras_custom_groups');
+    return raw ? JSON.parse(raw) : [];
+  } catch (err) {
+    return [];
+  }
+}
+
+export function saveCustomGroup(name) {
+  const clean = String(name || '').trim();
+  if (!clean) return null;
+  const current = getCustomGroups();
+  if (!DEFAULT_GROUPS.includes(clean) && !current.includes(clean)) {
+    current.push(clean);
+    localStorage.setItem('gheras_custom_groups', JSON.stringify(current));
+  }
+  return clean;
+}
+
+export function getAllGroups() {
+  const fromStudents = (students || []).map(s => s.group_name).filter(Boolean);
+  return Array.from(new Set([...DEFAULT_GROUPS, ...getCustomGroups(), ...fromStudents]));
+}
+
+export function openAddGroupModal(api, onAdded) {
+  const nameInput = el('input', { type: 'text', placeholder: 'مثال: مسار الموهوبين، حفظ المتون...', required: 'required', style: 'width:100%; padding:8px; border-radius:8px; border:1px solid #cbd5e1;' });
+  const saveBtn = el('button', { class: 'button', type: 'submit' }, 'إضافة المجموعة');
+  const cancelBtn = el('button', { class: 'button button-outline', type: 'button' }, 'إلغاء');
+  const modalForm = el('form', { class: 'form-grid' },
+    el('label', { style: 'grid-column: 1 / -1;' },
+      el('span', { style: 'font-weight:600; display:block; margin-bottom:6px;' }, 'اسم المجموعة الدراسية الجديدة *'),
+      nameInput
+    ),
+    el('div', { class: 'form-actions', style: 'grid-column: 1 / -1; display:flex; gap:8px; margin-top:10px;' }, saveBtn, cancelBtn)
+  );
+
+  const dialog = modal('إضافة مجموعة دراسية جديدة', modalForm);
+  cancelBtn.onclick = dialog.close;
+
+  modalForm.onsubmit = ev => {
+    ev.preventDefault();
+    const clean = nameInput.value.trim();
+    if (!clean) {
+      toast('يرجى إدخال اسم المجموعة', true);
+      return;
+    }
+    saveCustomGroup(clean);
+    toast(`تمت إضافة المجموعة الدراسية "${clean}" بنجاح`);
+    dialog.close();
+    updateTabs(api);
+    if (typeof onAdded === 'function') onAdded(clean);
+  };
+}
+
+export function openDeleteStudentModal(api, student, onDeleted) {
+  const confirmBtn = el('button', {
+    class: 'button',
+    type: 'submit',
+    style: 'background: #dc2626; border-color: #b91c1c; color: #fff; font-weight: 700; padding: 8px 18px;'
+  }, '🗑️ تأكيد الحذف');
+  const cancelBtn = el('button', {
+    class: 'button button-outline',
+    type: 'button',
+    style: 'padding: 8px 16px;'
+  }, 'إلغاء');
+
+  const warningContent = el('div', { style: 'display: flex; flex-direction: column; gap: 12px; min-width: 320px;' },
+    el('div', { style: 'display: flex; align-items: center; gap: 10px;' },
+      el('span', { style: 'font-size: 32px;' }, '⚠️'),
+      el('div', {},
+        el('div', { style: 'font-weight: 700; font-size: 16px; color: #1e293b;' }, `حذف الطالب: ${student.name || '—'}`),
+        el('div', { style: 'font-size: 13px; color: #64748b; margin-top: 2px;' }, student.group_name ? `المجموعة: ${student.group_name}` : '')
+      )
+    ),
+    el('p', { style: 'margin: 0; font-size: 14px; line-height: 1.6; color: #334155; background: #fef2f2; border: 1px solid #fee2e2; border-radius: 8px; padding: 12px 14px;' },
+      `هل أنت متأكد من رغبتك في حذف الطالب "${student.name || ''}" نهائياً من النظام؟ سيتم حذف بياناته وسجلاته وأرشفتها.`
+    ),
+    el('div', { class: 'form-actions', style: 'display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px;' },
+      cancelBtn,
+      confirmBtn
+    )
+  );
+
+  const modalForm = el('form', {}, warningContent);
+  const { close } = modal('تأكيد حذف الطالب', modalForm);
+  cancelBtn.onclick = () => close();
+
+  modalForm.onsubmit = async ev => {
+    ev.preventDefault();
+    confirmBtn.disabled = true;
+    confirmBtn.textContent = 'جاري الحذف...';
+    try {
+      await api.del(`students/${student.id}`);
+      toast('تم حذف الطالب بنجاح');
+      close();
+      if (typeof onDeleted === 'function') {
+        onDeleted();
+      } else {
+        await reload(api);
+      }
+    } catch (err) {
+      toast(err.message || 'تعذر حذف الطالب', true);
+      confirmBtn.disabled = false;
+      confirmBtn.textContent = '🗑️ تأكيد الحذف';
+    }
+  };
+}
+
 const GUARDIAN_RELATIONS = ['الأب', 'الأم', 'ولي الأمر', 'شخص آخر'];
 const STATUS_LABELS = { active: 'نشط', dismissed: 'منسحب', archived: 'مؤرشف' };
 const YES_NO = [['false', 'لا'], ['true', 'نعم']];
@@ -168,6 +278,14 @@ function studentRow(student, api) {
   }, '⭐ سلوكي');
   behaviorBtn.addEventListener('click', () => openBehaviorLogModal(api, student));
 
+  const deleteBtn = el('button', {
+    class: 'button button-outline',
+    type: 'button',
+    style: 'color:#dc2626; border-color:#fca5a5; background:#fef2f2; padding:5px 8px; font-size:12px; margin-right:4px;',
+    title: 'حذف هذا الطالب نهائياً من النظام'
+  }, '🗑️ حذف');
+  deleteBtn.addEventListener('click', () => openDeleteStudentModal(api, student));
+
   return el('tr', {},
     nameCol,
     el('td', {}, student.group_name || '—'),
@@ -175,7 +293,7 @@ function studentRow(student, api) {
     el('td', {}, roomLabel(student)),
     guardianCol,
     el('td', {}, statusBadge(student)),
-    el('td', {}, edit, ' ', printCard, ' ', commBtn, ' ', behaviorBtn)
+    el('td', {}, edit, ' ', printCard, ' ', commBtn, ' ', behaviorBtn, ' ', deleteBtn)
   );
 }
 
@@ -265,17 +383,30 @@ async function openBehaviorLogModal(api, student) {
   };
 }
 
-const TABS = [
-  ['all', 'كل الطلاب'],
-  ['morning', 'الصباح'],
-  ['evening', 'المساء'],
-  ['english_all', 'الإنجليزي (الكل)'],
-  ['english_boys', 'الإنجليزي (أولاد)'],
-  ['english_girls', 'الإنجليزي (بنات)'],
-  ['qudrat', 'القدرات']
-];
+function getTabs() {
+  const baseTabs = [
+    ['all', 'كل الطلاب'],
+    ['morning', 'الصباح'],
+    ['evening', 'المساء'],
+    ['english_all', 'الإنجليزي (الكل)'],
+    ['english_boys', 'الإنجليزي (أولاد)'],
+    ['english_girls', 'الإنجليزي (بنات)'],
+    ['qudrat', 'القدرات']
+  ];
+  const allGroups = getAllGroups();
+  allGroups.forEach(g => {
+    if (!DEFAULT_GROUPS.includes(g)) {
+      baseTabs.push([`group_${g}`, g]);
+    }
+  });
+  return baseTabs;
+}
 
 function countForTab(tabId) {
+  if (tabId.startsWith('group_')) {
+    const targetGroup = tabId.slice('group_'.length);
+    return students.filter(student => student.group_name === targetGroup).length;
+  }
   return students.filter(student => {
     if (tabId === 'morning') return student.group_name === 'الصباح';
     if (tabId === 'evening') return student.group_name === 'المساء';
@@ -289,28 +420,40 @@ function countForTab(tabId) {
 
 function updateTabs(api) {
   if (!tabsContainer) return;
-  tabsContainer.replaceChildren(
-    ...TABS.map(([id, label]) => {
-      const count = countForTab(id);
-      const btn = el('button', {
-        class: activeTab === id ? 'button' : 'button button-outline',
-        type: 'button',
-        style: 'display:inline-flex; align-items:center; gap:6px;'
-      }, 
-        el('span', {}, label),
-        el('span', { 
-          class: 'badge',
-          style: activeTab === id ? 'background:rgba(255,255,255,0.25); color:inherit; padding:2px 6px; font-size:11px;' : 'padding:2px 6px; font-size:11px;' 
-        }, String(count))
-      );
-      btn.onclick = () => {
-        activeTab = id;
-        updateTabs(api);
-        paint(api);
-      };
-      return btn;
-    })
-  );
+  const activeTabsList = getTabs();
+  const tabButtons = activeTabsList.map(([id, label]) => {
+    const count = countForTab(id);
+    const btn = el('button', {
+      class: activeTab === id ? 'button' : 'button button-outline',
+      type: 'button',
+      style: 'display:inline-flex; align-items:center; gap:6px;'
+    }, 
+      el('span', {}, label),
+      el('span', { 
+        class: 'badge',
+        style: activeTab === id ? 'background:rgba(255,255,255,0.25); color:inherit; padding:2px 6px; font-size:11px;' : 'padding:2px 6px; font-size:11px;' 
+      }, String(count))
+    );
+    btn.onclick = () => {
+      activeTab = id;
+      updateTabs(api);
+      paint(api);
+    };
+    return btn;
+  });
+
+  const addGroupTabBtn = el('button', {
+    class: 'button button-outline',
+    type: 'button',
+    style: 'border-color: #0284c7; color: #0284c7; background: #f0f9ff; display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; font-size: 13px; border-style: dashed;',
+    title: 'إضافة مجموعة دراسية جديدة عند الرغبة'
+  }, '📚 + مجموعة دراسية');
+  addGroupTabBtn.onclick = () => openAddGroupModal(api, () => {
+    updateTabs(api);
+    paint(api);
+  });
+
+  tabsContainer.replaceChildren(...tabButtons, addGroupTabBtn);
 }
 
 function paint(api) {
@@ -322,6 +465,10 @@ function paint(api) {
       if (!matchesQuery) return false;
     }
     // 2. Tab filter
+    if (activeTab.startsWith('group_')) {
+      const targetGroup = activeTab.slice('group_'.length);
+      return student.group_name === targetGroup;
+    }
     if (activeTab === 'morning') return student.group_name === 'الصباح';
     if (activeTab === 'evening') return student.group_name === 'المساء';
     if (activeTab === 'qudrat') return student.group_name === 'القدرات';
@@ -362,7 +509,6 @@ function openStudentForm(api, student) {
   const value = key => (student && student[key] !== undefined && student[key] !== null) ? String(student[key]) : '';
   const boolValue = key => String(student ? student[key] === true : false);
   const roomOptions = [['', 'بدون فصل']].concat(rooms.map(room => [room.id, room.name]));
-  const groupOptions = [['', 'اختر المجموعة']].concat(GROUPS.map(group => [group, group]));
   const relationOptions = GUARDIAN_RELATIONS.map(relation => [relation, relation]);
 
   let defaultGroup = '';
@@ -384,6 +530,138 @@ function openStudentForm(api, student) {
     defaultGroup = 'القدرات';
   }
 
+  const allGroups = getAllGroups();
+  let groupSelect = select('group_name', [['', 'اختر المجموعة']].concat(allGroups.map(g => [g, g])), value('group_name') || defaultGroup);
+
+  const addGroupInlineBtn = el('button', {
+    type: 'button',
+    class: 'button button-outline',
+    style: 'padding: 2px 8px; font-size: 11px; margin-right: 6px; color: #0284c7; border-color: #bae6fd; font-weight:600;',
+    title: 'إضافة مجموعة دراسية جديدة'
+  }, '+ مجموعة جديدة');
+
+  addGroupInlineBtn.onclick = () => {
+    openAddGroupModal(api, newName => {
+      const updated = getAllGroups();
+      groupSelect.replaceChildren(
+        el('option', { value: '' }, 'اختر المجموعة'),
+        ...updated.map(g => el('option', { value: g }, g))
+      );
+      groupSelect.value = newName;
+    });
+  };
+
+  const groupField = el('label', {},
+    el('div', { style: 'display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;' },
+      el('span', { style: 'font-weight:600;' }, 'المجموعة الدراسية *'),
+      addGroupInlineBtn
+    ),
+    groupSelect
+  );
+
+  // --- 📷 إدراج صورة الطالب من جهاز المستخدم (كمبيوتر / لابتوب) ---
+  const currentPhoto = value('photo_url');
+  const photoInput = el('input', { name: 'photo_url', type: 'hidden', value: currentPhoto });
+  const fileInput = el('input', { type: 'file', accept: 'image/png, image/jpeg, image/webp, image/gif', style: 'display:none;' });
+
+  const previewImg = el('img', {
+    src: currentPhoto || '',
+    alt: 'صورة الطالب',
+    style: `width:60px; height:60px; border-radius:10px; object-fit:cover; border:2px solid #0284c7; box-shadow:0 2px 6px rgba(0,0,0,0.08); ${currentPhoto ? 'display:block;' : 'display:none;'}`
+  });
+
+  const previewPlaceholder = el('div', {
+    style: `width:60px; height:60px; border-radius:10px; background:#f1f5f9; border:2px dashed #cbd5e1; display:${currentPhoto ? 'none' : 'flex'}; align-items:center; justify-content:center; font-size:26px; color:#94a3b8;`
+  }, '📷');
+
+  const uploadBtn = el('button', {
+    type: 'button',
+    class: 'button button-outline',
+    style: 'display:inline-flex; align-items:center; gap:6px; padding:7px 12px; font-size:12px; font-weight:600; color:#0284c7; border-color:#38bdf8; background:#f0f9ff;'
+  }, '📁 إدراج صورة من الجهاز (كمبيوتر / لابتوب)');
+
+  const clearPhotoBtn = el('button', {
+    type: 'button',
+    class: 'button button-outline',
+    style: `padding:4px 8px; font-size:11px; color:#ef4444; border-color:#fecaca; background:#fff; ${currentPhoto ? 'display:inline-block;' : 'display:none;'}`
+  }, 'حذف الصورة');
+
+  uploadBtn.onclick = () => fileInput.click();
+
+  clearPhotoBtn.onclick = () => {
+    photoInput.value = '';
+    previewImg.src = '';
+    previewImg.style.display = 'none';
+    previewPlaceholder.style.display = 'flex';
+    clearPhotoBtn.style.display = 'none';
+    fileInput.value = '';
+    toast('تم حذف صورة الطالب');
+  };
+
+  fileInput.onchange = () => {
+    const file = fileInput.files && fileInput.files[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast('يرجى اختيار ملف صورة صالح (JPEG, PNG, WebP)', true);
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const img = new Image();
+      img.onload = () => {
+        const maxDim = 600;
+        let w = img.width;
+        let h = img.height;
+        if (w > maxDim || h > maxDim) {
+          if (w > h) {
+            h = Math.round((h * maxDim) / w);
+            w = maxDim;
+          } else {
+            w = Math.round((w * maxDim) / h);
+            h = maxDim;
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+
+        photoInput.value = dataUrl;
+        previewImg.src = dataUrl;
+        previewImg.style.display = 'block';
+        previewPlaceholder.style.display = 'none';
+        clearPhotoBtn.style.display = 'inline-block';
+        toast(`تم إدراج صورة الطالب بنجاح: ${file.name}`);
+      };
+      img.onerror = () => {
+        toast('تعذر معالجة ملف الصورة', true);
+      };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const photoPickerField = el('div', { style: 'grid-column: 1 / -1; background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:12px; margin-top:4px;' },
+    el('label', { style: 'display:block; font-weight:600; font-size:13px; margin-bottom:8px; color:#334155;' }, '📷 صورة الطالب الشخصية (من الكمبيوتر أو اللابتوب)'),
+    el('div', { style: 'display:flex; align-items:center; gap:14px; flex-wrap:wrap;' },
+      previewPlaceholder,
+      previewImg,
+      el('div', { style: 'display:flex; flex-direction:column; gap:6px;' },
+        el('div', { style: 'display:flex; gap:8px; align-items:center; flex-wrap:wrap;' },
+          uploadBtn,
+          clearPhotoBtn
+        ),
+        el('span', { class: 'muted', style: 'font-size:11px;' }, 'يدعم ملفات JPG, PNG, WebP بحجم خفيف وجودة عالية تُحفظ وتُطبع في البطاقة')
+      )
+    ),
+    fileInput,
+    photoInput
+  );
+
   const fields = [
     // --- 1. البيانات الأساسية والأكاديمية ---
     el('div', { class: 'form-section-title', style: 'grid-column: 1 / -1; font-weight: bold; margin: 4px 0 6px; padding-bottom: 4px; border-bottom: 1.5px solid var(--border, #e2e8f0); color: var(--primary, #0284c7); display: flex; align-items: center; gap: 6px;' }, '👤 البيانات الأساسية والأكاديمية'),
@@ -395,7 +673,7 @@ function openStudentForm(api, student) {
       select('gender', [['بنين', '👦 بنين (أولاد)'], ['بنات', '👧 بنات']], value('gender') || (editing ? (isGirl(student || {}) ? 'بنات' : 'بنين') : defaultGender))
     ),
 
-    el('label', {}, el('span', { style: 'font-weight:600;' }, 'المجموعة الدراسية *'), select('group_name', groupOptions, value('group_name') || defaultGroup)),
+    groupField,
     el('label', {}, el('span', {}, 'الفصل / القاعة'), select('room_id', roomOptions, value('room_id'))),
     el('label', {}, el('span', {}, 'رقم الهوية الوطنية / الإقامة'), el('input', { name: 'national_id', type: 'text', value: value('national_id') })),
     createDatePicker({
@@ -407,7 +685,7 @@ function openStudentForm(api, student) {
       showAge: true
     }),
     el('label', {}, el('span', {}, 'الجنسية'), el('input', { name: 'nationality', type: 'text', value: value('nationality') || 'سعودي' })),
-    el('label', {}, el('span', {}, 'رابط / صورة الطالب الشخصية 📷'), el('input', { name: 'photo_url', type: 'text', placeholder: 'رابط الصورة أو مسار المعاينة', value: value('photo_url') })),
+    photoPickerField,
 
     // --- 2. بيانات ولي الأمر والتواصل ---
     el('div', { class: 'form-section-title', style: 'grid-column: 1 / -1; font-weight: bold; margin: 12px 0 6px; padding-bottom: 4px; border-bottom: 1.5px solid var(--border, #e2e8f0); color: var(--primary, #0284c7); display: flex; align-items: center; gap: 6px;' }, '📞 بيانات ولي الأمر والتواصل'),
@@ -444,10 +722,31 @@ function openStudentForm(api, student) {
 
   const submit = el('button', { class: 'button', type: 'button', style: 'padding: 10px 24px; font-weight: 700;' }, editing ? 'حفظ التعديلات' : 'إضافة طالب');
   const cancel = el('button', { class: 'button button-outline', type: 'button' }, 'إلغاء');
-  const actionsBar = el('div', { class: 'form-actions', style: 'grid-column: 1 / -1; display: flex; gap: 10px; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border, #e2e8f0);' }, submit, cancel);
+
+  const deleteStudentBtn = editing ? el('button', {
+    class: 'button button-outline',
+    type: 'button',
+    style: 'color: #dc2626; border-color: #fca5a5; background: #fef2f2; margin-inline-start: auto; padding: 10px 16px; font-weight: 600;',
+    title: 'حذف هذا الطالب نهائياً من النظام'
+  }, '🗑️ حذف الطالب') : null;
+
+  const actionsBar = el('div', { class: 'form-actions', style: 'grid-column: 1 / -1; display: flex; gap: 10px; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border, #e2e8f0); align-items: center;' },
+    submit,
+    cancel,
+    ...(deleteStudentBtn ? [deleteStudentBtn] : [])
+  );
   const form = el('form', { class: 'form-grid', novalidate: 'novalidate' }, ...fields, actionsBar);
   const dialog = modal(editing ? 'تعديل بيانات الطالب' : 'إضافة طالب جديد', form);
   cancel.addEventListener('click', dialog.close);
+
+  if (deleteStudentBtn) {
+    deleteStudentBtn.addEventListener('click', () => {
+      openDeleteStudentModal(api, student, () => {
+        dialog.close();
+        reload(api);
+      });
+    });
+  }
 
   const saveStudent = async () => {
     const rawData = new FormData(form);
@@ -484,14 +783,27 @@ function openStudentForm(api, student) {
     submit.textContent = 'جاري الحفظ...';
 
     try {
+      let createdStudent = null;
       if (editing) {
         await api.patch(`students/${student.id}`, payload);
       } else {
-        await api.post('students', payload);
+        createdStudent = await api.post('students', payload);
       }
       dialog.close();
       toast(editing ? 'تم تحديث بيانات الطالب بنجاح' : 'تمت إضافة الطالب بنجاح');
       await reload(api);
+
+      // Automated redirect to Receipt Print Page if an initial payment was recorded
+      if (!editing && createdStudent) {
+        const paymentId = createdStudent.initial_payment?.id || createdStudent.initial_receipt?.payment_id;
+        const initialAmount = parseFloat(payload.initial_payment_amount || payload.registration_fee || '0');
+        if (paymentId && initialAmount > 0) {
+          toast('تم تسجيل الطالب وسند القبض، جاري التحويل لطباعة السند...');
+          setTimeout(() => {
+            window.location.href = `../print/templates/receipt.html?payment=${encodeURIComponent(paymentId)}`;
+          }, 600);
+        }
+      }
     } catch (error) {
       console.error('Save student failed:', error);
       toast(error.message || 'تعذر حفظ بيانات الطالب', true);

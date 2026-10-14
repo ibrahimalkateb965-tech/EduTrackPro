@@ -138,7 +138,15 @@ function injectToolbar(docTitle) {
     </svg>
     إغلاق
   `;
-  closeBtn.addEventListener('click', () => window.close());
+  closeBtn.addEventListener('click', () => {
+    if (window.opener) {
+      window.close();
+    } else if (window.history.length > 1) {
+      window.history.back();
+    } else {
+      window.location.href = '../../dashboard/';
+    }
+  });
 
   actions.append(printBtn, closeBtn);
   toolbar.append(info, actions);

@@ -23,4 +23,4 @@ REMOTE_ENV=""
 if [[ -n "${EDUTRACK_ADMIN_PASSWORD:-}" ]]; then
   REMOTE_ENV="EDUTRACK_ADMIN_PASSWORD=$(printf '%q' "$EDUTRACK_ADMIN_PASSWORD") "
 fi
-"${SSH[@]}" -t "$TARGET" "cd $REMOTE_DIR && ${REMOTE_ENV}bash deploy/deploy.sh $HOST"
+"${SSH[@]}" "$TARGET" "cd $REMOTE_DIR && ${REMOTE_ENV}bash deploy/deploy.sh $HOST"

@@ -1,6 +1,17 @@
 import { el, toast, modal } from '../ui.js';
 
-const GROUP_OPTIONS = [['الصباح', 'الصباح'], ['المساء', 'المساء'], ['الإنجليزي', 'الإنجليزي'], ['القدرات', 'القدرات']];
+const DEFAULT_GROUP_OPTIONS = [['الصباح', 'الصباح'], ['المساء', 'المساء'], ['الإنجليزي', 'الإنجليزي'], ['القدرات', 'القدرات']];
+
+function getRoomGroupOptions() {
+  try {
+    const raw = localStorage.getItem('gheras_custom_groups');
+    const custom = raw ? JSON.parse(raw) : [];
+    const customOptions = custom.map(g => [g, g]);
+    return [...DEFAULT_GROUP_OPTIONS, ...customOptions];
+  } catch (e) {
+    return DEFAULT_GROUP_OPTIONS;
+  }
+}
 const WORKING_DAYS = ['السبت', 'الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'];
 const SUBJECT_OPTIONS = [['', 'اختر المادة'], ['القرآن', 'القرآن'], ['لغتي', 'لغتي'], ['الإنجليزي', 'الإنجليزي'], ['الرياضيات', 'الرياضيات']];
 const DAY_ORDER = new Map([
@@ -589,7 +600,8 @@ async function reload() {
 function openRoomForm(room = null) {
   const editing = Boolean(room);
   const nameInput = el('input', { name: 'name', type: 'text', required: 'required', value: room?.name ?? '' });
-  const groupSelect = select('group_name', GROUP_OPTIONS, room?.group_name || GROUP_OPTIONS[0][0], true);
+  const roomGroupOptions = getRoomGroupOptions();
+  const groupSelect = select('group_name', roomGroupOptions, room?.group_name || roomGroupOptions[0][0], true);
   const submit = el('button', { class: 'button', type: 'submit' }, editing ? 'حفظ التعديل' : 'إضافة');
   const cancel = el('button', { class: 'button button-outline', type: 'button' }, 'إلغاء');
   const form = el('form', { class: 'form-grid' },
