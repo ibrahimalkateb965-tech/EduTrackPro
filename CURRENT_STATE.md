@@ -4,7 +4,7 @@
 > **Master Orchestrator**: `Claude Code CLI` (Opus Max / Sonnet 5)  
 > **Handoff Source**: `Antigravity IDE` (Interactive Cockpit & Visual Inspector)  
 > **Timestamp**: 2026-09-16T12:55:00+03:00  
-> **Last updated:** 2026-10-14 22:27 (+03:00) — Claude Code CLI: Antigravity CLI 4-worker fleet DONE, all 4 accounts isolated and verified in parallel (§10). Previous update 21:26, session "context-budget hook design": global context-budget hook spec APPROVED (Brain `fb50405` + `1853b91`), not implemented. See §9. Previous update 21:12: EduTrack student photo DEPLOYED (`47cd020`); Antigravity CLI fleet awaiting Worker 1 login (§8).
+> **Last updated:** 2026-10-14 23:15 (+03:00) — Claude Code CLI: fleet order 08 (student photo private storage) [APPROVED] `e7cf93d`, not deployed (§11). 22:27: Antigravity CLI 4-worker fleet DONE (§10). Previous update 21:26, session "context-budget hook design": global context-budget hook spec APPROVED (Brain `fb50405` + `1853b91`), not implemented. See §9. Previous update 21:12: EduTrack student photo DEPLOYED (`47cd020`); Antigravity CLI fleet awaiting Worker 1 login (§8).
 > **VCS:** git at workspace root, branch `main`.
 
 ---
@@ -520,7 +520,7 @@ Pre-flight: Ibrahim confirmed `7eeeada` (pagination follow-up, choice (b) of §6
 
 ## 6. THE ONE THING TO DO NEXT (updated 2026-10-14 21:26)
 
-- Ibrahim picks between §8 choice (b), §9 choice (d) (implement the context-budget hook) and §10 choice (e) (first real fleet order). The agy fleet is DONE (§10).
+- Deploy fleet order 08 (student photo private storage, `e7cf93d` [APPROVED], §11): first run the read-only production count in §11, then push + WSL sync + `push.sh` (Antigravity, order-07 pattern). Other open choice: §9 (d) context-budget hook.
 - (Superseded 2026-09-21 item: Phase 5c Android commit/push/UAT. Check `git log` before acting on it.)
 
 ---
@@ -619,3 +619,24 @@ Pre-flight: Ibrahim confirmed `7eeeada` (pagination follow-up, choice (b) of §6
 
 ### Next choices
 - **(e)** First real fleet order through `agy-worker.ps1` (e.g. a bounded EduTrack task split across lanes W1 UI / W2 backend), Claude audits as usual.
+
+---
+
+## 11. Session 2026-10-14 ~22:30 → 23:15 — Fleet order 08: student photo private storage (first real agy fleet run)
+
+Plan: `edutrack_pro/docs/superpowers/plans/2026-10-14-student-photo-private-storage.md` (spec `78d42c1`, deviations listed in the plan). Orders: `edutrack_pro/fleet_orders/08_W1..W4_*.md` (quarantined).
+
+| Step | Who | Result | Evidence |
+| :--- | :--- | :--- | :--- |
+| Task 0 tests (RED) | Claude | 15 failed / 2 trivially passing; baseline 157 | `1138dad` |
+| Tasks 1-4 | W2 backend, W4 print/CRUD/migration, W3 ops, W1 web — parallel via `agy-worker.ps1` | 4/4 DONE in 3.8 min wall; 14 files exactly; 3 new files byte-identical to the plan; 0 patches | `fleet_orders/08_REPORT_W*.md` |
+| Gate | Claude | **[APPROVED]**: 174/174 (1 pre-existing Antigravity test updated to the new contract), ruff no new findings, node/bash/compose OK, local browser (9.3 MB → 600x450 78 KB file; edit keeps photo; delete → dashed box; card/report/certificate embed `data:image/jpeg`), `backup.sh` photo archive + rotation + API-down failure via docker shim, hygiene clean | `e7cf93d` |
+
+### Deploy (Ibrahim / Antigravity — not done)
+1. Read-only first, paste back: `SELECT count(*) FILTER (WHERE left(photo_url,5)='data:') AS legacy, count(*) FILTER (WHERE photo_url LIKE '/api/v1/students/%') AS migrated, count(*) FILTER (WHERE photo_url IS NOT NULL) AS any FROM students;`
+2. `git push`, sync the WSL clone, `deploy/push.sh` (API rebuild + new volume `gheras_student_photos`). `deploy.sh` prints `student photos: moved N, skipped M`; skipped ids keep their old value and print no photo — report them.
+3. Claude re-checks from the public side: `/api/v1/health` 200; `/api/v1/students/<id>/photo` without a token → 401; dashboard tag `v=3.4`.
+
+### Notes
+- `app.js` imports `./api.js` without a cache tag; production relies on Caddy `no-cache, must-revalidate` on `/web/*` (verified live). Lesson in Brain `EduTrack_Lessons_Testing`.
+- Repos: root `[ahead 3]` (`1138dad`, `c22e738`, `e7cf93d` + this note), Brain `[ahead 3]`. Push is Ibrahim's call.
