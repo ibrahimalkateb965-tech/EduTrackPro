@@ -149,7 +149,7 @@ def certificate(
     sid = student_id or student
     if cid and cid != "null":
         c = conn.execute(
-            "SELECT c.*, s.name student_name FROM certificates c JOIN students s ON s.id=c.student_id WHERE c.id=%s AND c.deleted_at IS NULL AND s.deleted_at IS NULL",
+            "SELECT c.*, s.name student_name, s.photo_url FROM certificates c JOIN students s ON s.id=c.student_id WHERE c.id=%s AND c.deleted_at IS NULL AND s.deleted_at IS NULL",
             (cid,),
         ).fetchone()
         if c:
@@ -160,12 +160,13 @@ def certificate(
                 "certificate_no": c["id"],
                 "date": _date(c["issued_on"]),
                 "student_name": c["student_name"],
+                "photo_url": c.get("photo_url") or "",
                 "reason": c["reason"] or reason,
             }, conn)
         if not sid:
             raise ApiError(404, "not_found", "الشهادة غير موجودة")
     if sid:
-        s = _one(conn, "SELECT name FROM students WHERE id = %s AND deleted_at IS NULL", (sid,), "الطالب غير موجود")
+        s = _one(conn, "SELECT name, photo_url FROM students WHERE id = %s AND deleted_at IS NULL", (sid,), "الطالب غير موجود")
         short_id = str(sid)[:8] if len(str(sid)) > 8 else str(sid)
         return _resp({
             "template": "excellence_certificate",
@@ -173,6 +174,7 @@ def certificate(
             "certificate_no": f"CERT-{short_id}",
             "date": _today().isoformat(),
             "student_name": s["name"],
+            "photo_url": s.get("photo_url") or "",
             "reason": reason or "التفوق والتميز الدراسي",
         }, conn)
     raise ApiError(400, "validation_error", "معرف الشهادة أو الطالب مطلوب")
@@ -233,6 +235,7 @@ def student_report(
         "report_no": str(sid),
         "date": _today().isoformat(),
         "student_name": s["name"],
+        "photo_url": s.get("photo_url") or "",
         "group_name": s["group_name"] or "",
         "room_name": s["room_name"] or "",
         "guardian_phone": s["guardian_phone"] or "",

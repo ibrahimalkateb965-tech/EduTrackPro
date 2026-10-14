@@ -46,7 +46,19 @@ function renderMustache(template, data) {
   // 1. Process block loops: {{#key}}...{{/key}}
   const loopRegex = /\{\{#([a-zA-Z0-9_]+)\}\}([\s\S]*?)\{\{\/\1\}\}/g;
   let rendered = template.replace(loopRegex, (match, key, inner) => {
-    const list = data[key];
+    const val = data[key];
+    // Truthy scalars (non-empty string, non-zero number, or boolean true)
+    // render the block once with the surrounding data. This covers scalar
+    // sections like {{#photo_url}} holding a string data URL. Strings, numbers
+    // and booleans are never objects, so objects are excluded by construction.
+    if (
+      (typeof val === 'string' && val !== '') ||
+      (typeof val === 'number' && val !== 0) ||
+      val === true
+    ) {
+      return renderMustache(inner, data);
+    }
+    const list = val;
     if (!Array.isArray(list) || list.length === 0) {
       return '';
     }

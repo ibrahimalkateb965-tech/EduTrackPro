@@ -24,7 +24,10 @@
 
       <main class="cert-body">
         <p class="cert-intro">تتقدم إدارة {{center_name}} بأسمى آيات الشكر والتقدير إلى الطالب/الطالبة</p>
-        <div class="cert-name">{{student_name}}</div>
+        <div style="display:flex; align-items:center; justify-content:center; gap:6mm;">
+          {{#photo_url}}<div class="photo-box" style="padding:0; overflow:hidden;"><img src="{{photo_url}}" alt="صورة الطالب" style="width:100%; height:100%; object-fit:cover;"></div>{{/photo_url}}
+          <div class="cert-name">{{student_name}}</div>
+        </div>
         <p class="cert-reason">{{reason}}</p>
         <p class="cert-closing">مع أطيب التمنيات بمزيد من التفوق والنجاح</p>
       </main>
