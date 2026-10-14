@@ -24,7 +24,15 @@ _ROLES = Depends(require_roles("manager", "supervisor"))
 
 
 def _date(value: object) -> str:
-    return value.isoformat() if hasattr(value, "isoformat") else str(value or "")
+    """Calendar day (YYYY-MM-DD) in Riyadh; row_to_json has already turned timestamptz into ISO strings."""
+    if isinstance(value, str) and value:
+        try:
+            value = datetime.fromisoformat(value)
+        except ValueError:
+            return value.split("T")[0].split(" ")[0]
+    if isinstance(value, datetime):
+        return (value.astimezone(_TZ) if value.tzinfo else value).date().isoformat()
+    return value.isoformat() if isinstance(value, date) else str(value or "")
 
 
 def _one(conn, sql: str, args: tuple, message: str):

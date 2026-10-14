@@ -5,8 +5,9 @@ Verified strictly against PostgreSQL 001_schema.sql.
 
 from __future__ import annotations
 
+import re
 import uuid
-from datetime import date
+from datetime import UTC, date, datetime
 
 
 def _seed_basic_data(db):
@@ -126,6 +127,19 @@ def test_print_receipt_by_payment_uuid(client, db, manager):
     assert body["template"] == "receipt"
     assert body["student_name"] == "عمر إبراهيم الكاتب"
     assert body["amount"] == 500
+
+
+def test_print_receipt_date_is_riyadh_calendar_day(client, db, manager):
+    data = _seed_basic_data(db)
+    # 21:47 UTC on 2026-10-14 is 00:47 on 2026-10-15 in Riyadh.
+    db.execute(
+        "UPDATE receipts SET issued_on = %s WHERE receipt_no = %s",
+        (datetime(2026, 10, 14, 21, 47, 16, 242906, tzinfo=UTC), data["receipt_no"]),
+    )
+    db.commit()
+    body = client.get(f"/api/v1/print/receipt?payment={data['payment_id']}", headers=manager).json()
+    assert re.fullmatch(r"\d{4}-\d{2}-\d{2}", body["date"]), body["date"]
+    assert body["date"] == "2026-10-15"
 
 
 def test_print_receipt_by_receipt_no(client, db, manager):
