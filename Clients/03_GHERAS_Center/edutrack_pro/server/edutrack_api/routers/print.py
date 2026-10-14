@@ -70,11 +70,22 @@ def _interval_label(days: int) -> str:
     return f"كل {days} يوم"
 
 
+def _installments_count_text(count: int) -> str:
+    if count == 1:
+        return "على دفعة واحدة"
+    if count == 2:
+        return "على دفعتين"
+    if 3 <= count <= 10:
+        return f"على {count} دفعات"
+    return f"على {count} دفعة"
+
+
 def _installment_breakdown(conn, student_id, amount, balance) -> dict:
     plan = conn.execute(
         """SELECT fp.total_amount, fp.interval_days,
                   count(*) FILTER (WHERE i.status IN ('pending', 'partial')) AS remaining_count,
                   min(i.due_date) FILTER (WHERE i.status IN ('pending', 'partial')) AS next_due_date,
+                  sum(i.amount - i.paid_amount) FILTER (WHERE i.status IN ('pending', 'partial')) AS remaining_amount,
                   (SELECT n.amount - n.paid_amount FROM installments n
                     WHERE n.fee_plan_id = fp.id AND n.deleted_at IS NULL AND n.status IN ('pending', 'partial')
                     ORDER BY n.seq_no ASC LIMIT 1) AS next_amount
@@ -85,21 +96,24 @@ def _installment_breakdown(conn, student_id, amount, balance) -> dict:
         (student_id,),
     ).fetchone()
     remaining = (plan["remaining_count"] if plan else 0) or 0
+    # Same plan as total_fee, so total, paid amount and remaining agree on the receipt.
+    plan_balance = float(plan["remaining_amount"] or 0) if plan else float(balance or 0)
     next_amount = float(plan["next_amount"] or 0) if plan and remaining else 0.0
     next_due = _date(plan["next_due_date"]) if plan and remaining else "—"
-    if not balance:
+    if not plan_balance:
         summary = "مسدد بالكامل"
     elif remaining:
         summary = (
-            f"المتبقي {_num(balance)} ر.س على {remaining} دفعات، "
+            f"المتبقي {_num(plan_balance)} ر.س {_installments_count_text(remaining)}، "
             f"قيمة الدفعة القادمة {_num(next_amount)} ر.س، تستحق بتاريخ {next_due}"
         )
     else:
-        summary = f"المتبقي {_num(balance)} ر.س"
+        summary = f"المتبقي {_num(plan_balance)} ر.س"
     return {
         "total_fee": float(plan["total_amount"]) if plan else float(amount),
+        "remaining_balance": plan_balance,
         "has_installments": remaining > 0,
-        "is_fully_paid": not balance,
+        "is_fully_paid": not plan_balance,
         "remaining_installments_count": remaining,
         "next_due_date": next_due,
         "next_installment_amount": next_amount,
@@ -150,7 +164,6 @@ def receipt(
         "method": item["method"],
         "amount": item["amount"],
         "installment_ref": item["seq_no"] or "—",
-        "remaining_balance": item["balance"] or 0,
         "amount_words": arabic_amount_words(Decimal(str(item["amount"]))),
         **_installment_breakdown(conn, item["student_id"], item["amount"], item["balance"]),
     }, conn)

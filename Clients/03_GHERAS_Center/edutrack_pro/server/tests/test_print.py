@@ -9,6 +9,10 @@ import re
 import uuid
 from datetime import UTC, date, datetime
 
+import pytest
+
+from edutrack_api.routers.print import _installments_count_text
+
 
 def _seed_basic_data(db):
     """Seed room, student, payment, schedule, fee plan adhering strictly to PostgreSQL schema constraints."""
@@ -171,8 +175,58 @@ def test_print_receipt_installment_breakdown(client, db, manager):
     assert body["next_due_date"] == "2026-10-01"
     assert body["next_installment_amount"] == 500
     assert body["interval_label"] == "شهري (كل 30 يوم)"
-    assert "على 2 دفعات" in body["installment_summary_text"]
+    assert "على دفعتين" in body["installment_summary_text"]
     assert "2026-10-01" in body["installment_summary_text"]
+
+
+def test_print_receipt_one_remaining_installment_wording(client, db, manager):
+    data = _seed_basic_data(db)
+    plan = db.execute("SELECT id FROM fee_plans WHERE student_id=%s", (data["student_id"],)).fetchone()
+    db.execute(
+        "INSERT INTO installments (fee_plan_id, seq_no, due_date, amount, paid_amount, status) VALUES (%s, %s, %s, %s, %s, %s)",
+        (plan["id"], 2, date(2026, 10, 1), 1000, 0, "pending"),
+    )
+    db.commit()
+    body = client.get(f"/api/v1/print/receipt?payment={data['payment_id']}", headers=manager).json()
+    assert body["remaining_installments_count"] == 1
+    assert "على دفعة واحدة" in body["installment_summary_text"]
+
+
+@pytest.mark.parametrize(
+    ("count", "text"),
+    [(1, "على دفعة واحدة"), (2, "على دفعتين"), (3, "على 3 دفعات"), (10, "على 10 دفعات"), (11, "على 11 دفعة")],
+)
+def test_installment_count_wording(count, text):
+    assert _installments_count_text(count) == text
+
+
+def test_print_receipt_remaining_balance_is_scoped_to_the_plan(client, db, manager):
+    data = _seed_basic_data(db)  # newest plan: 1500 total, 500 paid
+    plan = db.execute("SELECT id FROM fee_plans WHERE student_id=%s", (data["student_id"],)).fetchone()
+    for seq, due in ((2, date(2026, 10, 1)), (3, date(2026, 10, 31))):
+        db.execute(
+            "INSERT INTO installments (fee_plan_id, seq_no, due_date, amount, paid_amount, status) VALUES (%s, %s, %s, %s, %s, %s)",
+            (plan["id"], seq, due, 500, 0, "pending"),
+        )
+    # An older, unpaid plan raises the student-wide balance to 1800 but must not leak into this receipt.
+    old = db.execute(
+        "INSERT INTO fee_plans (student_id, total_amount, count, interval_days, start_date, created_at) "
+        "VALUES (%s, %s, %s, %s, %s, now() - interval '1 year') RETURNING id",
+        (data["student_id"], 800, 1, 30, date(2025, 9, 1)),
+    ).fetchone()
+    db.execute(
+        "INSERT INTO installments (fee_plan_id, seq_no, due_date, amount, paid_amount, status) VALUES (%s, %s, %s, %s, %s, %s)",
+        (old["id"], 1, date(2025, 9, 1), 800, 0, "pending"),
+    )
+    db.commit()
+    assert db.execute(
+        "SELECT balance FROM v_student_balance WHERE student_id=%s", (data["student_id"],)
+    ).fetchone()["balance"] == 1800
+    body = client.get(f"/api/v1/print/receipt?payment={data['payment_id']}", headers=manager).json()
+    assert body["total_fee"] == 1500
+    assert body["remaining_balance"] == 1000
+    assert body["is_fully_paid"] is False
+    assert "المتبقي 1000 ر.س" in body["installment_summary_text"]
 
 
 def test_print_receipt_without_remaining_installments(client, db, manager):
