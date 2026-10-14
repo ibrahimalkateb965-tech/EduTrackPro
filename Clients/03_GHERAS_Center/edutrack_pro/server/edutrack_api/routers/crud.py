@@ -543,6 +543,8 @@ def _register(path: str, table: str) -> None:
 
     def create_row(body: dict, request: Request, user: dict = Depends(require_roles("manager", "supervisor")), conn=Depends(get_conn)):
         _allowed(user, table, True)
+        if table == "students":
+            body = {k: v for k, v in body.items() if k != "photo_url"}  # written only by POST /students/{id}/photo
         if table == "evaluations" and user.get("role") == "supervisor":
             perms = user.get("permissions", {})
             eval_type = body.get("eval_type", "daily")
@@ -562,6 +564,8 @@ def _register(path: str, table: str) -> None:
 
     def update_row(record_id: UUID, body: dict, request: Request, user: dict = Depends(require_roles("manager", "supervisor")), conn=Depends(get_conn)):
         _allowed(user, table, True)
+        if table == "students":
+            body = {k: v for k, v in body.items() if k != "photo_url"}  # written only by POST /students/{id}/photo
         if table == "evaluations" and user.get("role") == "supervisor":
             perms = user.get("permissions", {})
             existing = _repo(request, conn, table).get(record_id)

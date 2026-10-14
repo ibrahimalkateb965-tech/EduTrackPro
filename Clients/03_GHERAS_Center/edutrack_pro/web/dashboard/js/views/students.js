@@ -566,19 +566,17 @@ function openStudentForm(api, student) {
     groupSelect
   );
 
-  // --- 📷 إدراج صورة الطالب من جهاز المستخدم (كمبيوتر / لابتوب) ---
-  const currentPhoto = value('photo_url');
-  const photoInput = el('input', { name: 'photo_url', type: 'hidden', value: currentPhoto });
-  const fileInput = el('input', { type: 'file', accept: 'image/png, image/jpeg, image/webp, image/gif', style: 'display:none;' });
+  // --- 📷 صورة الطالب: تُرفع إلى مخزن خاص على الخادم بعد حفظ الطالب (لا تُحفظ داخل بيانات الطالب) ---
+  const photoState = { blob: null, remove: false, objectUrl: null };
+  const fileInput = el('input', { type: 'file', accept: 'image/png, image/jpeg, image/webp', style: 'display:none;' });
 
   const previewImg = el('img', {
-    src: currentPhoto || '',
     alt: 'صورة الطالب',
-    style: `width:60px; height:60px; border-radius:10px; object-fit:cover; border:2px solid #0284c7; box-shadow:0 2px 6px rgba(0,0,0,0.08); ${currentPhoto ? 'display:block;' : 'display:none;'}`
+    style: 'width:60px; height:60px; border-radius:10px; object-fit:cover; border:2px solid #0284c7; box-shadow:0 2px 6px rgba(0,0,0,0.08); display:none;'
   });
 
   const previewPlaceholder = el('div', {
-    style: `width:60px; height:60px; border-radius:10px; background:#f1f5f9; border:2px dashed #cbd5e1; display:${currentPhoto ? 'none' : 'flex'}; align-items:center; justify-content:center; font-size:26px; color:#94a3b8;`
+    style: 'width:60px; height:60px; border-radius:10px; background:#f1f5f9; border:2px dashed #cbd5e1; display:flex; align-items:center; justify-content:center; font-size:26px; color:#94a3b8;'
   }, '📷');
 
   const uploadBtn = el('button', {
@@ -590,66 +588,66 @@ function openStudentForm(api, student) {
   const clearPhotoBtn = el('button', {
     type: 'button',
     class: 'button button-outline',
-    style: `padding:4px 8px; font-size:11px; color:#ef4444; border-color:#fecaca; background:#fff; ${currentPhoto ? 'display:inline-block;' : 'display:none;'}`
+    style: 'padding:4px 8px; font-size:11px; color:#ef4444; border-color:#fecaca; background:#fff; display:none;'
   }, 'حذف الصورة');
+
+  const showPreview = url => {
+    if (photoState.objectUrl) URL.revokeObjectURL(photoState.objectUrl);
+    photoState.objectUrl = url || null;
+    previewImg.src = url || '';
+    previewImg.style.display = url ? 'block' : 'none';
+    previewPlaceholder.style.display = url ? 'none' : 'flex';
+    clearPhotoBtn.style.display = url ? 'inline-block' : 'none';
+  };
+
+  if (editing && student.photo_url) {
+    api.fetchBlobUrl(`students/${student.id}/photo`).then(showPreview).catch(() => showPreview(null));
+  }
 
   uploadBtn.onclick = () => fileInput.click();
 
   clearPhotoBtn.onclick = () => {
-    photoInput.value = '';
-    previewImg.src = '';
-    previewImg.style.display = 'none';
-    previewPlaceholder.style.display = 'flex';
-    clearPhotoBtn.style.display = 'none';
+    photoState.blob = null;
+    photoState.remove = true;
     fileInput.value = '';
-    toast('تم حذف صورة الطالب');
+    showPreview(null);
+    toast('سيتم حذف صورة الطالب عند الحفظ');
   };
 
   fileInput.onchange = () => {
     const file = fileInput.files && fileInput.files[0];
     if (!file) return;
-
     if (!file.type.startsWith('image/')) {
       toast('يرجى اختيار ملف صورة صالح (JPEG, PNG, WebP)', true);
       return;
     }
-
-    const reader = new FileReader();
-    reader.onload = ev => {
-      const img = new Image();
-      img.onload = () => {
-        const maxDim = 600;
-        let w = img.width;
-        let h = img.height;
-        if (w > maxDim || h > maxDim) {
-          if (w > h) {
-            h = Math.round((h * maxDim) / w);
-            w = maxDim;
-          } else {
-            w = Math.round((w * maxDim) / h);
-            h = maxDim;
-          }
-        }
-        const canvas = document.createElement('canvas');
-        canvas.width = w;
-        canvas.height = h;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, w, h);
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
-
-        photoInput.value = dataUrl;
-        previewImg.src = dataUrl;
-        previewImg.style.display = 'block';
-        previewPlaceholder.style.display = 'none';
-        clearPhotoBtn.style.display = 'inline-block';
-        toast(`تم إدراج صورة الطالب بنجاح: ${file.name}`);
-      };
-      img.onerror = () => {
-        toast('تعذر معالجة ملف الصورة', true);
-      };
-      img.src = ev.target.result;
+    const sourceUrl = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(sourceUrl);
+      const maxDim = 600;
+      let w = img.width;
+      let h = img.height;
+      if (w > maxDim || h > maxDim) {
+        if (w > h) { h = Math.round((h * maxDim) / w); w = maxDim; } else { w = Math.round((w * maxDim) / h); h = maxDim; }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      canvas.toBlob(blob => {
+        if (!blob) { toast('تعذر معالجة ملف الصورة', true); return; }
+        photoState.blob = blob;
+        photoState.remove = false;
+        showPreview(URL.createObjectURL(blob));
+        toast(`تم تجهيز صورة الطالب: ${file.name}`);
+      }, 'image/jpeg', 0.85);
     };
-    reader.readAsDataURL(file);
+    img.onerror = () => {
+      URL.revokeObjectURL(sourceUrl);
+      toast('تعذر معالجة ملف الصورة', true);
+    };
+    img.src = sourceUrl;
   };
 
   const photoPickerField = el('div', { style: 'grid-column: 1 / -1; background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:12px; margin-top:4px;' },
@@ -662,11 +660,10 @@ function openStudentForm(api, student) {
           uploadBtn,
           clearPhotoBtn
         ),
-        el('span', { class: 'muted', style: 'font-size:11px;' }, 'يدعم ملفات JPG, PNG, WebP بحجم خفيف وجودة عالية تُحفظ وتُطبع في البطاقة')
+        el('span', { class: 'muted', style: 'font-size:11px;' }, 'يدعم JPG و PNG و WebP، وتُصغَّر تلقائيًا وتظهر في البطاقة والتقرير والشهادة')
       )
     ),
-    fileInput,
-    photoInput
+    fileInput
   );
 
   const feeInputAttrs = { name: 'registration_fee', type: 'number', step: '0.01', min: '0', placeholder: 'مثال: 500', value: value('registration_fee') };
@@ -776,6 +773,7 @@ function openStudentForm(api, student) {
   const form = el('form', { class: 'form-grid', novalidate: 'novalidate' }, ...fields, actionsBar);
   const dialog = modal(editing ? 'تعديل بيانات الطالب' : 'إضافة طالب جديد', form);
   cancel.addEventListener('click', dialog.close);
+  cancel.addEventListener('click', () => { if (photoState.objectUrl) URL.revokeObjectURL(photoState.objectUrl); });
 
   if (deleteStudentBtn) {
     deleteStudentBtn.addEventListener('click', () => {
@@ -880,8 +878,21 @@ function openStudentForm(api, student) {
       } else {
         createdStudent = await api.post('students', payload);
       }
+      const savedId = editing ? student.id : createdStudent?.id;
+      let photoFailed = false;
+      if (savedId && (photoState.blob || (editing && photoState.remove))) {
+        try {
+          if (photoState.blob) await api.upload(`students/${savedId}/photo`, photoState.blob);
+          else await api.del(`students/${savedId}/photo`);
+        } catch (photoError) {
+          console.error('Student photo failed:', photoError);
+          photoFailed = true;
+        }
+      }
+      if (photoState.objectUrl) URL.revokeObjectURL(photoState.objectUrl);
       dialog.close();
-      toast(editing ? 'تم تحديث بيانات الطالب بنجاح' : 'تمت إضافة الطالب بنجاح');
+      if (photoFailed) toast('تم حفظ الطالب، لكن تعذر رفع الصورة. أعد المحاولة من نافذة التعديل', true);
+      else toast(editing ? 'تم تحديث بيانات الطالب بنجاح' : 'تمت إضافة الطالب بنجاح');
       await reload(api);
 
       // Automated redirect to Receipt Print Page if an initial payment was recorded

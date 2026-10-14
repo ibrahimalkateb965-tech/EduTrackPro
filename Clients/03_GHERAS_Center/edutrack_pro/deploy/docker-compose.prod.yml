@@ -35,6 +35,7 @@ services:
     environment:
       DATABASE_URL: postgresql://gheras_app:${GHERAS_APP_PASSWORD:?set in deploy/.env}@db:5432/gheras_edutrack
       TZ: Asia/Riyadh
+      STUDENT_PHOTO_DIR: /app/student_photos
     depends_on:
       db:
         condition: service_healthy
@@ -42,6 +43,7 @@ services:
       - "127.0.0.1:8000:8000"   # loopback only; the host Caddy proxies /api/*
     volumes:
       - gheras_uploads:/app/uploads
+      - gheras_student_photos:/app/student_photos
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health', timeout=3).status == 200 else 1)"]
       interval: 10s
@@ -70,5 +72,6 @@ services:
 volumes:
   gheras_pgdata:
   gheras_uploads:
+  gheras_student_photos:
   caddy_data:
   caddy_config:

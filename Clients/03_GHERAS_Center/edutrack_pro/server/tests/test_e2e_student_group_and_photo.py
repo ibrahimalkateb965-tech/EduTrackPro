@@ -12,12 +12,14 @@ Strictly adheres to Rule 50 (0-9 Western Arabic numerals) and clean architecture
 
 from __future__ import annotations
 
+import base64
 import re
 from pathlib import Path
 
 
-def test_e2e_student_with_custom_group_and_photo(client, db, manager):
-    """End-to-End: Register student with custom study group and local device photo URL."""
+def test_e2e_student_with_custom_group_and_photo(client, db, manager, tmp_path, monkeypatch):
+    """End-to-End: Register student with custom study group, then upload the device photo to the private store."""
+    monkeypatch.setenv("STUDENT_PHOTO_DIR", str(tmp_path / "student_photos"))
     # Ensure database check constraints on group_name are relaxed for dynamic groups
     db.execute("ALTER TABLE students DROP CONSTRAINT IF EXISTS chk_students_group_name")
     db.execute("ALTER TABLE rooms DROP CONSTRAINT IF EXISTS chk_rooms_group_name")
@@ -60,13 +62,18 @@ def test_e2e_student_with_custom_group_and_photo(client, db, manager):
     assert student_id is not None, "Missing student ID in creation response"
     assert created_data.get("name") == "سلطان خالد الدوسري"
     assert created_data.get("group_name") == custom_group
-    assert created_data.get("photo_url") == mock_base64_photo
+    assert created_data.get("photo_url") is None  # generic CRUD never stores a client-sent photo_url
 
-    # Step 3: Verify GET /api/v1/students/{id} retrieves the exact photo_url and group
+    # Step 3: Upload the photo bytes to the private store, then GET returns the server-written URL
+    photo_bytes = base64.b64decode(mock_base64_photo.split(",", 1)[1])
+    up = client.post(f"/api/v1/students/{student_id}/photo", content=photo_bytes,
+                     headers={**manager, "Content-Type": "image/jpeg"})
+    assert up.status_code == 200, f"Photo upload failed: {up.text}"
     get_res = client.get(f"/api/v1/students/{student_id}", headers=manager)
     assert get_res.status_code == 200, f"Failed to fetch created student: {get_res.text}"
     fetched = get_res.json()
-    assert fetched.get("photo_url") == mock_base64_photo
+    assert fetched.get("photo_url") == up.json()["photo_url"]
+    assert fetched.get("photo_url").startswith(f"/api/v1/students/{student_id}/photo?v=")
     assert fetched.get("group_name") == custom_group
 
     # Step 4: Verify Print Guardian Card Endpoint payload contract
@@ -78,7 +85,7 @@ def test_e2e_student_with_custom_group_and_photo(client, db, manager):
     assert card_data.get("template") == "guardian_card"
     assert card_data.get("student_name") == "سلطان خالد الدوسري"
     assert card_data.get("group_name") == custom_group
-    assert card_data.get("photo_url") == mock_base64_photo
+    assert card_data.get("photo_url") == mock_base64_photo  # embedded from the stored file, same bytes
     assert card_data.get("room_name") == "قاعة الخوارزمي للموهوبين"
 
     # Step 5: Verify Guardian Card HTML Template Placeholders Contract

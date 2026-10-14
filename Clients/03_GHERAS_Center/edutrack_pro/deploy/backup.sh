@@ -52,8 +52,21 @@ chmod 600 "$TMP"
 mv "$TMP" "$OUT"
 trap - EXIT
 
+# ---------------------------------------------------------------- student photos (private volume, not in the dump)
+PHOTOS_OUT="$BACKUP_DIR/student_photos_${STAMP}.tar.gz"
+PHOTOS_TMP="$PHOTOS_OUT.part"
+trap 'rm -f "$PHOTOS_TMP"' EXIT
+log "Archiving student photos -> $PHOTOS_OUT"
+"${COMPOSE[@]}" exec -T api tar -C /app -czf - student_photos > "$PHOTOS_TMP"
+tar -tzf "$PHOTOS_TMP" >/dev/null || die "student photo archive is not readable"
+chmod 600 "$PHOTOS_TMP"
+mv "$PHOTOS_TMP" "$PHOTOS_OUT"
+trap - EXIT
+
 # ---------------------------------------------------------------- rotation
 removed="$(find "$BACKUP_DIR" -maxdepth 1 -type f -name 'edutrack_*.dump' -mtime +"$RETENTION_DAYS" -print -delete | wc -l | tr -d ' ')"
 find "$BACKUP_DIR" -maxdepth 1 -type f -name 'edutrack_*.dump.part' -mtime +1 -delete
+find "$BACKUP_DIR" -maxdepth 1 -type f -name 'student_photos_*.tar.gz' -mtime +"$RETENTION_DAYS" -delete
+find "$BACKUP_DIR" -maxdepth 1 -type f -name 'student_photos_*.tar.gz.part' -mtime +1 -delete
 
-echo "backup ok: $OUT ($(du -h "$OUT" | cut -f1), $entries toc entries), removed $removed old dump(s)"
+echo "backup ok: $OUT ($(du -h "$OUT" | cut -f1), $entries toc entries) + $PHOTOS_OUT ($(du -h "$PHOTOS_OUT" | cut -f1)), removed $removed old dump(s)"

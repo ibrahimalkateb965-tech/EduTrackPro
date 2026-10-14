@@ -86,6 +86,11 @@ Nightly at **03:00 UTC (06:00 KSA)** `edutrack-backup.timer` runs `deploy/backup
 than 14 days. A failed dump never triggers rotation. Dumps contain student PII — treat the directory
 like `deploy/.env`.
 
+Student photos live outside the database (volume `gheras_student_photos`, `/app/student_photos` in the
+API container), so the same run also writes `student_photos_YYYYMMDD_HHMMSS.tar.gz` next to the dump
+(`0600`, checked with `tar -tzf`, same 14-day rotation). If the API container is down the photo step
+fails the run after the dump is already saved. Photos of minors: same handling as the dumps.
+
 ### Verify it is working
 
 ```bash
@@ -121,6 +126,9 @@ $C exec -T db psql -U postgres -c 'DROP DATABASE gheras_edutrack' -c 'CREATE DAT
 $C exec -T db pg_restore -U postgres -d gheras_edutrack --no-owner --exit-on-error < "$F"
 $C start api
 curl -fsS http://127.0.0.1:8000/api/v1/health; echo
+# Student photos (pick the archive from the same night as the dump):
+P=/opt/edutrack/backups/student_photos_YYYYMMDD_HHMMSS.tar.gz
+$C exec -T api tar -C /app -xzf - < "$P"
 ```
 Roles (`gheras_app`) live at cluster level and survive the drop; `deploy/.env` is untouched.
 Off-site copy (manual, developer machine): `scp -i ~/.ssh/edutrack_deploy_key root@187.55.226.225:/opt/edutrack/backups/edutrack_*.dump ./`.

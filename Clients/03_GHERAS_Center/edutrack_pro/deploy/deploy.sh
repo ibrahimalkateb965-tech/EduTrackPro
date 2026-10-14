@@ -109,6 +109,13 @@ done
 [[ "$status" == healthy ]] || { "${COMPOSE[@]}" logs --tail 50 api; die "API did not become healthy"; }
 curl -fsS http://127.0.0.1:8000/api/v1/health; echo
 
+# ---------------------------------------------------------------- student photos (private volume)
+log "Checking the student photo volume and moving legacy base64 photos out of the database"
+"${COMPOSE[@]}" exec -T api sh -c 'touch "$STUDENT_PHOTO_DIR/.write-test" && rm "$STUDENT_PHOTO_DIR/.write-test"' \
+  || die "the API cannot write to STUDENT_PHOTO_DIR (volume gheras_student_photos)"
+"${COMPOSE[@]}" exec -T api python -m edutrack_api.migrate_student_photos \
+  || die "student photo migration failed"
+
 # ---------------------------------------------------------------- backups (nightly pg_dump)
 log "Installing the nightly backup timer"
 install -d -m 700 /opt/edutrack/backups
