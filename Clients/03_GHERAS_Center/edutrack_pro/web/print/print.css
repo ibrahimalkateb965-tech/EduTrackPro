@@ -144,36 +144,67 @@ h4 {
   color: var(--g-text);
 }
 
-/* Compact A5 Header Rules to prevent text collision */
-.page-a5 .doc-header {
+/* Compact A5 Header Rules (portrait + landscape) to prevent text collision */
+.page-a5 .doc-header,
+.page-a5-landscape .doc-header {
   gap: 2mm;
   padding-bottom: 2mm;
   margin-bottom: 3mm;
 }
 
-.page-a5 .doc-logo {
+.page-a5 .doc-logo,
+.page-a5-landscape .doc-logo {
   width: 90px;
   height: 52px;
 }
 
-.page-a5 .doc-center-name {
+.page-a5 .doc-center-name,
+.page-a5-landscape .doc-center-name {
   font-size: 15pt;
   line-height: 1.2;
 }
 
-.page-a5 .doc-tagline {
+.page-a5 .doc-tagline,
+.page-a5-landscape .doc-tagline {
   font-size: 7.5pt;
 }
 
-.page-a5 .doc-title {
+.page-a5 .doc-title,
+.page-a5-landscape .doc-title {
   font-size: 12pt;
   margin-top: 1mm;
 }
 
-.page-a5 .doc-meta {
+.page-a5 .doc-meta,
+.page-a5-landscape .doc-meta {
   min-width: 28mm;
   font-size: 8pt;
   white-space: nowrap;
+}
+
+/* A5 landscape receipt: keep the installment breakdown on one page */
+.page-a5-landscape th,
+.page-a5-landscape td {
+  padding: 1.2mm 3mm;
+  line-height: 1.5;
+}
+
+.page-a5-landscape tbody th,
+.page-a5-landscape tbody td:last-child {
+  white-space: nowrap;
+}
+
+.page-a5-landscape .amount-words {
+  margin-top: 3mm;
+  padding: 1.5mm 3mm;
+}
+
+.page-a5-landscape .signatures {
+  margin-top: 4mm;
+}
+
+.page-a5-landscape .signature .sig-line {
+  height: 8mm;
 }
 
 .doc-footer {

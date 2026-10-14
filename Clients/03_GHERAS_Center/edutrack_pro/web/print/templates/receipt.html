@@ -16,7 +16,7 @@
     </div>
     <div class="doc-meta">
       <div class="meta-row"><span class="meta-label">رقم السند:</span> {{receipt_no}}</div>
-      <div class="meta-row"><span class="meta-label">التاريخ:</span> {{date}}</div>
+      <div class="meta-row"><span class="meta-label">التاريخ:</span> <bdi>{{date}}</bdi></div>
     </div>
   </header>
 
@@ -36,9 +36,32 @@
           <td>{{installment_ref}}</td>
         </tr>
         <tr>
-          <th scope="row">الرصيد المتبقي</th>
-          <td colspan="3">{{remaining_balance}} ريال</td>
+          <th scope="row">إجمالي الرسوم</th>
+          <td>{{total_fee}} ريال</td>
+          <th scope="row">المتبقي</th>
+          <td>{{remaining_balance}} ريال</td>
         </tr>
+        {{#has_installments}}
+        <tr>
+          <th scope="row">الأقساط المتبقية</th>
+          <td>{{remaining_installments_count}}</td>
+          <th scope="row">تاريخ القسط القادم</th>
+          <td><bdi>{{next_due_date}}</bdi></td>
+        </tr>
+        <tr>
+          <th scope="row">قيمة القسط القادم</th>
+          <td>{{next_installment_amount}} ريال</td>
+          <th scope="row">دورية الأقساط</th>
+          <td>{{interval_label}}</td>
+        </tr>
+        {{/has_installments}}
+        {{^has_installments}}
+        {{#is_fully_paid}}
+        <tr>
+          <td colspan="4">الرسوم مسددة بالكامل</td>
+        </tr>
+        {{/is_fully_paid}}
+        {{/has_installments}}
       </tbody>
     </table>
 

@@ -138,6 +138,38 @@ def test_print_receipt_by_receipt_no(client, db, manager):
     assert body["receipt_no"] == data["receipt_no"]
 
 
+def test_print_receipt_installment_breakdown(client, db, manager):
+    data = _seed_basic_data(db)
+    plan = db.execute("SELECT id FROM fee_plans WHERE student_id=%s", (data["student_id"],)).fetchone()
+    for seq, due in ((2, date(2026, 10, 1)), (3, date(2026, 10, 31))):
+        db.execute(
+            "INSERT INTO installments (fee_plan_id, seq_no, due_date, amount, paid_amount, status) VALUES (%s, %s, %s, %s, %s, %s)",
+            (plan["id"], seq, due, 500, 0, "pending"),
+        )
+    db.commit()
+    res = client.get(f"/api/v1/print/receipt?payment={data['payment_id']}", headers=manager)
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body["total_fee"] == 1500
+    assert body["has_installments"] is True
+    assert body["is_fully_paid"] is False
+    assert body["remaining_installments_count"] == 2
+    assert body["next_due_date"] == "2026-10-01"
+    assert body["next_installment_amount"] == 500
+    assert body["interval_label"] == "شهري (كل 30 يوم)"
+    assert "على 2 دفعات" in body["installment_summary_text"]
+    assert "2026-10-01" in body["installment_summary_text"]
+
+
+def test_print_receipt_without_remaining_installments(client, db, manager):
+    data = _seed_basic_data(db)  # single installment, already paid
+    body = client.get(f"/api/v1/print/receipt?payment={data['payment_id']}", headers=manager).json()
+    assert body["has_installments"] is False
+    assert body["remaining_installments_count"] == 0
+    assert body["next_due_date"] == "—"
+    assert body["next_installment_amount"] == 0
+
+
 def test_print_guardian_card(client, db, manager):
     data = _seed_basic_data(db)
     res = client.get(f"/api/v1/print/guardian-card?student={data['student_id']}", headers=manager)

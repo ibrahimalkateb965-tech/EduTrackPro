@@ -82,6 +82,15 @@ def test_e2e_student_registration_with_receipt_flow(client, db, manager):
     assert print_data.get("method") == "كاش"
     assert "ريال" in print_data.get("amount_words", "")
 
+    # Installment breakdown for the plan opened by the down payment (600 total, 350 paid, 1 left)
+    assert print_data["total_fee"] == 600.0
+    assert print_data["has_installments"] is True
+    assert print_data["remaining_installments_count"] == 1
+    assert print_data["next_installment_amount"] == 250.0
+    assert print_data["next_due_date"] == PLAN_TERMS["next_due_date"]
+    assert print_data["interval_label"] == "شهري (كل 30 يوم)"
+    assert re.search(r"[٠-٩]", print_data["installment_summary_text"]) is None
+
     # Step 5: Verify Template Placeholder Integrity
     # Read the receipt HTML template to guarantee all {{placeholder}} tokens are satisfied by the payload
     repo_root = Path(__file__).resolve().parents[2]
@@ -89,7 +98,7 @@ def test_e2e_student_registration_with_receipt_flow(client, db, manager):
     if template_path.exists():
         template_content = template_path.read_text(encoding="utf-8")
         # Extract all {{key}} tokens
-        mustache_keys = set(re.findall(r"\{\{([a-zA-Z0-9_]+)\}\}", template_content))
+        mustache_keys = set(re.findall(r"\{\{[#^]?([a-zA-Z0-9_]+)\}\}", template_content))
         # Remove comment / meta keys if any
         mustache_keys.discard("center_name")  # Injected from system_settings
 

@@ -50,6 +50,56 @@ def _check_perm(user: dict, perm: str, message: str) -> None:
         raise ApiError(403, "forbidden", message)
 
 
+def _num(value: object) -> str:
+    return f"{float(value):.2f}".rstrip("0").rstrip(".")
+
+
+def _interval_label(days: int) -> str:
+    if days == 30:
+        return "شهري (كل 30 يوم)"
+    if days == 7:
+        return "أسبوعي (كل 7 أيام)"
+    return f"كل {days} يوم"
+
+
+def _installment_breakdown(conn, student_id, amount, balance) -> dict:
+    plan = conn.execute(
+        """SELECT fp.total_amount, fp.interval_days,
+                  count(*) FILTER (WHERE i.status IN ('pending', 'partial')) AS remaining_count,
+                  min(i.due_date) FILTER (WHERE i.status IN ('pending', 'partial')) AS next_due_date,
+                  (SELECT n.amount - n.paid_amount FROM installments n
+                    WHERE n.fee_plan_id = fp.id AND n.deleted_at IS NULL AND n.status IN ('pending', 'partial')
+                    ORDER BY n.seq_no ASC LIMIT 1) AS next_amount
+           FROM fee_plans fp JOIN installments i ON i.fee_plan_id = fp.id
+           WHERE fp.student_id=%s AND fp.deleted_at IS NULL AND i.deleted_at IS NULL
+           GROUP BY fp.id, fp.total_amount, fp.interval_days
+           ORDER BY fp.created_at DESC LIMIT 1""",
+        (student_id,),
+    ).fetchone()
+    remaining = (plan["remaining_count"] if plan else 0) or 0
+    next_amount = float(plan["next_amount"] or 0) if plan and remaining else 0.0
+    next_due = _date(plan["next_due_date"]) if plan and remaining else "—"
+    if not balance:
+        summary = "مسدد بالكامل"
+    elif remaining:
+        summary = (
+            f"المتبقي {_num(balance)} ر.س على {remaining} دفعات، "
+            f"قيمة الدفعة القادمة {_num(next_amount)} ر.س، تستحق بتاريخ {next_due}"
+        )
+    else:
+        summary = f"المتبقي {_num(balance)} ر.س"
+    return {
+        "total_fee": float(plan["total_amount"]) if plan else float(amount),
+        "has_installments": remaining > 0,
+        "is_fully_paid": not balance,
+        "remaining_installments_count": remaining,
+        "next_due_date": next_due,
+        "next_installment_amount": next_amount,
+        "interval_label": _interval_label(plan["interval_days"]) if plan and remaining else "—",
+        "installment_summary_text": summary,
+    }
+
+
 @router.get("/print/receipt")
 @router.get("/print/receipt/{payment_id}")
 def receipt(
@@ -65,7 +115,7 @@ def receipt(
         raise ApiError(400, "validation_error", "رقم الدفعة أو السند مطلوب")
     if str(pid).isdigit():
         item = conn.execute(
-            """SELECT r.receipt_no, r.issued_on, p.amount, p.method, s.name student_name, i.seq_no,
+            """SELECT r.receipt_no, r.issued_on, p.amount, p.method, p.student_id, s.name student_name, i.seq_no,
                b.balance FROM receipts r JOIN payments p ON p.id=r.payment_id JOIN students s ON s.id=p.student_id
                LEFT JOIN installments i ON i.id=p.installment_id LEFT JOIN v_student_balance b ON b.student_id=s.id
                WHERE r.receipt_no=%s AND r.deleted_at IS NULL AND p.deleted_at IS NULL AND s.deleted_at IS NULL""",
@@ -77,7 +127,7 @@ def receipt(
     else:
         item = _one(
             conn,
-            """SELECT r.receipt_no, r.issued_on, p.amount, p.method, s.name student_name, i.seq_no,
+            """SELECT r.receipt_no, r.issued_on, p.amount, p.method, p.student_id, s.name student_name, i.seq_no,
                b.balance FROM receipts r JOIN payments p ON p.id=r.payment_id JOIN students s ON s.id=p.student_id
                LEFT JOIN installments i ON i.id=p.installment_id LEFT JOIN v_student_balance b ON b.student_id=s.id
                WHERE p.id=%s AND r.deleted_at IS NULL AND p.deleted_at IS NULL AND s.deleted_at IS NULL""",
@@ -94,6 +144,7 @@ def receipt(
         "installment_ref": item["seq_no"] or "—",
         "remaining_balance": item["balance"] or 0,
         "amount_words": arabic_amount_words(Decimal(str(item["amount"]))),
+        **_installment_breakdown(conn, item["student_id"], item["amount"], item["balance"]),
     }, conn)
 
 
