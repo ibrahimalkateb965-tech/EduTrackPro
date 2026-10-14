@@ -194,7 +194,7 @@ def test_student_enrollment_with_quick_down_payment(db, client, manager):
         json={
             "name": "يوسف محمد",
             "father_phone": "0512345678",
-            "registration_fee": 200,
+            "registration_fee": 500,
             "initial_payment_amount": 500,
             "payment_method": "مدى",
         },
