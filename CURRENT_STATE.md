@@ -4,7 +4,7 @@
 > **Master Orchestrator**: `Claude Code CLI` (Opus Max / Sonnet 5)  
 > **Handoff Source**: `Antigravity IDE` (Interactive Cockpit & Visual Inspector)  
 > **Timestamp**: 2026-09-16T12:55:00+03:00  
-> **Last updated:** 2026-10-14 21:26 (+03:00) — Claude Code CLI, session "context-budget hook design": global context-budget hook spec APPROVED (Brain `fb50405` + `1853b91`), not implemented. See §9. Previous update 21:12: EduTrack student photo DEPLOYED (`47cd020`); Antigravity CLI fleet awaiting Worker 1 login (§8).
+> **Last updated:** 2026-10-14 22:27 (+03:00) — Claude Code CLI: Antigravity CLI 4-worker fleet DONE, all 4 accounts isolated and verified in parallel (§10). Previous update 21:26, session "context-budget hook design": global context-budget hook spec APPROVED (Brain `fb50405` + `1853b91`), not implemented. See §9. Previous update 21:12: EduTrack student photo DEPLOYED (`47cd020`); Antigravity CLI fleet awaiting Worker 1 login (§8).
 > **VCS:** git at workspace root, branch `main`.
 
 ---
@@ -520,8 +520,7 @@ Pre-flight: Ibrahim confirmed `7eeeada` (pagination follow-up, choice (b) of §6
 
 ## 6. THE ONE THING TO DO NEXT (updated 2026-10-14 21:26)
 
-- Ibrahim picks between §8 choices (a)/(b)/(c) and §9 choice (d) (implement the context-budget hook).
-- Ibrahim: run `D:\FleetProfiles\Login_Agy_1.bat`, sign in Worker 1, `/quit`. Then Claude checks whether Worker 2's isolated home shows as signed in (Windows keyring sharing test) before Workers 2-4 log in. Details and choices in §8.
+- Ibrahim picks between §8 choice (b), §9 choice (d) (implement the context-budget hook) and §10 choice (e) (first real fleet order). The agy fleet is DONE (§10).
 - (Superseded 2026-09-21 item: Phase 5c Android commit/push/UAT. Check `git log` before acting on it.)
 
 ---
@@ -569,17 +568,17 @@ Pre-flight: Ibrahim confirmed `7eeeada` (pagination follow-up, choice (b) of §6
 | Fleet: Antigravity CLI | Claude | `agy.exe` 1.3.5 installed at `%LOCALAPPDATA%\agy\bin`; homes `D:\FleetProfiles\Agy_1..4`; `Login_Agy_<N>.bat`; dispatcher `D:\FleetProfiles\agy-worker.ps1`. Gemini CLI rejected (Google sign-in retired) and uninstalled | Brain `05_Fleet/Decisions.md` |
 
 ### Open items / blockers
-1. **Worker 1 login pending** (Ibrahim). Keyring-sharing test across `Agy_1..4` not yet done; fallback = run workers in WSL (agy uses file token storage there).
+1. ~~Worker 1 login pending~~ — DONE 2026-10-14 22:26, all 4 workers verified (§10).
 2. **Report layout:** student report grows ~19 mm with a photo (certificate unchanged). Cosmetic.
 3. **Photo storage:** base64 data URL inside `students.photo_url` bloats `/students` list payloads and Android sync; private-folder design stays in spec `78d42c1`.
 4. **Untested here:** the dashboard photo picker itself (Antigravity's code, pre-existing).
 5. **Repo hygiene:** Brain Phase 4 edits (`.gitignore`, `AGENTS.md`, `CLAUDE.md`) and `OBSIDIAN_BRAIN_ADOPTION_PLAN.md` committed locally 2026-10-14 (not pushed). `edutrack_pro/docs/reports/` (daily report HTML/PDF) is **kept untracked on purpose** (Ibrahim, strategic-clear). WSL clone has uncommitted `CLAUDE.md` with 4 personal emails: never commit it.
-6. `%APPDATA%\npm\agy.cmd` is a shim to the IDE and shadows the real `agy`; always call `agy.exe` by full path.
+6. `%APPDATA%\npm\agy.cmd` is a shim to the IDE; it only wins in shells with a stale PATH (§10). Fleet scripts call `D:\FleetProfiles\bin\agy.exe`.
 
 ### Next choices
-- **(a)** Finish the Antigravity CLI fleet: Worker 1 login, keyring isolation test, then Workers 2-4 and a smoke task per worker.
+- ~~(a) Finish the Antigravity CLI fleet~~ — done (§10).
 - **(b)** EduTrack phase 2 of the photo: move photos out of the DB into the private folder (spec `78d42c1`), then Android display.
-- **(c)** Push the 2 local root-repo commits (governance + Brain plan) and the Brain vault (`git push` in both), when Ibrahim says "push".
+- ~~(c) Push~~ — done by Ibrahim's agy (root `8764547`, Brain `d09f40f`).
 
 ---
 
@@ -599,3 +598,24 @@ Pre-flight: Ibrahim confirmed `7eeeada` (pagination follow-up, choice (b) of §6
 
 ### Next choices
 - **(d)** Implement the context-budget hook: `superpowers:writing-plans` from the spec, then TDD (`node:test`), then Ibrahim reviews the `~/.claude/settings.json` diff.
+
+---
+
+## 10. Session 2026-10-14 ~21:30 → 22:27 — Antigravity CLI fleet finished (Claude Code CLI, no code in the repo)
+
+| Step | Result | Evidence |
+| :--- | :--- | :--- |
+| Login script failed for Ibrahim ("cannot find the path") | Root cause: the Claude desktop app is MSIX; the earlier agy install landed in `%LOCALAPPDATA%\Packages\Claude_pzs8sxrjxfjjc\LocalCache\...`, invisible outside Claude. Same cause made `agy` in a terminal open the IDE (PATH entry missing, fell through to `npm\agy.cmd`). | Reproduced in a Terminal tab (`cmd` exit 3) |
+| Binary placement | `agy.exe` 1.3.5 copied to `D:\FleetProfiles\bin\` (fleet scripts) and to the real `%LOCALAPPDATA%\agy\bin\` (personal `agy` in a fresh terminal) | `agy --version` = 1.3.5 from Ibrahim's shell |
+| Keyring isolation test | FAILED with homes only: one global Credential Manager entry `gemini:antigravity`; a never-signed-in home answered with the shared account | Agy_2 probe log `ChainedAuth: authenticated via keyring` |
+| Fix | `SSH_CONNECTION=127.0.0.1 0 127.0.0.1 22` in `Login_Agy_1..4.bat` + `agy-worker.ps1` → agy uses file token storage `Agy_<N>\.gemini\antigravity-cli\antigravity-oauth-token`; dispatcher sign-in check now tests that file | Log line `Using file-based token storage because SSH session detected` |
+| Verification | All 4 workers in parallel (`-Mode plan`, prompt "Do not use any tools. Reply with exactly: WORKER-N-OK"): 4/4 exit 0, correct reply, 15–73 s, each log shows file storage + its own account; global keyring entry unchanged (21:35:16) | `D:\FleetProfiles\logs\agy_w<N>_20261014_2225*.log` |
+
+### Notes
+- Ibrahim's personal `agy` (no `SSH_CONNECTION`) keeps the keyring account; worker runs never write the keyring.
+- Under `SSH_CONNECTION` the login prints a Google URL instead of opening the browser; paste the code back if asked.
+- Without "Do not use any tools", a plan-mode smoke prompt once ended with "a tool required the command permission" (W2), no reply.
+- Lessons + decision: Brain `05_Fleet/Lessons.md`, `05_Fleet/Decisions.md` (`cc2927e` + this session's follow-up).
+
+### Next choices
+- **(e)** First real fleet order through `agy-worker.ps1` (e.g. a bounded EduTrack task split across lanes W1 UI / W2 backend), Claude audits as usual.
