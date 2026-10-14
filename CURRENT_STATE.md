@@ -4,7 +4,7 @@
 > **Master Orchestrator**: `Claude Code CLI` (Opus Max / Sonnet 5)  
 > **Handoff Source**: `Antigravity IDE` (Interactive Cockpit & Visual Inspector)  
 > **Timestamp**: 2026-09-16T12:55:00+03:00  
-> **Last updated:** 2026-10-11 23:55 (+03:00) — Antigravity browser_subagent: Shajan GTM v23 LIVE + redundant gtag removed from WordPress YYDevelopment with LiteSpeed Cache purged. See §7.
+> **Last updated:** 2026-10-14 21:12 (+03:00) — Claude Code CLI, session "student photo + Antigravity CLI fleet": EduTrack student photo on card/report/certificate DEPLOYED (`47cd020`); Antigravity CLI fleet installed, awaiting Worker 1 login. See §8.
 > **VCS:** git at workspace root, branch `main`.
 
 ---
@@ -518,11 +518,10 @@ Pre-flight: Ibrahim confirmed `7eeeada` (pagination follow-up, choice (b) of §6
 
 ---
 
-## 6. THE ONE THING TO DO NEXT (updated 2026-09-21 11:35)
+## 6. THE ONE THING TO DO NEXT (updated 2026-10-14 21:12)
 
-- Commit all Phase 5c Android files and push to `origin/main` (`git push`).
-- GitHub Actions CI workflow triggers automatically on push to build release artifact.
-- Deploy APK to demo phones for user acceptance testing (Ibrahim, §7.7 checklist).
+- Ibrahim: run `D:\FleetProfiles\Login_Agy_1.bat`, sign in Worker 1, `/quit`. Then Claude checks whether Worker 2's isolated home shows as signed in (Windows keyring sharing test) before Workers 2-4 log in. Details and choices in §8.
+- (Superseded 2026-09-21 item: Phase 5c Android commit/push/UAT. Check `git log` before acting on it.)
 
 ---
 
@@ -552,3 +551,31 @@ Pre-flight: Ibrahim confirmed `7eeeada` (pagination follow-up, choice (b) of §6
   - **(a)** Pull labels for `واتساب` and `اتصال موقع` conversion actions and confirm they are not double-fired.
   - **(b)** Return to Gheras EduTrack (§6): Phase 5c Android UAT on demo phones.
 
+
+---
+
+## 8. Session 2026-10-14 — EduTrack student photo + Antigravity CLI fleet (Claude Code CLI)
+
+### Execution log
+| Step | Worker | Result | Evidence |
+| :--- | :--- | :--- | :--- |
+| Spec (private-folder design, phase 1) | Claude | Written; later **deferred** by Ibrahim (chose option 2: keep Antigravity's base64-in-`photo_url`) | `78d42c1` `edutrack_pro/docs/superpowers/specs/2026-10-14-student-photo-design.md` |
+| Merge recovery branch into main | Claude | Clean merge, no conflicts | `5bcbd63` |
+| Order 04: `photo_url` in student-report + certificate payloads | OpenCode `glm-5.3-flash` | Done, diff = order | `fleet_orders/04_REPORT.md` |
+| Order 05: `renderMustache` scalar sections + photo in report/certificate templates | Cline (agcli not installed) | Done, diff = order | `fleet_orders/05_REPORT.md` |
+| Quality Gate | Claude | **[APPROVED]**: server suite **160/160** (incl. new `tests/test_print_student_photo.py` 3/3); local browser render: photo shows on card/report/certificate (by student and by certificate id), no-photo keeps dashed box on card, nothing extra on report/certificate | commit `47cd020` |
+| Order 07: push + WSL sync + deploy | Antigravity | Done; `origin/main` = `47cd020`; smoke test OK | Claude verified prod over HTTPS: health ok, deployed print_engine/templates contain the fix, `no-cache` on print_engine.js, print endpoint 401 without token |
+| Fleet: Antigravity CLI | Claude | `agy.exe` 1.3.5 installed at `%LOCALAPPDATA%\agy\bin`; homes `D:\FleetProfiles\Agy_1..4`; `Login_Agy_<N>.bat`; dispatcher `D:\FleetProfiles\agy-worker.ps1`. Gemini CLI rejected (Google sign-in retired) and uninstalled | Brain `05_Fleet/Decisions.md` |
+
+### Open items / blockers
+1. **Worker 1 login pending** (Ibrahim). Keyring-sharing test across `Agy_1..4` not yet done; fallback = run workers in WSL (agy uses file token storage there).
+2. **Report layout:** student report grows ~19 mm with a photo (certificate unchanged). Cosmetic.
+3. **Photo storage:** base64 data URL inside `students.photo_url` bloats `/students` list payloads and Android sync; private-folder design stays in spec `78d42c1`.
+4. **Untested here:** the dashboard photo picker itself (Antigravity's code, pre-existing).
+5. **Repo hygiene:** Brain Phase 4 edits (`.gitignore`, `AGENTS.md`, `CLAUDE.md`) and `OBSIDIAN_BRAIN_ADOPTION_PLAN.md` committed locally 2026-10-14 (not pushed). `edutrack_pro/docs/reports/` (daily report HTML/PDF) is **kept untracked on purpose** (Ibrahim, strategic-clear). WSL clone has uncommitted `CLAUDE.md` with 4 personal emails: never commit it.
+6. `%APPDATA%\npm\agy.cmd` is a shim to the IDE and shadows the real `agy`; always call `agy.exe` by full path.
+
+### Next choices
+- **(a)** Finish the Antigravity CLI fleet: Worker 1 login, keyring isolation test, then Workers 2-4 and a smoke task per worker.
+- **(b)** EduTrack phase 2 of the photo: move photos out of the DB into the private folder (spec `78d42c1`), then Android display.
+- **(c)** Push the 2 local root-repo commits (governance + Brain plan) and the Brain vault (`git push` in both), when Ibrahim says "push".

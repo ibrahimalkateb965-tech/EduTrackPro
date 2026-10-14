@@ -96,3 +96,8 @@ scratch/
 .e2e/failures/
 .e2e/logs/
 .e2e/videos/
+
+# --- Autovem Brain vault (own private repo) ---
+Brain/
+# --- Pre-redaction secret backups (never commit, never read by agents) ---
+_SECRETS_BACKUP/

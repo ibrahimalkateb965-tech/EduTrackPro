@@ -63,7 +63,7 @@ This document is the canonical entry point for all AI agents, coding assistants,
   - Production-grade **FastMCP** server construction and tool exposure.
   - **n8n** automation workflows, webhook processors, and LLM router architectures.
   - Visualization & System Architecture: **Autovem Flowchart Studio** (`tools/flowchart_studio/`) for 4K architectural diagramming with WCAG AA compliance.
-- **Memory & Decisions**: Long-term Architectural Decision Records (ADRs) live in `.agents/MEMORY_STORE.md`.
+- **Memory & Decisions**: Live in the **Autovem Brain** vault (`Brain/`). Every agent boots from `Brain/00_Home.md` and follows its navigation rules (one master note, max depth 2). `.agents/MEMORY_STORE.md` is frozen history since 2026-10-13: do not load at boot, do not append.
 
 ### Pillar 3: Application Engineering (Mobile & Web)
 - **Android Engineering**: Kotlin, Jetpack Compose, Material 3, Room DB, WorkManager, Offline-first sync, and Google Play Console compliance (D-U-N-S, Organization account standards).
@@ -81,14 +81,15 @@ When the user provides a brief or conversational prompt, immediately resolve and
 
 | User Trigger / Keyword | Target Directory / Document | Standard Operating Action |
 | :--- | :--- | :--- |
-| **"عميل جديد" / "new client"** | `Clients/_Agency_Templates` → `Clients/NN_Name` | Clone template folder, initialize `00_Client_Profile/CLIENT_OVERVIEW.md`. |
+| **"فحص يومي" / "health check"** | `Brain/03_Jobs/Google_Ads_Daily_Health_Check.md` | Report-only daily check; never apply recommendations or change budget. |
+| **"عميل جديد" / "new client"** | `Clients/_Agency_Templates` → `Clients/NN_Name` (SOP: `Brain/03_Jobs/Client_Onboarding.md`) | Clone template folder, initialize `00_Client_Profile/CLIENT_OVERVIEW.md`. |
 | **"شجن" / "حاويات" / "Shajan"** | `Clients/01_Shajan_Containers/` | Check `02_Google_Ads_Campaigns` or `05_Analytics_Reports`. Focus: Search + Call-Only, Riyadh waste/dumpsters. |
 | **"ياز" / "تكييف" / "YAZ"** | `Clients/02_YAZ_Air_Conditioning/` | Check campaigns or email credentials. Enforce negative list for automotive AC bleed; isolate emergency maintenance from project installs. |
 | **"غراس" / "Gheras"** | `Clients/03_GHERAS_Center/` | Educational center campaigns, landing page lead-gen, local community targeting. |
 | **"تقرير أداء" / "Google Ads report"** | `Clients/<client>/05_Analytics_Reports/` | Build 3-page print-ready report (DOCX via `arabic-docx-builder` + PDF export + `print.html`). Apply Rule 50 (0-9 numerals). |
 | **"صفحة هبوط" / "CRO" / "landing page"** | `Clients/<client>/04_Landing_Pages_CRO/` | Mobile-first CRO, WhatsApp/Call sticky buttons, GTM click-to-call triggers. |
 | **"فاتورة" / "عرض سعر" / "quote"** | `Clients/<client>/06_Contracts_Invoices/` | Managed subscription standard (399 SAR/yr for domain+mail). Strict 1-Page A4, Rule 50 zero-pricing. |
-| **"نطاق" / "بريد مهني" / "DNS"** | `.agents/MEMORY_STORE.md` (Decisions 10–13) | Hybrid architecture: DNet/SaudiNIC for `.sa` + Hostinger Enterprise Mail (MX/SPF/DKIM/DMARC). |
+| **"نطاق" / "بريد مهني" / "DNS"** | `Brain/03_Jobs/Domain_And_Business_Email_Setup.md` | Hybrid architecture: DNet/SaudiNIC for `.sa` + Hostinger Enterprise Mail (MX/SPF/DKIM/DMARC). |
 | **"Google Ads API" / "OAuth" / "token"** | `GOOGLE_ADS_API_RESUMPTION.md`, `tools/google_ads_mcp/` | ✅ **Active & Connected (API v22)**. Managed via FastMCP server (`tools/google_ads_mcp/server.py`). Run `get_api_status` or use `authenticate_google_ads.py` for token refresh. |
 | **"Android" / "APK" / "Play Console"** | Play Console PDFs at root + mobile specs | Review Organization D-U-N-S rules and demo account requirements before submission. |
 | **"iOS" / "TestFlight" / "build ipa"** | `REMOTE_IOS_DEV_PLAYBOOK.md` | Execute fast loop on Linux container; push to GitHub Actions `macos-15` for `.ipa`. |
@@ -173,7 +174,8 @@ Governed by [.agents/CONTEXT_GOVERNANCE.md](file:///f:/AI%20PROJECTS/Autovemtech
 - **4 Operational Zones:**
   1. **🟢 Green Zone (< 180k tokens):** 100% attention; normal operations with `lean-ctx` signatures.
   2. **🟡 Yellow Zone (180k – 240k tokens):** Strict ban on `mode='full'` reads; line range inspection only.
-  3. **🟠 Orange Zone (240k – 300k tokens):** Scope freeze, clean git commit, log ADR in `MEMORY_STORE.md`, generate resumption prompt.
+  3. **🟠 Orange Zone (240k – 300k tokens):** Scope freeze, clean git commit, log the decision in the matching Brain note + today's daily note, generate resumption prompt.
+  4. **🔴 Red Zone (> 300k tokens):** Stop all exploratory work; run Hook 25 / `/strategic-clear`, then `/clear` and resume from the resumption prompt.
 - **Active Offloading Engine:** Route all boilerplate, shell commands, and DB migrations to OpenCode CLI (GLM 5.3 Flash) to conserve expensive Claude Opus Max token budget.
 - **Claude-Exclusive Statusline Golden Safety Calibration (150,000 tokens):**
   The 150,000 token safety cap applies **EXCLUSIVELY to Claude Code CLI** (and not to other agents like Antigravity IDE / Gemini or OpenCode, which operate up to their 300,000 golden sweet spot or full model limits). Claude statusline scripts (`statusline.ps1` / `statusline.js`) must strictly calculate context consumption against this 150,000 cap to safeguard against Claude's quadratic cache cost escalation $O(N^2)$.
@@ -284,7 +286,7 @@ All agents and CLI harnesses must complete tasks with the **smallest sufficient 
 - **Analysis-Only Scope**: If requested only to analyze, inspect, or audit, report structured findings—do not modify code.
 
 ### 6.4. Fleet-Calibrated Verification & Testing Invariant
-- **Fleet Testing Monopoly**: All automated test execution (`test`, `analyze`, lint gates) remains the **exclusive monopoly of Claude Code CLI (Opus Max)**. Other agents (`OpenCode`, `agcli`, `Codex`) must perform static code inspection and rely on Claude Code for automated test execution and final `[APPROVED]` status.
+- **Fleet Testing Monopoly**: Canonical rule in §4 "Mandatory Testing & Verification Monopoly". Non-Claude agents do static inspection only.
 - **Verification Parsimony**: Reuse existing tests first. Add new tests only for real behavior and genuine regression risks—never mechanical tests that mirror implementation details.
 - **Ephemeral Verification**: Keep scratch scripts in temporary folders; do not leave temporary verification scripts as permanent repository tests.
 - **Check Restraint**: Once checks pass, repeat them only if subsequent edits are made, failures emerge, or unresolved edge cases remain.
