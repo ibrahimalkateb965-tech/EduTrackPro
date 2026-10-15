@@ -2,12 +2,14 @@ from datetime import date, datetime
 from decimal import Decimal
 from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
+from fastapi.responses import Response
 
 from edutrack_api.auth import require_roles
 from edutrack_api.db import get_conn
 from edutrack_api.errors import ApiError
 from edutrack_api.serializers import _convert, row_to_json
+from edutrack_api.services import pdf
 from edutrack_api.services.settings import load_settings
 from edutrack_api.services.words import arabic_amount_words
 from edutrack_api.services.student_photos import photo_data_uri
@@ -590,3 +592,35 @@ def statistics(from_: str = Query(alias="from"), to: str = Query(), conn=Depends
         "by_group": [{"group": x["group_label"] or "عام", "students": x["students"], "pct": round(x["students"] * 100 / total, 2) if total else 0} for x in group],
     }, conn)
 
+
+@router.post("/print/pdf/{template}")
+async def print_pdf(template: str, request: Request) -> dict:
+    """Render the template to PDF; the query string is the print page's own query string.
+
+    Returns a short-lived download URL (see services/pdf.py for why it is not the response body).
+    No DB dependency here: the in-process data call made by the renderer authenticates the
+    bearer token and applies the template endpoint's role/permission checks.
+    """
+    authorization = request.headers.get("authorization", "")
+    if not authorization.lower().startswith("bearer "):
+        raise ApiError(401, "unauthorized", "غير مصرح")
+    doc = await pdf.render_pdf(request.app, template, request.url.query, authorization)
+    token = pdf.store_download(doc)
+    return {
+        "url": f"/api/v1/print/pdf/download/{token}",
+        "filename": f"{doc.title}.pdf",
+        "expires_in": pdf.DOWNLOAD_TTL_SECONDS,
+    }
+
+
+@router.get("/print/pdf/download/{token}")
+async def print_pdf_download(token: str) -> Response:
+    """The rendered file as an attachment. The 256-bit token is the authorization (capability URL)."""
+    doc = pdf.get_download(token)
+    if doc is None:
+        raise ApiError(404, "not_found", "انتهت صلاحية رابط التنزيل، اضغط زر التنزيل مرة أخرى")
+    return Response(
+        doc.content,
+        media_type="application/pdf",
+        headers={"Content-Disposition": pdf.content_disposition(doc), "Cache-Control": "no-store"},
+    )

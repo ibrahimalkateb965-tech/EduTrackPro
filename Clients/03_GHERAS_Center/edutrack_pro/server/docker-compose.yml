@@ -21,9 +21,11 @@ services:
     command: ["uvicorn", "edutrack_api.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
     volumes:
       - ./edutrack_api:/app/edutrack_api:ro
+      - ../web/print:/app/web/print:ro
     env_file: .env
     environment:
       DATABASE_URL: postgresql://postgres:postgres@db:5432/gheras_edutrack
+      PRINT_WEB_DIR: /app/web/print
     depends_on:
       db:
         condition: service_healthy

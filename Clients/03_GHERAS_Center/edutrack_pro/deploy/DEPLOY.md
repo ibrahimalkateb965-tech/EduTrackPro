@@ -153,5 +153,19 @@ Off-site copy (manual, developer machine): `scp -i ~/.ssh/edutrack_deploy_key ro
 ## Out of scope (Phase 3)
 
 Automated **off-site** copies of the nightly dumps (local nightly backups are in place — see Backups), rate limiting / refresh tokens, `revoked_tokens` purge job, mobile-role API
-scoping, and server-side rendering of the 11 print templates to PDF.
+scoping.
 
+## Print PDF download
+
+The print toolbar's download button calls `POST /api/v1/print/pdf/<template>?<the page's query>`
+(bearer token). The API renders the template with headless Chromium (installed in the image by
+`playwright install --with-deps --only-shell chromium`) from the read-only mount
+`../web/print:/app/web/print` (`PRINT_WEB_DIR`), then returns a 2-minute capability URL
+`/api/v1/print/pdf/download/<token>` that the browser follows as a normal attachment download.
+That URL is not a fetch() body on purpose: Internet Download Manager strips PDF bodies out of browser
+fetches (0-byte files), but it can re-request a URL that carries its own authorization.
+
+- Template, CSS, JS or font edits need no image rebuild; a change to `services/pdf.py`, `pyproject.toml`
+  or the Dockerfile does (full `push.sh`).
+- Rendered files are kept in process memory: keep the API a single uvicorn process (no `--workers`).
+- At most 2 renders run at once (~150 MB of RAM each).

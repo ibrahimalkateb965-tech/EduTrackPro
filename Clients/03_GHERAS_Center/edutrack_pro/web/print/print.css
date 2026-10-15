@@ -1,4 +1,30 @@
-@import url("https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap");
+/* Cairo (OFL, fonts/OFL.txt), self-hosted so the browser preview and the server PDF
+   renderer (edutrack_api/services/pdf.py) use the same font with no network access.
+   Static instances of the google/fonts variable font: Chromium embeds variable fonts in
+   PDFs as Type3 outlines, static ones as real TrueType. */
+@font-face {
+  font-family: "Cairo";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("fonts/Cairo-Regular.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Cairo";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("fonts/Cairo-SemiBold.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Cairo";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("fonts/Cairo-Bold.woff2") format("woff2");
+}
 
 :root {
   --g-teal: #0f8b8d;
@@ -585,6 +611,12 @@ tr {
   .print-toolbar-btn.download-btn:hover {
     background: #00695c;
     transform: translateY(-1px);
+  }
+
+  .print-toolbar-btn.download-btn:disabled {
+    opacity: 0.75;
+    cursor: progress;
+    transform: none;
   }
 
   .print-toolbar-btn.print-btn {

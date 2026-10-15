@@ -102,6 +102,51 @@ function renderMustache(template, data) {
   return rendered;
 }
 
+// Direct PDF download: the server renders this same template in headless Chromium
+// (POST /api/v1/print/pdf/<key>), so Arabic shaping and spacing match the print preview
+// and the file keeps real text. The browser then follows the returned short-lived URL as a
+// plain attachment download (no print dialog, no blob): download managers such as IDM empty
+// PDF bodies read through fetch(), but take over a URL download correctly.
+async function downloadPdf(button, templateKey, label) {
+  if (button.disabled) return;
+  const labelEl = button.querySelector('.download-label');
+  button.disabled = true;
+  button.setAttribute('aria-busy', 'true');
+  labelEl.textContent = 'جارٍ تجهيز الملف...';
+
+  const searchParams = new URLSearchParams(window.location.search);
+  searchParams.delete('token');
+  const queryString = searchParams.toString();
+  const token = getToken();
+  const headers = { 'Accept': 'application/json' };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  try {
+    const response = await fetch(
+      `/api/v1/print/pdf/${encodeURIComponent(templateKey)}${queryString ? '?' + queryString : ''}`,
+      { method: 'POST', headers }
+    );
+    const data = await response.json().catch(() => null);
+    if (!response.ok || !data?.url) {
+      throw new Error(data?.error?.message || data?.detail || `خطأ استجابة الخادم (${response.status})`);
+    }
+    const link = document.createElement('a');
+    link.href = data.url;
+    document.body.append(link);
+    link.click();
+    link.remove();
+  } catch (err) {
+    console.error('[PrintEngine] PDF download failed:', err);
+    alert(`تعذر تنزيل ملف PDF: ${err.message || 'خطأ غير معروف'}`);
+  } finally {
+    button.disabled = false;
+    button.removeAttribute('aria-busy');
+    labelEl.textContent = label;
+  }
+}
+
 function injectToolbar(docTitle, templateKey) {
   if (document.querySelector('.print-toolbar')) return;
   const currentKey = templateKey || getTemplateKey();
@@ -137,9 +182,9 @@ function injectToolbar(docTitle, templateKey) {
       <polyline points="7 10 12 15 17 10"></polyline>
       <line x1="12" y1="15" x2="12" y2="3"></line>
     </svg>
-    ${downloadLabel}
+    <span class="download-label">${downloadLabel}</span>
   `;
-  downloadBtn.addEventListener('click', () => window.print());
+  downloadBtn.addEventListener('click', () => downloadPdf(downloadBtn, currentKey, downloadLabel));
 
   const printBtn = document.createElement('button');
   printBtn.type = 'button';
