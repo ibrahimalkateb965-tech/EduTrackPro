@@ -576,6 +576,17 @@ tr {
     transition: all 0.2s ease;
   }
 
+  .print-toolbar-btn.download-btn {
+    background: #00796b;
+    color: #ffffff;
+    box-shadow: 0 2px 8px rgba(0, 121, 107, 0.35);
+  }
+
+  .print-toolbar-btn.download-btn:hover {
+    background: #00695c;
+    transform: translateY(-1px);
+  }
+
   .print-toolbar-btn.print-btn {
     background: var(--g-orange);
     color: #ffffff;

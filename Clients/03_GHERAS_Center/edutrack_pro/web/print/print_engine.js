@@ -102,8 +102,9 @@ function renderMustache(template, data) {
   return rendered;
 }
 
-function injectToolbar(docTitle) {
+function injectToolbar(docTitle, templateKey) {
   if (document.querySelector('.print-toolbar')) return;
+  const currentKey = templateKey || getTemplateKey();
 
   const toolbar = document.createElement('aside');
   toolbar.className = 'print-toolbar';
@@ -124,6 +125,21 @@ function injectToolbar(docTitle) {
 
   const actions = document.createElement('div');
   actions.className = 'print-toolbar-actions';
+
+  const downloadBtn = document.createElement('button');
+  downloadBtn.type = 'button';
+  downloadBtn.className = 'print-toolbar-btn download-btn';
+  downloadBtn.id = 'gheras-download-action';
+  const downloadLabel = currentKey === 'receipt' ? 'تنزيل السند (PDF)' : 'تنزيل (PDF)';
+  downloadBtn.innerHTML = `
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="margin-left: 6px;">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+      <polyline points="7 10 12 15 17 10"></polyline>
+      <line x1="12" y1="15" x2="12" y2="3"></line>
+    </svg>
+    ${downloadLabel}
+  `;
+  downloadBtn.addEventListener('click', () => window.print());
 
   const printBtn = document.createElement('button');
   printBtn.type = 'button';
@@ -160,7 +176,7 @@ function injectToolbar(docTitle) {
     }
   });
 
-  actions.append(printBtn, closeBtn);
+  actions.append(downloadBtn, printBtn, closeBtn);
   toolbar.append(info, actions);
   document.body.prepend(toolbar);
 }
@@ -273,9 +289,13 @@ async function initPrintEngine() {
 
     if (data.title && templateKey === 'excellence_certificate') {
       document.title = data.title;
+    } else if (templateKey === 'receipt' && data.receipt_no) {
+      const cleanStudent = (data.student_name || '').replace(/[/\\?%*:|"<>]/g, '_').trim();
+      const studentPart = cleanStudent ? `_${cleanStudent}` : '';
+      document.title = `سند_قبض_${data.receipt_no}${studentPart}`;
     }
 
-    injectToolbar(document.title);
+    injectToolbar(document.title, templateKey);
   } catch (err) {
     console.error('[PrintEngine] Fetch failed:', err);
     showError(err.message || 'حدث خطأ في الاتصال بالخادم أثناء جلب بيانات الطباعة');
