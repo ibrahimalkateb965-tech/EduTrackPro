@@ -749,3 +749,22 @@ Request: add a dedicated download button on the receipt voucher preview page (`r
 - **(b)** Implement the context-budget hook (§9 (d)).
 - **(c)** Receipt plan selection: use the paid installment's own fee plan instead of newest plan (§14).
 
+---
+
+## 15. Session 2026-10-15 - Receipt plan selection by the paid installment (Claude Code CLI, TDD)
+
+Request: option (b) from section 14. The receipt breakdown (`total_fee`, `remaining_balance`, installment rows) now uses the fee plan of the installment the payment settled, not the newest plan.
+
+| Step | Who | Result | Evidence |
+| :--- | :--- | :--- | :--- |
+| RED | Claude | `test_print_receipt_uses_the_plan_of_the_paid_installment` failed with `900.0 == 1500` (newest plan won); the no-installment fallback test passed from the start as a guard | `server/tests/test_print.py` |
+| Fix | Claude | Both receipt SELECTs return `i.fee_plan_id`; `_installment_breakdown(..., plan_id=None)` filters `fp.id` when given, else newest plan (payments without an installment) | `45396f0` |
+| Gate | Claude | **[APPROVED]**: full suite 186/186 with `PGTZ='<+03>-03'` (184 + 2); ruff delta 0 (12 pre-existing, same before and after) | embedded PG 16, 001-014 |
+| Push + deploy | - | **NOT done** | next: a fleet order 14 |
+
+### Next choices
+- **(a)** Fleet order for push, WSL ff, `push.sh` (API image change), then public check and one reprint of a student whose paid installment is on an older plan.
+- **(b)** Context-budget hook (section 9 (d)).
+- **(c)** Photo phase 2 on Android.
+- **(d)** Phase 5 role scoping sections 3-4.
+
