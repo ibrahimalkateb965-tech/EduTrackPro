@@ -21,7 +21,8 @@ _CHILD_ROOMS = "(SELECT s.room_id FROM students s WHERE s.id = ANY(%(student_ids
 
 _STUDENT_BASE_COLS = (
     "s.id, s.name, s.birth_date, s.nationality, s.gender, s.room_id, r.name AS room_name, "
-    "s.group_name, s.status, s.has_difficulties"
+    "s.group_name, s.status, s.has_difficulties, "
+    "CASE WHEN s.photo_url LIKE '/api/v1/students/%%' THEN s.photo_url END AS photo_url"
 )
 _STUDENT_TEACHER_COLS = _STUDENT_BASE_COLS + ", s.difficulty_notes, s.child_notes, s.guardian_phone, s.guardian_relation"
 

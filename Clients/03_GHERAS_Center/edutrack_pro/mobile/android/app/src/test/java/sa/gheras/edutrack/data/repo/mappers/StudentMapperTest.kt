@@ -23,7 +23,8 @@ class StudentMapperTest {
             difficultyNotes = null,
             childNotes = null,
             guardianPhone = "0555555555",
-            guardianRelation = "FATHER"
+            guardianRelation = "FATHER",
+            photoUrl = "/api/v1/students/s_1/photo?v=1"
         )
 
         val entity = StudentMappers.toEntity(dto, "branch_1")
@@ -34,6 +35,7 @@ class StudentMapperTest {
         assertEquals("2015-05-10", entity.birthDate?.toString())
         assertEquals("MALE", entity.gender)
         assertEquals("0555555555", entity.guardianPhone)
+        assertEquals("/api/v1/students/s_1/photo?v=1", entity.photoUrl)
     }
 
     @Test

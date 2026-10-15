@@ -50,5 +50,6 @@ data class StudentEntity(
     @ColumnInfo(name = "status", defaultValue = "'active'") val status: String = "active",
     @ColumnInfo(name = "created_at", defaultValue = "(strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))") val createdAt: Instant,
     @ColumnInfo(name = "updated_at", defaultValue = "(strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))") val updatedAt: Instant,
-    @ColumnInfo(name = "deleted_at") val deletedAt: Instant? = null
+    @ColumnInfo(name = "deleted_at") val deletedAt: Instant? = null,
+    @ColumnInfo(name = "photo_url") val photoUrl: String? = null
 )

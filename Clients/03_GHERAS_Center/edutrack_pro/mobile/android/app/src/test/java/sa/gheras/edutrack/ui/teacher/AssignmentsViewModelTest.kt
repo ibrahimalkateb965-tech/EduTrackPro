@@ -43,8 +43,8 @@ class AssignmentsViewModelTest {
     private lateinit var session: FakeSessionStore
     private lateinit var assignmentsRepo: AssignmentsRepository
     private lateinit var studentsRepo: StudentsRepository
-    private val now: Instant = Instant.parse("2026-10-11T08:00:00Z")
-    private val today: LocalDate = LocalDate.parse("2026-10-11")
+    private val now: Instant get() = Instant.now()
+    private val today: LocalDate get() = LocalDate.now()
 
     @Before
     fun setUp() {

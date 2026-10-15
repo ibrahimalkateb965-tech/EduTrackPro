@@ -217,6 +217,26 @@ def test_b1_guardian_students_include_dismissed_child_and_drop_private_columns(c
             assert key not in row, key
 
 
+def test_b1_students_photo_url_whitelisted_and_evil_url_filtered(client, world, db):
+    # Set a valid relative photo URL on a1, an evil external URL on a2, and a data URI on c1
+    db.execute("UPDATE students SET photo_url = %s WHERE id = %s", (f"/api/v1/students/{world.a1}/photo?v=1", world.a1))
+    db.execute("UPDATE students SET photo_url = %s WHERE id = %s", ("https://evil.example/malicious.jpg", world.a2))
+    db.execute("UPDATE students SET photo_url = %s WHERE id = %s", ("data:image/jpeg;base64,/9j/4AAQSkZJRg==", world.c1))
+    db.commit()
+
+    # Verify teacher view: a1 gets relative URL, a2 (evil) is sanitized to None
+    t_rows = {r["id"]: r for r in client.get(f"{ME}/students", headers=world.teacher).json()["items"]}
+    assert "photo_url" in t_rows[world.a1]
+    assert t_rows[world.a1]["photo_url"] == f"/api/v1/students/{world.a1}/photo?v=1"
+    assert t_rows[world.a2]["photo_url"] is None
+
+    # Verify guardian view: a1 gets relative URL, c1 (data URI) is sanitized to None
+    g_rows = {r["id"]: r for r in client.get(f"{ME}/students", headers=world.guardian).json()["items"]}
+    assert "photo_url" in g_rows[world.a1]
+    assert g_rows[world.a1]["photo_url"] == f"/api/v1/students/{world.a1}/photo?v=1"
+    assert g_rows[world.c1]["photo_url"] is None
+
+
 def test_b1_out_of_scope_student_filter_is_empty_200(client, world):
     res = client.get(f"{ME}/students?student_id={world.c1}", headers=world.teacher)
     assert res.status_code == 200, res.text

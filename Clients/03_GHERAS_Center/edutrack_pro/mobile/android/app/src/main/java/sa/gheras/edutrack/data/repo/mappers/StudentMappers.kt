@@ -40,7 +40,8 @@ object StudentMappers {
             status = dto.status ?: "active",
             createdAt = now,
             updatedAt = now,
-            deletedAt = null
+            deletedAt = null,
+            photoUrl = dto.photoUrl
         )
     }
 

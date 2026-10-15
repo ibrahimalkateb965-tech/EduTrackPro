@@ -18,5 +18,6 @@ data class StudentDto(
     @SerialName("difficulty_notes") val difficultyNotes: String? = null,
     @SerialName("child_notes") val childNotes: String? = null,
     @SerialName("guardian_phone") val guardianPhone: String? = null,
-    @SerialName("guardian_relation") val guardianRelation: String? = null
+    @SerialName("guardian_relation") val guardianRelation: String? = null,
+    @SerialName("photo_url") val photoUrl: String? = null
 )

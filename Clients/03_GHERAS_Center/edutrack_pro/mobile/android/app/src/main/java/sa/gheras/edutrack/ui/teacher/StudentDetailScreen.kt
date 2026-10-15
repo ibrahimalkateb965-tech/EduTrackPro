@@ -43,6 +43,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import sa.gheras.edutrack.ui.common.LoadingView
 import sa.gheras.edutrack.ui.common.Num
+import sa.gheras.edutrack.ui.common.StudentAvatar
 import sa.gheras.edutrack.ui.theme.PresentGreen
 import sa.gheras.edutrack.ui.theme.WarningAmber
 
@@ -87,24 +88,37 @@ fun StudentDetailScreen(
                         modifier = Modifier.fillMaxWidth(),
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
                     ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            Text(
-                                text = student?.name ?: "",
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.Bold
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            StudentAvatar(
+                                name = student?.name ?: "",
+                                photoUrl = student?.photoUrl,
+                                size = 56.dp
                             )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = "القاعة: ${state.roomName} ${if (!student?.groupName.isNullOrBlank()) "(${student?.groupName})" else ""}",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            if (!student?.nationalId.isNullOrBlank()) {
+                            Spacer(modifier = Modifier.width(16.dp))
+                            Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = "الهوية الوطنية: ${Num.enforceWesternNumerals(student?.nationalId ?: "")}",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.outline
+                                    text = student?.name ?: "",
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Bold
                                 )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "القاعة: ${state.roomName} ${if (!student?.groupName.isNullOrBlank()) "(${student?.groupName})" else ""}",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                if (!student?.nationalId.isNullOrBlank()) {
+                                    Text(
+                                        text = "الهوية الوطنية: ${Num.enforceWesternNumerals(student?.nationalId ?: "")}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.outline
+                                    )
+                                }
                             }
                         }
                     }

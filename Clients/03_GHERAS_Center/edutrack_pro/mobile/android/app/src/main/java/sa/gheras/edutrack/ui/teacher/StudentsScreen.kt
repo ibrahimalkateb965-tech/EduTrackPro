@@ -44,10 +44,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import sa.gheras.edutrack.ui.common.EmptyView
 import sa.gheras.edutrack.ui.common.LoadingView
 import sa.gheras.edutrack.ui.common.Num
-import androidx.lifecycle.compose.LifecycleResumeEffect
+import sa.gheras.edutrack.ui.common.StudentAvatar
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -213,19 +214,11 @@ fun StudentItemCard(
                 .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Surface(
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.primaryContainer,
-                modifier = Modifier.size(44.dp)
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = Icons.Default.Person,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                }
-            }
+            StudentAvatar(
+                name = student.name,
+                photoUrl = student.photoUrl,
+                size = 44.dp
+            )
 
             Spacer(modifier = Modifier.width(12.dp))
 

@@ -29,7 +29,7 @@ class AppContainer(private val context: Context) {
             GherasDatabase::class.java,
             GherasDatabase.DATABASE_NAME
         )
-            .addMigrations(GherasDatabase.MIGRATION_1_2, GherasDatabase.MIGRATION_2_3)
+            .addMigrations(GherasDatabase.MIGRATION_1_2, GherasDatabase.MIGRATION_2_3, GherasDatabase.MIGRATION_3_4)
             .fallbackToDestructiveMigrationOnDowngrade()
             .build()
     }
@@ -44,7 +44,7 @@ class AppContainer(private val context: Context) {
         encodeDefaults = true
     }
 
-    private val okHttpClient: OkHttpClient by lazy {
+    internal val okHttpClient: OkHttpClient by lazy {
         val logging = HttpLoggingInterceptor().apply {
             level = if (BuildConfig.DEBUG) HttpLoggingInterceptor.Level.BODY else HttpLoggingInterceptor.Level.NONE
         }

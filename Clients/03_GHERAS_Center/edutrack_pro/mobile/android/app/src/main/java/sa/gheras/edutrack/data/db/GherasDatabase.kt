@@ -59,7 +59,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         SubmissionFileEntity::class,
         SyncStateEntity::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -161,6 +161,12 @@ abstract class GherasDatabase : RoomDatabase() {
                     )
                 """.trimIndent())
                 db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_evaluations_student_id_date_subject_eval_type ON evaluations(student_id, date, subject, eval_type)")
+            }
+        }
+
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE students ADD COLUMN photo_url TEXT")
             }
         }
     }

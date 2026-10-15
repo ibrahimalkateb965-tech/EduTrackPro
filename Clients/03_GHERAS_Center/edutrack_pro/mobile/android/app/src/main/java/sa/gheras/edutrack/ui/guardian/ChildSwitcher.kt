@@ -3,6 +3,7 @@ package sa.gheras.edutrack.ui.guardian
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -14,6 +15,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import sa.gheras.edutrack.data.entity.StudentEntity
+import sa.gheras.edutrack.ui.common.StudentAvatar
 
 @Composable
 fun ChildSwitcher(
@@ -35,7 +37,15 @@ fun ChildSwitcher(
                 selected = isSelected,
                 onClick = { onChildSelected(child.id) },
                 leadingIcon = {
-                    Icon(Icons.Default.Face, contentDescription = null)
+                    if (!child.photoUrl.isNullOrBlank()) {
+                        StudentAvatar(
+                            name = child.name,
+                            photoUrl = child.photoUrl,
+                            size = 24.dp
+                        )
+                    } else {
+                        Icon(Icons.Default.Face, contentDescription = null, modifier = Modifier.size(18.dp))
+                    }
                 },
                 label = { Text(child.name) }
             )
