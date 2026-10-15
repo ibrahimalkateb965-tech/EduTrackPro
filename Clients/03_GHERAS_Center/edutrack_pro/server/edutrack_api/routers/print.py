@@ -80,7 +80,7 @@ def _installments_count_text(count: int) -> str:
     return f"على {count} دفعة"
 
 
-def _installment_breakdown(conn, student_id, amount, balance) -> dict:
+def _installment_breakdown(conn, student_id, amount, balance, plan_id=None) -> dict:
     plan = conn.execute(
         """SELECT fp.total_amount, fp.interval_days,
                   count(*) FILTER (WHERE i.status IN ('pending', 'partial')) AS remaining_count,
@@ -90,10 +90,11 @@ def _installment_breakdown(conn, student_id, amount, balance) -> dict:
                     WHERE n.fee_plan_id = fp.id AND n.deleted_at IS NULL AND n.status IN ('pending', 'partial')
                     ORDER BY n.seq_no ASC LIMIT 1) AS next_amount
            FROM fee_plans fp JOIN installments i ON i.fee_plan_id = fp.id
-           WHERE fp.student_id=%s AND fp.deleted_at IS NULL AND i.deleted_at IS NULL
+           WHERE fp.student_id=%s AND (%s::uuid IS NULL OR fp.id=%s::uuid)
+             AND fp.deleted_at IS NULL AND i.deleted_at IS NULL
            GROUP BY fp.id, fp.total_amount, fp.interval_days
            ORDER BY fp.created_at DESC LIMIT 1""",
-        (student_id,),
+        (student_id, plan_id, plan_id),
     ).fetchone()
     remaining = (plan["remaining_count"] if plan else 0) or 0
     # Same plan as total_fee, so total, paid amount and remaining agree on the receipt.
@@ -137,7 +138,7 @@ def receipt(
         raise ApiError(400, "validation_error", "رقم الدفعة أو السند مطلوب")
     if str(pid).isdigit():
         item = conn.execute(
-            """SELECT r.receipt_no, r.issued_on, p.amount, p.method, p.student_id, s.name student_name, i.seq_no,
+            """SELECT r.receipt_no, r.issued_on, p.amount, p.method, p.student_id, s.name student_name, i.seq_no, i.fee_plan_id,
                b.balance FROM receipts r JOIN payments p ON p.id=r.payment_id JOIN students s ON s.id=p.student_id
                LEFT JOIN installments i ON i.id=p.installment_id LEFT JOIN v_student_balance b ON b.student_id=s.id
                WHERE r.receipt_no=%s AND r.deleted_at IS NULL AND p.deleted_at IS NULL AND s.deleted_at IS NULL""",
@@ -149,7 +150,7 @@ def receipt(
     else:
         item = _one(
             conn,
-            """SELECT r.receipt_no, r.issued_on, p.amount, p.method, p.student_id, s.name student_name, i.seq_no,
+            """SELECT r.receipt_no, r.issued_on, p.amount, p.method, p.student_id, s.name student_name, i.seq_no, i.fee_plan_id,
                b.balance FROM receipts r JOIN payments p ON p.id=r.payment_id JOIN students s ON s.id=p.student_id
                LEFT JOIN installments i ON i.id=p.installment_id LEFT JOIN v_student_balance b ON b.student_id=s.id
                WHERE p.id=%s AND r.deleted_at IS NULL AND p.deleted_at IS NULL AND s.deleted_at IS NULL""",
@@ -165,7 +166,7 @@ def receipt(
         "amount": item["amount"],
         "installment_ref": item["seq_no"] or "—",
         "amount_words": arabic_amount_words(Decimal(str(item["amount"]))),
-        **_installment_breakdown(conn, item["student_id"], item["amount"], item["balance"]),
+        **_installment_breakdown(conn, item["student_id"], item["amount"], item["balance"], item["fee_plan_id"]),
     }, conn)
 
 

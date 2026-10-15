@@ -229,6 +229,47 @@ def test_print_receipt_remaining_balance_is_scoped_to_the_plan(client, db, manag
     assert "المتبقي 1000 ر.س" in body["installment_summary_text"]
 
 
+def _add_pending_installments(db, plan_id, rows):
+    for seq, due, amount in rows:
+        db.execute(
+            "INSERT INTO installments (fee_plan_id, seq_no, due_date, amount, paid_amount, status) VALUES (%s, %s, %s, %s, %s, %s)",
+            (plan_id, seq, due, amount, 0, "pending"),
+        )
+
+
+def _add_newer_plan(db, student_id):
+    newer = db.execute(
+        "INSERT INTO fee_plans (student_id, total_amount, count, interval_days, start_date) VALUES (%s, %s, %s, %s, %s) RETURNING id",
+        (student_id, 900, 1, 7, date(2026, 10, 5)),
+    ).fetchone()
+    _add_pending_installments(db, newer["id"], [(1, date(2026, 10, 12), 900)])
+
+
+def test_print_receipt_uses_the_plan_of_the_paid_installment(client, db, manager):
+    data = _seed_basic_data(db)  # payment settles installment 1 of the 1500 plan
+    plan = db.execute("SELECT id FROM fee_plans WHERE student_id=%s", (data["student_id"],)).fetchone()
+    db.execute("UPDATE fee_plans SET created_at = now() - interval '1 month' WHERE id=%s", (plan["id"],))
+    _add_pending_installments(db, plan["id"], [(2, date(2026, 10, 1), 500), (3, date(2026, 10, 31), 500)])
+    _add_newer_plan(db, data["student_id"])
+    db.commit()
+    body = client.get(f"/api/v1/print/receipt?payment={data['payment_id']}", headers=manager).json()
+    assert body["total_fee"] == 1500
+    assert body["remaining_balance"] == 1000
+    assert body["remaining_installments_count"] == 2
+    assert body["next_due_date"] == "2026-10-01"
+    assert body["interval_label"] == "شهري (كل 30 يوم)"
+
+
+def test_print_receipt_without_installment_falls_back_to_newest_plan(client, db, manager):
+    data = _seed_basic_data(db)
+    db.execute("UPDATE payments SET installment_id = NULL WHERE id=%s", (data["payment_id"],))
+    _add_newer_plan(db, data["student_id"])
+    db.commit()
+    body = client.get(f"/api/v1/print/receipt?payment={data['payment_id']}", headers=manager).json()
+    assert body["total_fee"] == 900
+    assert body["remaining_balance"] == 900
+
+
 def test_print_receipt_without_remaining_installments(client, db, manager):
     data = _seed_basic_data(db)  # single installment, already paid
     body = client.get(f"/api/v1/print/receipt?payment={data['payment_id']}", headers=manager).json()
