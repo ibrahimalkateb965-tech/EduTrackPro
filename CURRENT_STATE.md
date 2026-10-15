@@ -751,7 +751,7 @@ Request: add a dedicated download button on the receipt voucher preview page (`r
 
 ---
 
-## 15. Session 2026-10-15 - Receipt plan selection by the paid installment (Claude Code CLI, TDD)
+## 16. Session 2026-10-15 - Receipt plan selection by the paid installment (Claude Code CLI, TDD)
 
 Request: option (b) from section 14. The receipt breakdown (`total_fee`, `remaining_balance`, installment rows) now uses the fee plan of the installment the payment settled, not the newest plan.
 
