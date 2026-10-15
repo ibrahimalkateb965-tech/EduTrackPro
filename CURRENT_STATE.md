@@ -4,7 +4,7 @@
 > **Master Orchestrator**: `Claude Code CLI` (Opus Max / Sonnet 5)  
 > **Handoff Source**: `Antigravity IDE` (Interactive Cockpit & Visual Inspector)  
 > **Timestamp**: 2026-09-16T12:55:00+03:00  
-> **Last updated:** 2026-10-15 00:40 (+03:00) — Claude Code CLI, session "receipt date format": receipt date fix [APPROVED] `dac9938`, pushed and DEPLOYED via fleet order 11; order 10 (installment breakdown `cdc1c3d`) also DEPLOYED; public side verified (§13). Ibrahim's receipt reprint pending. Previous update 00:07: receipt voucher installment breakdown [APPROVED] `cdc1c3d`, fleet order 10 ready (§12). Order 08 photo storage DEPLOYED via order 09 (§11). Previous update 2026-10-14 23:15: fleet order 08 [APPROVED] `e7cf93d`. 22:27: Antigravity CLI 4-worker fleet DONE (§10). Previous update 21:26, session "context-budget hook design": global context-budget hook spec APPROVED (Brain `fb50405` + `1853b91`), not implemented. See §9. Previous update 21:12: EduTrack student photo DEPLOYED (`47cd020`); Antigravity CLI fleet awaiting Worker 1 login (§8).
+> **Last updated:** 2026-10-15 08:08 (+03:00) — Claude Code CLI, session "receipt date + nits" (strategic-clear): receipt nits fix [APPROVED] `072320e` (184/184), NOT pushed, NOT deployed; fleet order 12 ready (§14). Previous update 00:40, session "receipt date format": receipt date fix [APPROVED] `dac9938`, pushed and DEPLOYED via fleet order 11; order 10 (installment breakdown `cdc1c3d`) also DEPLOYED; public side verified (§13). Ibrahim's receipt reprint pending. Previous update 00:07: receipt voucher installment breakdown [APPROVED] `cdc1c3d`, fleet order 10 ready (§12). Order 08 photo storage DEPLOYED via order 09 (§11). Previous update 2026-10-14 23:15: fleet order 08 [APPROVED] `e7cf93d`. 22:27: Antigravity CLI 4-worker fleet DONE (§10). Previous update 21:26, session "context-budget hook design": global context-budget hook spec APPROVED (Brain `fb50405` + `1853b91`), not implemented. See §9. Previous update 21:12: EduTrack student photo DEPLOYED (`47cd020`); Antigravity CLI fleet awaiting Worker 1 login (§8).
 > **VCS:** git at workspace root, branch `main`.
 
 ---
@@ -518,9 +518,9 @@ Pre-flight: Ibrahim confirmed `7eeeada` (pagination follow-up, choice (b) of §6
 
 ---
 
-## 6. THE ONE THING TO DO NEXT (updated 2026-10-15 00:40)
+## 6. THE ONE THING TO DO NEXT (updated 2026-10-15 08:08)
 
-- Ibrahim reprints two receipts from the dashboard (installment plan + fully paid): `التاريخ:` reads `YYYY-MM-DD`, each fits on one A5 landscape page (§13). Then pick from §13 next choices.
+- Run fleet order 12 (`edutrack_pro/fleet_orders/12_RECEIPT_NITS_PUSH_DEPLOY.md`, push + WSL ff + `push.sh` for `072320e`), then Claude verifies the public side and Ibrahim reprints two receipts (§14). Then pick from §14 next choices.
 - (Done 2026-10-15 00:07 / 00:30: fleet orders 10 and 11 deployed `cdc1c3d` + `dac9938`, §12-§13.)
 - (Done 2026-10-14 23:29: order 08 photo storage deployed via order 09, §11.)
 - (Superseded 2026-09-21 item: Phase 5c Android commit/push/UAT. Check `git log` before acting on it.)
@@ -690,3 +690,30 @@ Bug: the receipt voucher printed `2026-10-14T23:47:16.242906+03:00` as its date.
 - **(a)** Fix the two receipt nits (§12) with TDD, one more `push.sh`.
 - **(b)** Implement the context-budget hook (§9 (d)).
 - **(c)** Photo phase 2 on Android: display student photos via `/api/v1/students/<id>/photo` (good agy fleet order).
+
+---
+
+## 14. Session 2026-10-15 ~00:45 → 08:08 — Receipt nits: plan-scoped balance + Arabic count wording (Claude Code CLI, TDD)
+
+Request: (1) receipt `remaining_balance` must come from the same fee plan as `total_fee`; (2) summary text count grammar.
+
+| Step | Who | Result | Evidence |
+| :--- | :--- | :--- | :--- |
+| RED | Claude | 6 failing for the right reason: old `على 1/2 دفعات` wording; `remaining_balance` 1800 (student-wide, older unpaid plan) vs plan 1000 | `server/tests/test_print.py` |
+| Fix | Claude | `_installments_count_text()`: `على دفعة واحدة` / `على دفعتين` / `على 3..10 دفعات` / `على 11+ دفعة`. `_installment_breakdown()` returns `remaining_balance` = sum(`amount - paid_amount`) over the newest plan's pending/partial installments (fallback: student balance when no plan); `is_fully_paid` and summary use it too | `072320e` |
+| Gate | Claude | **[APPROVED]**: full suite 184/184 with `PGTZ='<+03>-03'` (177 + 7 new); receipt suites (`test_print`, `test_api`, `test_e2e_student_registration_receipt`) 40/40; ruff delta 0 | `072320e` |
+| Push + deploy | — | **NOT done**: origin/main = `dac9938` (checked 08:08) | fleet order 12 |
+
+### Open items
+- Fleet order 12: `edutrack_pro/fleet_orders/12_RECEIPT_NITS_PUSH_DEPLOY.md` (quarantined). Its Step 2 expects `0   2`; if this §14 note is committed first the count is `0   3` (Amendment A in the order covers both).
+- Semantics to confirm with Ibrahim: `is_fully_paid` is now plan-scoped (an older unpaid plan no longer shows on the receipt); plan selection is still "newest plan", not "plan of the paid installment" (one-line change if wanted).
+- Ibrahim's receipt reprint from §13 (date `YYYY-MM-DD`, one A5 page) is folded into order 12's final check.
+- Test flake (§13): `test_registration_installments` fails 00:00-03:00 Riyadh in a UTC test DB; gate runs with `PGTZ='<+03>-03'`.
+- `edutrack_pro/docs/reports/` stays untracked on purpose (Ibrahim's `keep`).
+- Repos: root `[ahead 2]` before this note; Brain `[ahead 6]`. Push is Ibrahim's call.
+
+### Next choices
+- **(a)** Run fleet order 12 (push, WSL ff, `push.sh`), then Claude verifies the public side and Ibrahim reprints two receipts.
+- **(b)** Receipt plan selection: use the paid installment's own fee plan instead of the newest plan (TDD, one more deploy).
+- **(c)** Implement the context-budget hook (§9 (d)).
+- **(d)** Photo phase 2 on Android: display student photos via `/api/v1/students/<id>/photo` (agy fleet order).
