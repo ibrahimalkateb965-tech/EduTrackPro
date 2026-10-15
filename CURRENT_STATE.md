@@ -702,7 +702,9 @@ Request: (1) receipt `remaining_balance` must come from the same fee plan as `to
 | RED | Claude | 6 failing for the right reason: old `على 1/2 دفعات` wording; `remaining_balance` 1800 (student-wide, older unpaid plan) vs plan 1000 | `server/tests/test_print.py` |
 | Fix | Claude | `_installments_count_text()`: `على دفعة واحدة` / `على دفعتين` / `على 3..10 دفعات` / `على 11+ دفعة`. `_installment_breakdown()` returns `remaining_balance` = sum(`amount - paid_amount`) over the newest plan's pending/partial installments (fallback: student balance when no plan); `is_fully_paid` and summary use it too | `072320e` |
 | Gate | Claude | **[APPROVED]**: full suite 184/184 with `PGTZ='<+03>-03'` (177 + 7 new); receipt suites (`test_print`, `test_api`, `test_e2e_student_registration_receipt`) 40/40; ruff delta 0 | `072320e` |
-| Push + deploy | — | **NOT done**: origin/main = `dac9938` (checked 08:08) | fleet order 12 |
+| Push + deploy | Ibrahim / Antigravity (WSL) | **DONE** 2026-10-15: origin/main = `feed8e6`; backup ok; `push.sh` rebuilt the API; `moved 0, skipped 0`; container grep = 4 | `fleet_orders/12_REPORT.md` |
+| Public check | Claude | health 200; `/print/receipt` no token 401; dashboard 200 `v=3.4` x2; `/server/` 404; `receipt.html` has `دورية الأقساط` | curl 2026-10-15 |
+| Reprint | Ibrahim | **DONE** (two receipts: installment + fully paid) | Ibrahim: "DONE" |
 
 ### Open items
 - Fleet order 12: `edutrack_pro/fleet_orders/12_RECEIPT_NITS_PUSH_DEPLOY.md` (quarantined). Its Step 2 expects `0   2`; if this §14 note is committed first the count is `0   3` (Amendment A in the order covers both).
