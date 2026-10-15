@@ -518,12 +518,13 @@ Pre-flight: Ibrahim confirmed `7eeeada` (pagination follow-up, choice (b) of §6
 
 ---
 
-## 6. THE ONE THING TO DO NEXT (updated 2026-10-15 11:15)
+## 6. THE ONE THING TO DO NEXT (updated 2026-10-15 21:18)
 
-- Receipt PDF download button is live on production (§15). Next choices:
+- Fleet Order 14 deployed `f123050` live on production: direct receipt PDF download via server-side Chromium and local Cairo font + receipt plan selection (§16-§17). Next choices:
   - (a) Photo phase 2 on Android: display student photos via `/api/v1/students/<id>/photo` (§8/§14).
   - (b) Implement the context-budget hook (§9 (d)).
-  - (c) Receipt plan selection: use the paid installment's own fee plan instead of newest plan (§14).
+  - (c) Phase 5 role scoping sections 3-4.
+- (Done 2026-10-15 21:18: fleet order 14 deployed `f123050`, §17.)
 - (Done 2026-10-15 08:55: fleet order 13 deployed `9ff8e0e`, §15.)
 - (Done 2026-10-15 08:20: fleet order 12 deployed `072320e`, §14.)
 - (Done 2026-10-15 00:07 / 00:30: fleet orders 10 and 11 deployed `cdc1c3d` + `dac9938`, §12-§13.)
@@ -772,4 +773,24 @@ Request: option (b) from section 14. The receipt breakdown (`total_fee`, `remain
 - Root `[ahead 5]` (`45396f0` code + docs); Brain `[ahead 7]`, `06_Daily/2026-10-15.md` modified. Push is Ibrahim's call.
 - `edutrack_pro/docs/reports/` stays untracked on purpose (Ibrahim's `keep`). `stash@{0}` (teacher media viewer WIP on `92a2a1d`) predates this session; not touched.
 - Section numbers collide when two sessions append to this file (two §15 existed). Read the last `## N.` heading right before appending.
+
+---
+
+## 17. Session 2026-10-15 — Direct receipt PDF download via server-side Chromium (Claude Code CLI & Antigravity WSL)
+
+Request: user noted download button in §15 opened the print dialog; requested real direct PDF download without print dialog and E2E verification.
+
+| Step | Who | Result | Evidence |
+| :--- | :--- | :--- | :--- |
+| Implement | Claude Code CLI | Headless Chromium in API server renders receipt template + `print_engine.js` with exact Arabic shaping, word spacing, colons, and local Cairo font; signed 2-min download URL prevents IDM 0-byte stream intercept; `downloadPdf()` in `print_engine.js` | `server/edutrack_api/services/pdf.py`, `web/print/` |
+| Gate | Claude Code CLI | **[APPROVED]**: full server suite 196/196 passed at `PGTZ='<+03>-03'` (+10 new); browser tests 26/26 passed with headless Chromium; receipt PDF downloads as `سند_قبض_1_عمر إبراهيم الكاتب.pdf` (1 page A5 landscape, vector text, Cairo embedded); ruff delta 0; committed as `f123050` | `f123050` |
+| Fleet Order 14 | Antigravity (WSL) | `fleet_orders/14_RECEIPT_DIRECT_PDF_PUSH_DEPLOY.md` prepared | `fleet_orders/14_RECEIPT_DIRECT_PDF_PUSH_DEPLOY.md` |
+| Push + deploy | Antigravity (WSL) / Ibrahim | **DONE** 2026-10-15 21:18: backup ok; `git push origin main` fast-forward `0   7` (`f123050`); WSL clone ff-only; `push.sh` deployed; Dockerfile built API image with Chromium; `moved 0, skipped 0`; API healthy `2.0.0`; dashboard 200; `/server/` 404 | `fleet_orders/14_REPORT.md` |
+| Public check | Antigravity / Ibrahim | Public curl verified: `downloadPdf` = 2 in `print_engine.js`; Cairo font 200; `POST /api/v1/print/pdf/receipt` 401 without auth | curl 2026-10-15 21:18 |
+
+### Next choices
+- **(a)** Photo phase 2 on Android: display student photos via `/api/v1/students/<id>/photo`.
+- **(b)** Implement the context-budget hook (§9 (d)).
+- **(c)** Phase 5 role scoping sections 3-4.
+
 
