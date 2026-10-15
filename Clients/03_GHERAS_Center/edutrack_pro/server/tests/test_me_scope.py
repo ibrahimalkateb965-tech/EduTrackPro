@@ -147,6 +147,13 @@ def test_b1_manager_is_rejected_on_me_routes(client, manager):
     assert res.json()["error"] == {"code": "forbidden", "message": MSG_NOT_MOBILE}
 
 
+def test_b1_supervisor_is_rejected_on_me_routes(client, db):
+    make_user(db, "sup_user", "supervisor")
+    res = client.get(f"{ME}/profile", headers=login(client, "sup_user"))
+    assert res.status_code == 403, res.text
+    assert res.json()["error"] == {"code": "forbidden", "message": MSG_NOT_MOBILE}
+
+
 def test_b1_guardian_without_link_is_403(client, db):
     make_user(db, "g_orphan", "guardian")
 
@@ -251,7 +258,7 @@ def test_b1_teacher_rooms_are_home_and_scheduled(client, world):
 
 def test_b1_teacher_without_room_or_schedule_sees_empty_lists(client, db, world):
     _, empty = _teacher(db, client, "t_empty", None)
-    for path in ("students", "rooms", "schedule", "notifications"):
+    for path in ("students", "rooms", "schedule", "notifications", "attendance", "evaluations", "assignments", "submissions", "lesson-logs", "skill-progress"):
         res = client.get(f"{ME}/{path}", headers=empty)
         assert res.status_code == 200, (path, res.text)
         assert res.json()["items"] == [] and res.json()["total"] == 0, path
@@ -468,6 +475,8 @@ def test_b2_submissions_never_leak_another_childs_files(client, db, world):
 
     teacher_view = client.get(f"{ME}/submissions?assignment_id={asg}", headers=world.teacher).json()
     assert {r["id"] for r in teacher_view["items"]} == {sub_a1, sub_b1}
+    out_of_scope_asg = str(uuid.uuid4())
+    assert client.get(f"{ME}/submissions?assignment_id={out_of_scope_asg}", headers=world.teacher).json() == {"items": [], "total": 0, "limit": 100, "offset": 0}
 
 
 def test_b2_lesson_logs_teacher_sees_notes_guardian_does_not(client, db, world):

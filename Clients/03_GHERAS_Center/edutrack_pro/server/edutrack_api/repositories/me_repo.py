@@ -11,7 +11,7 @@ from uuid import UUID
 
 from edutrack_api.audit import write_audit
 from edutrack_api.errors import ApiError
-from edutrack_api.scope import Scope
+from edutrack_api.scope import MSG_ROOM_OUT_OF_SCOPE, Scope
 from edutrack_api.services.settings import load_settings
 
 Rows = tuple[list[dict], int]
@@ -463,8 +463,6 @@ def list_skill_progress(conn, scope: Scope, filters: dict, limit: int, offset: i
 
 
 # ---- batch 3: installments, receipts, POST lesson-logs ----------------------
-
-MSG_ROOM_OUT_OF_SCOPE = "الحلقة خارج نطاق صلاحيتك"
 
 
 def list_installments(conn, scope: Scope, filters: dict, limit: int, offset: int) -> Rows:

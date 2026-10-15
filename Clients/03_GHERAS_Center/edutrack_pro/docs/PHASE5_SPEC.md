@@ -1,8 +1,8 @@
-# EduTrack Pro — Phase 5 (b) Specification: Mobile Role Scoping (`teacher` / `guardian`)
+# EduTrack Pro — Phase 5 (b) Specification: Mobile Role Scoping (`teacher` / `guardian` / `student`)
 
 - **Owner**: Autovem Master Architect (Claude Code CLI)
 - **Client**: Gheras Center (`Clients/03_GHERAS_Center`)
-- **Status**: **[IMPLEMENTED — batches 0–3 [APPROVED] 2026-09-20; commits `d136a4b` (0a scope.py), `1be6f01` (0b tests), `9ee3705` (batch 1), `650e171` (batch 2), batch 3 = the commit that carries this line; 100 tests green on embedded PG 16; deploy pending]**
+- **Status**: **[IMPLEMENTED — batches 0–3 [APPROVED] 2026-09-20; re-audited and [APPROVED] 2026-10-16 @ `fb6657e`; 198 server tests green]**
 - **Baseline**: `af6afff` on `main` (Phase 4 closed in production, v=3.0, migrations 001–006)
 - **Process**: superpowers brainstorming, architectural path. Sections 1–4 approved; self-review done 2026-09-20. Next: Ibrahim reviews this file → `superpowers:writing-plans` → batches per §4.4 (routers to OpenCode Worker B, `scope.py` + tests by Claude Code only).
 
@@ -19,9 +19,9 @@
 
 ### Findings that motivated the design (code facts, verified)
 
-- Roles exist end-to-end: `users.role ∈ {manager, supervisor, teacher, guardian}` (`001_schema.sql:148`), JWT carries `role`, `auth.current_user` already loads `staff_id`, `guardian_id`, `room_id`. **No schema migration needed.**
-- Scoping keys exist: teacher → `users.room_id` + `schedules/assignments/lesson_logs/evaluations.teacher_user_id`; guardian → `users.guardian_id` → `student_guardians` → `students`.
-- All `/api/v1/<resource>` CRUD routes are `require_roles("manager","supervisor")` → teacher/guardian get 403 today.
+- Roles exist end-to-end: `users.role ∈ {manager, supervisor, teacher, guardian, student}` (`001_schema.sql:148`), JWT carries `role`, `auth.current_user` already loads `staff_id`, `guardian_id`, `student_id`, `room_id`. **No schema migration needed.**
+- Scoping keys exist: teacher → `users.room_id` + `schedules/assignments/lesson_logs/evaluations.teacher_user_id`; guardian → `users.guardian_id` → `student_guardians` → `students`; student → `users.student_id`.
+- All `/api/v1/<resource>` CRUD routes are `require_roles("manager","supervisor")` → teacher/guardian/student get 403 today.
 - **Security defect (pre-existing since Phase 2):** `routers/attendance.py` admits `teacher` on three routes with **no row scope** — `POST /attendance/students`, `GET /daily-evaluations`, `POST /evaluations/daily` (also `POST /daily-evaluations` alias). A teacher can read/write attendance and daily evaluations for any student in the center. Fixed by Section 1 guards. **Shipped as hotfix `2a63c50` (B-5.1) together with B-5.2: `POST /attendance/staff` restricted to manager/supervisor. `scope.py` now holds the teacher branch of §1; the guardian branch and `require_scope` land with `routers/me.py`.**
 - Dashboard assigns a teacher one room («الحلقة», `web/dashboard/js/views/staff.js:202`) but the schedule editor assigns a teacher per slot (`rooms.js:568`) → a teacher can legitimately cover rooms other than `room_id` (drives D2).
 - Mobile Room DAOs already present under `mobile/android/app/src/main/java/sa/gheras/edutrack/data/dao/`: Assignment, AssignmentStudent, Evaluation, Guardian, LessonLog, Notification, Room, Schedule, SkillProgress, StudentAttendance → bounds the endpoint surface.
@@ -36,17 +36,20 @@ New module `edutrack_api/scope.py`:
 ```python
 @dataclass(frozen=True)
 class Scope:
-    role: str                     # "teacher" | "guardian"
-    room_ids: frozenset[UUID]     # teacher: home room ∪ scheduled rooms; guardian: ∅
-    student_ids: frozenset[UUID]  # guardian: linked children; teacher: students in room_ids (active, not deleted)
+    role: str                     # "teacher" | "guardian" | "student"
+    room_ids: frozenset[UUID]     # teacher: home room ∪ scheduled rooms; guardian: ∅; student: own room
+    student_ids: frozenset[UUID]  # guardian: linked children; teacher: students in room_ids; student: {student_id}
+    user_id: UUID
     def assert_students(self, ids: Iterable[UUID]) -> None  # raises ApiError(403, "forbidden") on any id outside student_ids
+    def assert_rooms(self, ids: Iterable[UUID]) -> None     # raises ApiError(403, "forbidden", MSG_ROOM_OUT_OF_SCOPE)
 ```
 
 - `resolve_scope(conn, user) -> Scope` — one query per role:
   - **teacher**: `room_ids = {users.room_id} ∪ SELECT room_id FROM schedules WHERE teacher_user_id = me AND deleted_at IS NULL`; `student_ids = SELECT id FROM students WHERE room_id = ANY(room_ids) AND status = 'active' AND deleted_at IS NULL`.
   - **guardian**: `student_ids = SELECT sg.student_id FROM student_guardians sg JOIN students s ON s.id = sg.student_id AND s.deleted_at IS NULL WHERE sg.guardian_id = users.guardian_id AND sg.deleted_at IS NULL`. Dismissed/archived children **stay visible** (history).
+  - **student**: `student_ids = {users.student_id}`; `room_ids = {s.room_id}` (from `students` if set). Student with `student_id NULL` → 403 `forbidden` (MSG_STUDENT_UNLINKED).
   - Teacher with `room_id NULL` and no schedules → empty scope; endpoints return empty lists (200), not 403. Guardian with `guardian_id NULL` → 403 `forbidden` (misconfigured account, manager must fix).
-- FastAPI dependency `require_scope` = `require_roles("teacher", "guardian")` + `resolve_scope`. Manager/supervisor are **rejected** on `/me/*` (403) — they use the dashboard routes; `/me/*` stays a single-purpose boundary.
+- FastAPI dependency `require_scope` = `require_roles("teacher", "guardian", "student")` + `resolve_scope`. Manager/supervisor are **rejected** on `/me/*` (403) with `MSG_NOT_MOBILE` («هذه الواجهة مخصصة لتطبيق المعلم وولي الأمر والطالب») — they use the dashboard routes; `/me/*` stays a single-purpose boundary.
 - Empty-`student_ids` fast path: every list query short-circuits to `{"items": [], "total": 0, ...}` without touching the DB (avoids `= ANY('{}')` edge cases).
 - `attendance.py` guards: the three teacher-reachable routes call `resolve_scope` only when `user["role"] == "teacher"` and run `scope.assert_students(...)` on every posted/filtered `student_id`; the teacher path of `GET /daily-evaluations` appends `AND e.student_id = ANY(%s)`. Manager/supervisor behaviour unchanged.
 
@@ -126,7 +129,7 @@ Reuse `ApiError` and `DEFAULT_MESSAGES`; no new error module.
 
 | Case | Status / code | Message |
 | :--- | :--- | :--- |
-| manager/supervisor on any `/me/*` | 403 `forbidden` | «هذه الواجهة مخصصة لتطبيق المعلم وولي الأمر» |
+| manager/supervisor on any `/me/*` | 403 `forbidden` | «هذه الواجهة مخصصة لتطبيق المعلم وولي الأمر والطالب» |
 | guardian with `users.guardian_id NULL` | 403 `forbidden` | «حساب ولي الأمر غير مرتبط بطالب — راجع إدارة المركز» |
 | teacher on `/me/installments`, `/me/receipts`; guardian on `/me/rooms`, `POST /me/lesson-logs` | 403 `forbidden` | default |
 | `schedule.room_id ∉ room_ids` on `POST /me/lesson-logs` | 403 `forbidden` | «الحلقة خارج نطاق صلاحيتك» (mirrors the `2a63c50` message «الطالب خارج نطاق صلاحيتك») |
@@ -149,7 +152,7 @@ Out-of-scope filter values (`student_id`, `schedule_id`, `assignment_id`) are **
 | `submissions` | `submitted_at DESC, id` |
 | `schedules` | `day, start_time, id` (`day` is `text` — deterministic, not weekday-chronological; the app groups by weekday itself) |
 | `students`, `rooms` | `name, id` |
-| `notifications` | `created_at DESC, id` |
+| `notifications` | `COALESCE(sent_at, created_at) DESC, id` (from Notifications v2) |
 | `installments` | `due_date, id` |
 | `receipts` | `issued_on DESC, id` |
 
