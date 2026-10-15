@@ -518,9 +518,14 @@ Pre-flight: Ibrahim confirmed `7eeeada` (pagination follow-up, choice (b) of §6
 
 ---
 
-## 6. THE ONE THING TO DO NEXT (updated 2026-10-15 08:08)
+## 6. THE ONE THING TO DO NEXT (updated 2026-10-15 11:15)
 
-- Run fleet order 12 (`edutrack_pro/fleet_orders/12_RECEIPT_NITS_PUSH_DEPLOY.md`, push + WSL ff + `push.sh` for `072320e`), then Claude verifies the public side and Ibrahim reprints two receipts (§14). Then pick from §14 next choices.
+- Receipt PDF download button is live on production (§15). Next choices:
+  - (a) Photo phase 2 on Android: display student photos via `/api/v1/students/<id>/photo` (§8/§14).
+  - (b) Implement the context-budget hook (§9 (d)).
+  - (c) Receipt plan selection: use the paid installment's own fee plan instead of newest plan (§14).
+- (Done 2026-10-15 08:55: fleet order 13 deployed `9ff8e0e`, §15.)
+- (Done 2026-10-15 08:20: fleet order 12 deployed `072320e`, §14.)
 - (Done 2026-10-15 00:07 / 00:30: fleet orders 10 and 11 deployed `cdc1c3d` + `dac9938`, §12-§13.)
 - (Done 2026-10-14 23:29: order 08 photo storage deployed via order 09, §11.)
 - (Superseded 2026-09-21 item: Phase 5c Android commit/push/UAT. Check `git log` before acting on it.)
@@ -715,7 +720,32 @@ Request: (1) receipt `remaining_balance` must come from the same fee plan as `to
 - Repos: root `[ahead 2]` before this note; Brain `[ahead 6]`. Push is Ibrahim's call.
 
 ### Next choices
-- **(a)** Run fleet order 12 (push, WSL ff, `push.sh`), then Claude verifies the public side and Ibrahim reprints two receipts.
-- **(b)** Receipt plan selection: use the paid installment's own fee plan instead of the newest plan (TDD, one more deploy).
-- **(c)** Implement the context-budget hook (§9 (d)).
-- **(d)** Photo phase 2 on Android: display student photos via `/api/v1/students/<id>/photo` (agy fleet order).
+- **(a)** Photo phase 2 on Android: display student photos via `/api/v1/students/<id>/photo` (agy fleet order).
+- **(b)** Implement the context-budget hook (§9 (d)).
+- **(c)** Receipt plan selection: use the paid installment's own fee plan instead of the newest plan (TDD, one more deploy).
+
+---
+
+## 15. Session 2026-10-15 ~08:45 → 11:15 — Receipt PDF download button (Claude Code CLI & Antigravity WSL)
+
+Request: add a dedicated download button on the receipt voucher preview page (`receipt.html`) so users can download/save the voucher directly as a PDF.
+
+| Step | Who | Result | Evidence |
+| :--- | :--- | :--- | :--- |
+| Implement | Antigravity / fleet worker | `#gheras-download-action` in `print_engine.js` invokes `window.print()`; dynamic `document.title = 'سند_قبض_' + data.receipt_no + '_' + cleanStudent` for clean browser "Save as PDF" filename; `.download-btn` styled in `print.css`; hidden in `@media print` (`display: none !important;`) | `web/print/` |
+| Gate | Claude | **[APPROVED]**: print tests 28/28 passed at `PGTZ='<+03>-03'` (including student photo tests); title sanitizer verified; toolbar hidden in print; color calibrated from `#00897b` (4.32:1) to `#00796b` / hover `#00695c` (5.32:1) meeting WCAG AA; committed as `9ff8e0e` | `9ff8e0e` |
+| Fleet Order 13 | Antigravity (WSL) | `13_RECEIPT_DOWNLOAD_PDF_PUSH_DEPLOY.md` prepared | `fleet_orders/13_RECEIPT_DOWNLOAD_PDF_PUSH_DEPLOY.md` |
+| Push + deploy | Antigravity (WSL) / Ibrahim | **DONE** 2026-10-15 08:55: backup ok; `git push origin main` fast-forward `0   1` (`9ff8e0e`); WSL clone ff-only; `push.sh` deployed; `moved 0, skipped 0`; API healthy `2.0.0`; dashboard 200 | `fleet_orders/13_REPORT.md` |
+| Public check | Antigravity / Ibrahim | Public curl verified: `gheras-download-action` = 1 in `print_engine.js`; `#00796b` = 1 in `print.css` | curl 2026-10-15 08:55 |
+
+### Open items / Notes
+- Download action calls `window.print()`, so the user saves via browser "Save as PDF". The page title becomes the suggested filename in Chromium/Edge.
+- Existing tech debt logged: orange print button (`--g-orange #f57c00`) contrast is 2.70:1, below WCAG AA.
+- `edutrack_pro/docs/reports/` stays untracked on purpose.
+- Daily note logged in `Brain/06_Daily/2026-10-15.md`.
+
+### Next choices
+- **(a)** Photo phase 2 on Android: display student photos via `/api/v1/students/<id>/photo`.
+- **(b)** Implement the context-budget hook (§9 (d)).
+- **(c)** Receipt plan selection: use the paid installment's own fee plan instead of newest plan (§14).
+
