@@ -852,6 +852,23 @@ Request: User order "الثاني، ثم الثالث، ثم الأول" (Resolv
 - Android APK `app-debug.apk` (21.7 MB) is built and ready for physical device testing when connected via ADB.
 - All three user requests (Option a, Option b, Option c + Follow-up 2, 3, 1) are 100% completed, tested, approved, committed, and deployed.
 
+---
+
+## 22. Session 2026-10-16 — Sustainable Learning Protocol & Technical Invariants [C-88, C-89, C-91, C-92] (/learn)
+
+Request: User triggered `/learn`, `سجل هذا`, and `تم بنجاح` (Hook 14 & Hook 15). Extract and persist technical lessons and architecture decisions into global context and brain vault.
+
+| Invariant | Title & Domain | Problem & Resolution | Status |
+| :--- | :--- | :--- | :--- |
+| **[C-88]** | psycopg3 SQL Percentage Wildcard Escaping (Domain 4) | Literal `%` inside parameterised queries (e.g. `LIKE '/api/v1/students/%'`) triggers `500 ProgrammingError` in psycopg3; mandatory standard is double percent `%%` (`LIKE '/api/v1/students/%%'`). | Injected in `ACTIVE_CONTEXT_INJECTION.md` |
+| **[C-89]** | Claude Code Hooks Directory Junction & CJS Module Isolation (Domain 1) | ESM `"type": "module"` in project root breaks CJS hooks; Windows direct writes risk C: drive pollution. Standard: Directory Junction to secondary drive + dedicated `package.json {"type": "commonjs"}` inside `tools/claude_hooks`. | Injected in `ACTIVE_CONTEXT_INJECTION.md` |
+| **[C-91]** | Multi-CLI Headless Delegation via Stdin Streaming (Domain 1) | Long/multiline prompts via raw CMD args (`claude -p "..."`) truncate quotes and break. Standard: stream prompt via `stdin=subprocess.PIPE` (`cmd.exe /c "claude -p -"`). | Injected in `ACTIVE_CONTEXT_INJECTION.md` |
+| **[C-92]** | Cross-Platform Android Non-Interactive Build & JDK Isolation (Domain 3) | Cross-environment WSL/Windows JVM mismatch corrupts builds. Standard: explicit `$env:JAVA_HOME` targeting Adoptium JDK 17 + Python raw strings (`r'''...'''`). | Injected in `ACTIVE_CONTEXT_INJECTION.md` |
+
+- **Artifact:** `learning_proposal.md` written, reviewed, and approved via automated review policy.
+- **Context Injection:** `ACTIVE_CONTEXT_INJECTION.md` updated to 89 total constraints across all 6 domains.
+
+
 
 
 
