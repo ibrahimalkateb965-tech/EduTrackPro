@@ -4,7 +4,7 @@
 > **Master Orchestrator**: `Claude Code CLI` (Opus Max / Sonnet 5)  
 > **Handoff Source**: `Antigravity IDE` (Interactive Cockpit & Visual Inspector)  
 > **Timestamp**: 2026-09-16T12:55:00+03:00  
-> **Last updated:** 2026-10-15 08:08 (+03:00) — Claude Code CLI, session "receipt date + nits" (strategic-clear): receipt nits fix [APPROVED] `072320e` (184/184), NOT pushed, NOT deployed; fleet order 12 ready (§14). Previous update 00:40, session "receipt date format": receipt date fix [APPROVED] `dac9938`, pushed and DEPLOYED via fleet order 11; order 10 (installment breakdown `cdc1c3d`) also DEPLOYED; public side verified (§13). Ibrahim's receipt reprint pending. Previous update 00:07: receipt voucher installment breakdown [APPROVED] `cdc1c3d`, fleet order 10 ready (§12). Order 08 photo storage DEPLOYED via order 09 (§11). Previous update 2026-10-14 23:15: fleet order 08 [APPROVED] `e7cf93d`. 22:27: Antigravity CLI 4-worker fleet DONE (§10). Previous update 21:26, session "context-budget hook design": global context-budget hook spec APPROVED (Brain `fb50405` + `1853b91`), not implemented. See §9. Previous update 21:12: EduTrack student photo DEPLOYED (`47cd020`); Antigravity CLI fleet awaiting Worker 1 login (§8).
+> **Last updated:** 2026-10-15 11:25 (+03:00) — Claude Code CLI, session "receipt plan selection" (strategic-clear): receipt breakdown now scoped to the paid installment's fee plan, [APPROVED] `45396f0` (186/186), NOT pushed, NOT deployed (§16). Earlier today: orders 12 and 13 DEPLOYED (§14, §15). Previous: 08:08 session "receipt date + nits" (§14).
 > **VCS:** git at workspace root, branch `main`.
 
 ---
@@ -763,8 +763,13 @@ Request: option (b) from section 14. The receipt breakdown (`total_fee`, `remain
 | Push + deploy | - | **NOT done** | next: a fleet order 14 |
 
 ### Next choices
-- **(a)** Fleet order for push, WSL ff, `push.sh` (API image change), then public check and one reprint of a student whose paid installment is on an older plan.
+- **(a)** Write fleet order 14: push (root is ahead 5), WSL ff, `push.sh` (API image change), then public check and one reprint of a student whose paid installment is on an older plan.
 - **(b)** Context-budget hook (section 9 (d)).
 - **(c)** Photo phase 2 on Android.
 - **(d)** Phase 5 role scoping sections 3-4.
+
+### Open items (frozen 2026-10-15 11:25)
+- Root `[ahead 5]` (`45396f0` code + docs); Brain `[ahead 7]`, `06_Daily/2026-10-15.md` modified. Push is Ibrahim's call.
+- `edutrack_pro/docs/reports/` stays untracked on purpose (Ibrahim's `keep`). `stash@{0}` (teacher media viewer WIP on `92a2a1d`) predates this session; not touched.
+- Section numbers collide when two sessions append to this file (two §15 existed). Read the last `## N.` heading right before appending.
 
