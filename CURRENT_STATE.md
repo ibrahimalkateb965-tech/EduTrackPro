@@ -518,12 +518,15 @@ Pre-flight: Ibrahim confirmed `7eeeada` (pagination follow-up, choice (b) of §6
 
 ---
 
-## 6. THE ONE THING TO DO NEXT (updated 2026-10-15 21:18)
+## 6. THE ONE THING TO DO NEXT (updated 2026-10-16 01:15)
 
-- Fleet Order 14 deployed `f123050` live on production: direct receipt PDF download via server-side Chromium and local Cairo font + receipt plan selection (§16-§17). Next choices:
-  - (a) Photo phase 2 on Android: display student photos via `/api/v1/students/<id>/photo` (§8/§14).
-  - (b) Implement the context-budget hook (§9 (d)).
-  - (c) Phase 5 role scoping sections 3-4.
+- Autonomous Fleet cycle complete: Options (a), (b), and (c) all finished and **[APPROVED]** by Claude Code CLI (§18–§20). Next choices:
+  - (a) Push commits (`5847703` / `fb6657e` / Brain `86634ff`) and deploy to production VPS (`push.sh`).
+  - (b) Clean up non-blocking nits from §20 audit (unify `MSG_ROOM_OUT_OF_SCOPE`, update `PHASE5_SPEC.md`).
+  - (c) Android end-to-end UAT on physical device via ADB.
+- (Done 2026-10-16 01:12: Phase 5b role scoping sections 3–4 audited and **[APPROVED]** by Claude Code CLI, §20.)
+- (Done 2026-10-16 00:55: context-budget hook implemented, tested 28/28, verified live, §19.)
+- (Done 2026-10-16 00:25: photo phase 2 on Android + photo_url scoping committed `5847703`, approved 157/157 + 197/197, §18.)
 - (Done 2026-10-15 21:18: fleet order 14 deployed `f123050`, §17.)
 - (Done 2026-10-15 08:55: fleet order 13 deployed `9ff8e0e`, §15.)
 - (Done 2026-10-15 08:20: fleet order 12 deployed `072320e`, §14.)
@@ -787,10 +790,51 @@ Request: user noted download button in §15 opened the print dialog; requested r
 | Fleet Order 14 | Antigravity (WSL) | `fleet_orders/14_RECEIPT_DIRECT_PDF_PUSH_DEPLOY.md` prepared | `fleet_orders/14_RECEIPT_DIRECT_PDF_PUSH_DEPLOY.md` |
 | Push + deploy | Antigravity (WSL) / Ibrahim | **DONE** 2026-10-15 21:18: backup ok; `git push origin main` fast-forward `0   7` (`f123050`); WSL clone ff-only; `push.sh` deployed; Dockerfile built API image with Chromium; `moved 0, skipped 0`; API healthy `2.0.0`; dashboard 200; `/server/` 404 | `fleet_orders/14_REPORT.md` |
 | Public check | Antigravity / Ibrahim | Public curl verified: `downloadPdf` = 2 in `print_engine.js`; Cairo font 200; `POST /api/v1/print/pdf/receipt` 401 without auth | curl 2026-10-15 21:18 |
+| Post-Deploy Fix | Antigravity / Ibrahim | **Fixed & Redeployed** `6e686c5`: Playwright permissions in non-root Docker (`ENV PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright` + `chmod -R 755`). Production mobile voucher PDF download verified (`سند_قبض_21_علاء الدين`, 124 KB, 0 errors). Architectural invariant `[C-87]` approved and recorded. | `6e686c5` |
+
+---
+
+## 18. Session 2026-10-16 — Student Photo Phase 2 on Android & photo_url scoping (Claude Code CLI & Antigravity)
+
+Request: Option (a) from section 17. Implement photo phase 2 on Android displaying student photos via Coil with secure photo_url scoping.
+
+| Step | Who | Result | Evidence |
+| :--- | :--- | :--- | :--- |
+| Backend | Antigravity / Ibrahim | Whitelist `s.photo_url` via `CASE WHEN s.photo_url LIKE '/api/v1/students/%%' THEN s.photo_url END` in `me_repo.py` to prevent token leakage and external URL bleed. | `me_repo.py` |
+| Android Data | Antigravity | Added `photo_url` to `StudentDto`, `StudentEntity`, `StudentMappers`; upgraded `GherasDatabase` to v4 (`MIGRATION_3_4`), tracked `schemas/4.json`; exposed `okHttpClient` as `internal` in `AppContainer`. | Android data layer |
+| Android UI | Antigravity | Created `PhotoUtils.kt` (relative path verification) and `StudentAvatar.kt` (Coil `AsyncImage` with initials/icon fallback); wired in `StudentsScreen`, `StudentDetailScreen`, and `ChildSwitcher`. | Android UI |
+| Gate | Claude Code CLI | **[APPROVED]**: Android 157/157 unit tests in 38 suites passed (`Migration3To4Test`, `StudentMapperTest`); Server 197/197 tests passed at `PGTZ='<+03>-03'` (+1 security test in `test_me_scope.py`); committed as `5847703` (WSL) / `fb6657e` (Windows). | `5847703` / `fb6657e` |
+
+---
+
+## 19. Session 2026-10-16 — Global Context-Budget Hook implementation & verification (Antigravity & Claude Code CLI)
+
+Request: Option (b) from section 17. Implement the context-budget hook according to `Brain/05_Fleet/Context_Budget_Hook_Spec.md`.
+
+| Step | Who | Result | Evidence |
+| :--- | :--- | :--- | :--- |
+| Implement | Antigravity | Built `tools/claude_hooks/context-budget.js` (token limits 120k/135k/150k/170k, PreToolUse lock, PostToolUse zone alerts, SessionStart resume delivery, fail-open robustness). | `tools/claude_hooks/context-budget.js` |
+| Unit Tests | Antigravity | Full automated test suite `tools/claude_hooks/context-budget.test.js`: **28/28 tests passed**. | `context-budget.test.js` |
+| [C-82] Quarantine | Antigravity | Configured Windows Directory Junction from `C:\Users\Kt\.claude\hooks` to `F:\AI PROJECTS\Autovemtech\tools\claude_hooks` with zero physical file writes on `C:`. | PowerShell Junction |
+| Statusline & Config | Antigravity | Updated `statusline.ps1` with lock icon 🔒 and zones Cyan/Yellow/Red; hooked `settings.json` and `strategic-clear.md` step 3b; live test in Claude Code CLI confirmed lock and allowlist behavior. | `~/.claude/` |
+| Documentation | Antigravity | Updated `Context_Governance.md`, `Context_Budget_Hook_Spec.md`, `.agents/CONTEXT_GOVERNANCE.md`, and `06_Daily/2026-10-16.md`; committed in Brain as `5b2750e`. | `5b2750e` |
+
+---
+
+## 20. Session 2026-10-16 — Phase 5 (b) Role Scoping Sections 3–4 Audit & Approval (Claude Code CLI)
+
+Request: Option (c) from section 17. Comprehensive architectural audit and verification of Sections 3 and 4 of `PHASE5_SPEC.md` for `/api/v1/me/*`.
+
+| Step | Who | Result | Evidence |
+| :--- | :--- | :--- | :--- |
+| Audit Scope | Claude Code CLI | Audited `routers/me.py`, `repositories/me_repo.py`, `scope.py`, and `tests/test_me_scope.py` against `PHASE5_SPEC.md` §3–§4. | Code audit |
+| Spec Verification | Claude Code CLI | Confirmed: §3.1 Student projections (allow-lists, sensitive data masked, safe `photo_url`), §3.2 `POST /me/lesson-logs` (SELECT-then-write, room-scope check, audit log), §3.3 Attendance cross-guards, §3.4 Guardian reads (notes stripped, scoped assignments/submissions), §4.1 Error messages & status codes, §4.2 Deterministic pagination ending in `, id`. | Spec verification |
+| Gate | Claude Code CLI | **[APPROVED]**: `test_me_scope.py` 40/40 passed; `test_teacher_scope.py` 10/10 passed; full server suite 197/197 passed in 180s; 6 ephemeral probes passed; logged in Brain `02_Clients/03_GHERAS_Center/Signoff.md` and `06_Daily/2026-10-16.md` (`86634ff`). | `86634ff` |
 
 ### Next choices
-- **(a)** Photo phase 2 on Android: display student photos via `/api/v1/students/<id>/photo`.
-- **(b)** Implement the context-budget hook (§9 (d)).
-- **(c)** Phase 5 role scoping sections 3-4.
+- **(a)** Push commits (`5847703` / `fb6657e` / Brain `86634ff`) and deploy to production VPS (`push.sh`).
+- **(b)** Address minor nits from §20 audit: unify `MSG_ROOM_OUT_OF_SCOPE` constant between `scope.py` and `me_repo.py`, update `PHASE5_SPEC.md` text for student role.
+- **(c)** Android end-to-end UAT on physical device via ADB.
+
 
 
