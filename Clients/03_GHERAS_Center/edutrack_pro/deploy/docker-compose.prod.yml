@@ -37,6 +37,7 @@ services:
       TZ: Asia/Riyadh
       STUDENT_PHOTO_DIR: /app/student_photos
       PRINT_WEB_DIR: /app/web/print   # templates rendered to PDF by headless Chromium
+      PLAYWRIGHT_BROWSERS_PATH: /opt/ms-playwright
     depends_on:
       db:
         condition: service_healthy

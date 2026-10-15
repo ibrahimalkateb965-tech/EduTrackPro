@@ -7,6 +7,7 @@ ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \
     UV_PROJECT_ENVIRONMENT=/app/.venv \
     PYTHONUNBUFFERED=1 \
+    PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright \
     PATH="/app/.venv/bin:$PATH"
 
 WORKDIR /app
@@ -15,9 +16,12 @@ WORKDIR /app
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev --no-install-project
 
-# Headless Chromium for /api/v1/print/pdf/* (services/pdf.py), outside /app so the
+# Headless Chromium for /api/v1/print/pdf/* (services/pdf.py), in /opt/ms-playwright so the
 # non-root user can read it; --with-deps pulls its system libraries.
-RUN playwright install --with-deps --only-shell chromium && rm -rf /var/lib/apt/lists/*
+RUN mkdir -p /opt/ms-playwright && \
+    playwright install --with-deps --only-shell chromium && \
+    chmod -R 755 /opt/ms-playwright && \
+    rm -rf /var/lib/apt/lists/*
 
 COPY edutrack_api ./edutrack_api
 RUN uv sync --frozen --no-dev
