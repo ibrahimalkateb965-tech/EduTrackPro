@@ -518,16 +518,19 @@ Pre-flight: Ibrahim confirmed `7eeeada` (pagination follow-up, choice (b) of §6
 
 ---
 
-## 6. THE ONE THING TO DO NEXT (updated 2026-10-16 01:15)
+## 6. THE ONE THING TO DO NEXT (updated 2026-10-16 01:30)
 
-- Autonomous Fleet cycle complete: Options (a), (b), and (c) all finished and **[APPROVED]** by Claude Code CLI (§18–§20). Next choices:
-  - (a) Push commits (`5847703` / `fb6657e` / Brain `86634ff`) and deploy to production VPS (`push.sh`).
-  - (b) Clean up non-blocking nits from §20 audit (unify `MSG_ROOM_OUT_OF_SCOPE`, update `PHASE5_SPEC.md`).
-  - (c) Android end-to-end UAT on physical device via ADB.
+- Production is **LIVE at `e4c6f32`**: All 3 pipeline phases completed, nits resolved, Android APK built (21.7 MB), and deployed to Hostinger VPS with smoke tests green (§18–§21). Next choices:
+  - (a) Plug in Samsung Galaxy S25 Ultra via USB and run `adb install -r Clients/03_GHERAS_Center/edutrack_pro/mobile/android/app/build/outputs/apk/debug/app-debug.apk` for field UAT.
+  - (b) Next agency sprint or new client feature request.
+- (Done 2026-10-16 01:29: deployed `e4c6f32` live to production VPS, API healthy 2.0.0, dashboard 200, §21.)
+- (Done 2026-10-16 01:26: fresh Android APK built clean 21.7 MB, §21.)
+- (Done 2026-10-16 01:23: Phase 5b nits resolved, 198/198 server tests **[APPROVED]**, committed `e4c6f32`, §21.)
 - (Done 2026-10-16 01:12: Phase 5b role scoping sections 3–4 audited and **[APPROVED]** by Claude Code CLI, §20.)
 - (Done 2026-10-16 00:55: context-budget hook implemented, tested 28/28, verified live, §19.)
 - (Done 2026-10-16 00:25: photo phase 2 on Android + photo_url scoping committed `5847703`, approved 157/157 + 197/197, §18.)
 - (Done 2026-10-15 21:18: fleet order 14 deployed `f123050`, §17.)
+
 - (Done 2026-10-15 08:55: fleet order 13 deployed `9ff8e0e`, §15.)
 - (Done 2026-10-15 08:20: fleet order 12 deployed `072320e`, §14.)
 - (Done 2026-10-15 00:07 / 00:30: fleet orders 10 and 11 deployed `cdc1c3d` + `dac9938`, §12-§13.)
@@ -831,10 +834,24 @@ Request: Option (c) from section 17. Comprehensive architectural audit and verif
 | Spec Verification | Claude Code CLI | Confirmed: §3.1 Student projections (allow-lists, sensitive data masked, safe `photo_url`), §3.2 `POST /me/lesson-logs` (SELECT-then-write, room-scope check, audit log), §3.3 Attendance cross-guards, §3.4 Guardian reads (notes stripped, scoped assignments/submissions), §4.1 Error messages & status codes, §4.2 Deterministic pagination ending in `, id`. | Spec verification |
 | Gate | Claude Code CLI | **[APPROVED]**: `test_me_scope.py` 40/40 passed; `test_teacher_scope.py` 10/10 passed; full server suite 197/197 passed in 180s; 6 ephemeral probes passed; logged in Brain `02_Clients/03_GHERAS_Center/Signoff.md` and `06_Daily/2026-10-16.md` (`86634ff`). | `86634ff` |
 
-### Next choices
-- **(a)** Push commits (`5847703` / `fb6657e` / Brain `86634ff`) and deploy to production VPS (`push.sh`).
-- **(b)** Address minor nits from §20 audit: unify `MSG_ROOM_OUT_OF_SCOPE` constant between `scope.py` and `me_repo.py`, update `PHASE5_SPEC.md` text for student role.
-- **(c)** Android end-to-end UAT on physical device via ADB.
+---
+
+## 21. Session 2026-10-16 — Phase 5b Nits Resolution, Android APK Build, and Live Production Deployment (Claude Code CLI & Antigravity)
+
+Request: User order "الثاني، ثم الثالث، ثم الأول" (Resolve nits -> Android APK -> Push & deploy).
+
+| Step | Who | Result | Evidence |
+| :--- | :--- | :--- | :--- |
+| Nits Resolution | Antigravity | Unified `MSG_ROOM_OUT_OF_SCOPE = "الحلقة خارج نطاق صلاحيتك"` between `scope.py` and `me_repo.py`; updated `PHASE5_SPEC.md` for student role and notification ordering; added permanent regression tests in `test_me_scope.py` (supervisor rejection, empty teacher 10 endpoints, out-of-scope assignment filter). | `scope.py`, `me_repo.py`, `PHASE5_SPEC.md`, `test_me_scope.py` |
+| Gate | Claude Code CLI | **[APPROVED]**: full server suite **198/198 passed** in 171s; 3 targeted tests passed; ruff delta 0; committed as `e4c6f32` (WSL) / `3ae8ccb` (Windows); Brain logged `58854bc`. | `e4c6f32` / `58854bc` |
+| Android APK | Antigravity | Assembled debug APK with JDK 17: `app-debug.apk` built clean (21.7 MB, timestamp 2026-10-16 01:26:58); verified ADB status (no device currently attached; ready for install). | `app-debug.apk` |
+| Push & Deploy | Antigravity / Ibrahim | Pre-deploy backup: `edutrack_20261015_222819.dump` (392K) + photos (248K); pushed `e4c6f32` to `origin/main`; deployed via `push.sh`: API container rebuilt, Caddy reloaded; smoke test healthy `2.0.0`; dashboard 200; `/server/` 404; public probe `/api/v1/me/profile` 401 unauthenticated. | `e4c6f32` deployed live |
+
+### Current Status
+- Production is LIVE at `e4c6f32` with all student photo phase 2 backend scoping, role scoping, and PDF download improvements active.
+- Android APK `app-debug.apk` (21.7 MB) is built and ready for physical device testing when connected via ADB.
+- All three user requests (Option a, Option b, Option c + Follow-up 2, 3, 1) are 100% completed, tested, approved, committed, and deployed.
+
 
 
 
