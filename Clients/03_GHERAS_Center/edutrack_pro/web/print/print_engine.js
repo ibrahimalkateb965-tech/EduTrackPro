@@ -211,38 +211,31 @@ function injectToolbar(docTitle, templateKey, data = null) {
       const amountVal = Number(data.amount || 0).toFixed(2);
       const receiptDate = data.date || '';
 
-      const isMobileDevice = () => {
-        const ua = navigator.userAgent || '';
-        const isTouch = (navigator.maxTouchPoints > 0) || ('ontouchstart' in window);
-        const isSmallScreen = Math.min(window.screen.width, window.screen.height) <= 768;
-        const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile/i.test(ua);
-        return isMobileUA || (isTouch && isSmallScreen) || (window.innerWidth <= 768);
-      };
-
-      const desktopUrl = `https://web.whatsapp.com/send?phone=${encodeURIComponent(phone)}&text=${encodeURIComponent(messageText)}`;
-      const nativeUrl = `whatsapp://send?phone=${encodeURIComponent(phone)}&text=${encodeURIComponent(messageText)}`;
-      const fallbackWebUrl = `https://wa.me/${encodeURIComponent(phone)}?text=${encodeURIComponent(messageText)}`;
+      const lines = [
+        centerName,
+        `سند قبض رقم: ${receiptNo}`,
+        `الطالب: ${studentName}`,
+        `المبلغ: ${amountVal} ريال`,
+        `التاريخ: ${receiptDate}`,
+      ];
+      if (data.has_bus && Number(data.bus_paid_amount || 0) > 0) {
+        lines.push(`المسدد من الباص: ${Number(data.bus_paid_amount).toFixed(2)} ريال`);
+      }
+      if (Number(data.remaining_balance || 0) > 0) {
+        lines.push(`المتبقي: ${Number(data.remaining_balance).toFixed(2)} ريال`);
+      }
+      const messageText = lines.join('\n');
+      const encodedText = encodeURIComponent(messageText);
+      const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || '');
 
       const whatsappBtn = document.createElement('a');
       whatsappBtn.id = 'gheras-whatsapp-action';
       whatsappBtn.className = 'print-toolbar-btn whatsapp-btn';
       whatsappBtn.target = '_blank';
       whatsappBtn.rel = 'noopener noreferrer';
-      whatsappBtn.href = isMobileDevice() ? nativeUrl : desktopUrl;
-
-      whatsappBtn.addEventListener('click', (e) => {
-        if (isMobileDevice()) {
-          e.preventDefault();
-          window.location.href = nativeUrl;
-          setTimeout(() => {
-            if (document.hasFocus()) {
-              window.open(fallbackWebUrl, '_blank', 'noopener,noreferrer');
-            }
-          }, 1500);
-        } else {
-          whatsappBtn.href = desktopUrl;
-        }
-      });
+      whatsappBtn.href = isMobile
+        ? `https://wa.me/${phone}?text=${encodedText}`
+        : `https://web.whatsapp.com/send?phone=${phone}&text=${encodedText}`;
       whatsappBtn.innerHTML = `
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="margin-left: 6px;">
           <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
