@@ -138,6 +138,10 @@ def _normalize_guardian_whatsapp(phone: str | None) -> str:
         return "966" + digits[1:]
     if digits.startswith("5") and len(digits) == 9:
         return "966" + digits
+    if digits.startswith("00") and len(digits) > 8:
+        return digits[2:]
+    if len(digits) >= 9:
+        return digits
     return ""
 
 

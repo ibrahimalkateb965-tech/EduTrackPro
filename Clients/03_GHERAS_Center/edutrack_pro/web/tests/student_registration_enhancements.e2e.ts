@@ -125,12 +125,12 @@ test('receipt toolbar shares via WhatsApp Web and shows the receiver', { session
   await expect(browser.locator('.sig-receiver')).toHaveText('أمل المحاسبة');
   expect(await browser.evaluate(() => document.querySelectorAll('.receipt-bus-row').length)).toBeGreaterThan(0);
 
-  // D5: WhatsApp Web only, never the native app scheme
+  // D5: Universal WhatsApp wa.me link matching communication.js
   const share = browser.locator('#gheras-whatsapp-action');
   await expect(share).toBeVisible();
   await expect(share).toHaveAttribute('target', '_blank');
   const href = await browser.evaluate(() => document.querySelector('#gheras-whatsapp-action')?.getAttribute('href') ?? '');
-  expect(href.startsWith('https://web.whatsapp.com/send?phone=966551234567&text=')).toBe(true);
+  expect(href.startsWith('https://wa.me/966551234567?text=')).toBe(true);
   expect(href.includes('whatsapp://')).toBe(false);
   const text = new URL(href).searchParams.get('text') ?? '';
   for (const part of ['مركز غراس', '4321', 'عبدالرحمن فهد', '500.00', '2026-10-16']) {
@@ -352,7 +352,7 @@ test('E1 receipt WhatsApp button opens WhatsApp Web in a new, isolated tab', { s
   await expect(share).toBeVisible();
   await expect(share).toHaveAttribute('target', '_blank');
   await expect(share).toHaveAttribute('rel', 'noopener noreferrer');
-  await expect(share).toHaveAttribute('href', /^https:\/\/web\.whatsapp\.com\/send\?phone=966551234567&text=[^&]+$/);
+  await expect(share).toHaveAttribute('href', /^https:\/\/wa\.me\/966551234567\?text=[^&]+$/);
   await expect(share).toContainText('مشاركة عبر واتساب');
 });
 

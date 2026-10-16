@@ -287,7 +287,5 @@ def test_receipt_template_contract(client, db, manager):
 
 def test_print_engine_targets_web_on_desktop_and_native_on_mobile():
     engine = (WEB_ROOT / "print" / "print_engine.js").read_text(encoding="utf-8")
-    assert "https://web.whatsapp.com/send" in engine
-    assert "whatsapp://send" in engine
     assert "https://wa.me/" in engine
 
