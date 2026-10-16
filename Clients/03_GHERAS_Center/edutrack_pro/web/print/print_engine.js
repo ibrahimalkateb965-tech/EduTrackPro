@@ -219,7 +219,9 @@ function injectToolbar(docTitle, templateKey, data = null) {
         `التاريخ: ${receiptDate}`
       ];
       const messageText = lines.join('\n');
-      const shareUrl = `https://web.whatsapp.com/send?phone=${encodeURIComponent(phone)}&text=${encodeURIComponent(messageText)}`;
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent || '');
+      const baseUrl = isMobile ? 'https://api.whatsapp.com/send' : 'https://web.whatsapp.com/send';
+      const shareUrl = `${baseUrl}?phone=${encodeURIComponent(phone)}&text=${encodeURIComponent(messageText)}`;
 
       const whatsappBtn = document.createElement('a');
       whatsappBtn.id = 'gheras-whatsapp-action';
