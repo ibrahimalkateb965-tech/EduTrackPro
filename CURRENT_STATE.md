@@ -4,7 +4,8 @@
 > **Master Orchestrator**: `Claude Code CLI` (Opus Max / Sonnet 5)  
 > **Handoff Source**: `Antigravity IDE` (Interactive Cockpit & Visual Inspector)  
 > **Timestamp**: 2026-09-16T12:55:00+03:00  
-> **Last updated:** 2026-10-15 11:25 (+03:00) — Claude Code CLI, session "receipt plan selection" (strategic-clear): receipt breakdown now scoped to the paid installment's fee plan, [APPROVED] `45396f0` (186/186), NOT pushed, NOT deployed (§16). Earlier today: orders 12 and 13 DEPLOYED (§14, §15). Previous: 08:08 session "receipt date + nits" (§14).
+> **Last updated:** 2026-10-16 20:45 (+03:00) — Claude Code CLI, session "REA adoption" (strategic-clear): REA MCP registered in Claude Code only; Brain SOP + fleet capability added (§23). HEAD `dc9c9ec` on `main` [ahead 1], push pending. Previous: session 22 `/learn` (§22).
+> **Repository scope:** `Autovemtech` is the umbrella repository for every Autovem pillar and project (clients, AI systems, apps, tools). Gheras/EduTrack is one active client, not the repository's scope.
 > **VCS:** git at workspace root, branch `main`.
 
 ---
@@ -867,6 +868,30 @@ Request: User triggered `/learn`, `سجل هذا`, and `تم بنجاح` (Hook 1
 
 - **Artifact:** `learning_proposal.md` written, reviewed, and approved via automated review policy.
 - **Context Injection:** `ACTIVE_CONTEXT_INJECTION.md` updated to 89 total constraints across all 6 domains.
+
+---
+
+## 23. Session 2026-10-16 — REA (reverse engineering) adoption as an Autovem capability (Claude Code CLI)
+
+Request: explore `github.com/morluto/rea`, register it in Claude Code, and adopt it officially in the Brain.
+
+| Step | Who | Result | Evidence |
+| :--- | :--- | :--- | :--- |
+| Discovery | Antigravity (earlier) | Copied the `reverse-engineer-anything` skill to 5 paths; never ran `setup`; no MCP registration anywhere. | Antigravity read-only report |
+| Registration | Claude Code CLI | `npx -y rea-agents@latest setup --client claude_code --yes` after a reviewed `--dry-run`. Added `rea-agents@6.5.0 mcp` to `C:\Users\Kt\.claude.json`; backup `C:\Users\Kt\.claude.json.rea.backup`; skill refreshed (v42). Other clients untouched. | `.claude.json` |
+| Engines | none | Ghidra, JADX (`jadx-headless-mcp 0.7.1` via `REA_JADX_MCP_JAR`), IDA, Hopper all missing. JS/Electron/.NET static analysis needs no engine. | `doctor` output |
+| Brain | Claude Code CLI | New SOP `Brain/03_Jobs/Reverse_Engineering_SOP.md`; lesson in `05_Fleet/Lessons.md`; REA rows in `05_Fleet/05_Fleet.md` and `03_Jobs.md`. Not committed in the Brain repo (strategic-clear is read-only git). | Brain working tree |
+
+### Standing decisions
+- **Repository scope (Ibrahim, 2026-10-16):** `Autovemtech` is the umbrella repo for all agency pillars and projects, not a Gheras-only repo.
+- **Untracked kept (Ibrahim: `keep`):** `Clients/03_GHERAS_Center/edutrack_pro/docs/reports/` (`EduTrack_Daily_Report_2026-10-14.html` + `.pdf`) stays untracked on purpose; not a blocker in future strategic-clears.
+- REA tools load only after a Claude Code restart; not yet verified in a live session.
+- `stash@{0}` (WIP on `92a2a1d`) is old and untouched.
+
+### Next choices
+- **(a)** Push `dc9c9ec` to `origin/main` (Ibrahim runs the push).
+- **(b)** Verify REA after restart (`/mcp` shows `rea` connected), then a static JS/ASAR smoke run.
+- **(c)** Supply `jadx-headless-mcp 0.7.1`, set `REA_JADX_MCP_JAR`, then run an authorized REA audit of the EduTrack `app-debug.apk` (leaked secrets, API hosts, R8 residue).
 
 
 
