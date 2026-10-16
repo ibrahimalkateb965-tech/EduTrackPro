@@ -178,14 +178,18 @@ def test_bus_amounts_without_subscription_rejected(client, db, manager):
     _assert_nothing_written(db)
 
 
-def test_bus_paid_immutable_after_registration(client, db, manager):
-    res = _register(client, manager, has_bus_subscription=True, bus_fee=300, bus_paid=150)
+def test_bus_paid_updatable_with_payment_and_receipt(client, db, manager):
+    res = _register(client, manager, has_bus_subscription=True, bus_fee=500, bus_paid=150)
     assert res.status_code == 200, res.text
     sid = res.json()["id"]
-    res = client.patch(f"/api/v1/students/{sid}", json={"bus_paid": 0}, headers=manager)
-    assert res.status_code == 400, res.text
+    res = client.patch(f"/api/v1/students/{sid}", json={"bus_paid": 350}, headers=manager)
+    assert res.status_code == 200, res.text
     row = client.get(f"/api/v1/students/{sid}", headers=manager).json()
-    assert row["bus_paid"] == 150.0
+    assert float(row["bus_paid"]) == 350.0
+    assert float(row["bus_remaining"]) == 150.0
+
+    res_over = client.patch(f"/api/v1/students/{sid}", json={"bus_paid": 600}, headers=manager)
+    assert res_over.status_code == 400, res_over.text
 
 
 def test_bus_only_registration_without_fee_plan(client, db, manager):

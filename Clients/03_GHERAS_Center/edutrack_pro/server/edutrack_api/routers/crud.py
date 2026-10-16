@@ -535,11 +535,49 @@ def _create_hook(conn, repo, table: str, data: dict, actor: dict) -> tuple[dict,
     return row, details
 
 
-def _update_hook(conn, repo, table: str, record_id: UUID, data: dict) -> tuple[dict | None, dict]:
+def _update_hook(conn, repo, table: str, record_id: UUID, data: dict, actor: dict = None) -> tuple[dict | None, dict]:
     details = _audit_details(data)
     if table == "students":
-        if "bus_paid" in data:
-            raise ApiError(400, "validation_error", "لا يمكن تعديل المبلغ المسدد للباص بعد التسجيل")
+        if "has_bus_subscription" in data or "bus_fee" in data or "bus_paid" in data:
+            curr = conn.execute(
+                "SELECT branch_id, has_bus_subscription, bus_fee, bus_paid FROM students WHERE id = %s",
+                (record_id,)
+            ).fetchone()
+            if curr:
+                raw_has_bus = data.get("has_bus_subscription", curr["has_bus_subscription"])
+                if isinstance(raw_has_bus, str):
+                    has_bus = raw_has_bus.lower() in ("true", "1")
+                else:
+                    has_bus = bool(raw_has_bus)
+                data["has_bus_subscription"] = has_bus
+
+                if not has_bus:
+                    data["bus_fee"] = Decimal("0.00")
+                    data["bus_paid"] = Decimal("0.00")
+                else:
+                    bus_fee = _money(data["bus_fee"]) if "bus_fee" in data and data["bus_fee"] not in (None, "") else _money(curr["bus_fee"])
+                    bus_paid = _money(data["bus_paid"]) if "bus_paid" in data and data["bus_paid"] not in (None, "") else _money(curr["bus_paid"])
+                    if bus_fee < 0 or bus_paid < 0:
+                        raise ApiError(400, "validation_error", "رسوم اشتراك الباص غير صالحة")
+                    if bus_paid > bus_fee:
+                        raise ApiError(400, "validation_error", "المبلغ المسدد للباص أكبر من رسوم الاشتراك")
+                    data["bus_fee"] = bus_fee
+                    data["bus_paid"] = bus_paid
+
+                    old_bus_paid = _money(curr["bus_paid"])
+                    if bus_paid > old_bus_paid:
+                        diff = bus_paid - old_bus_paid
+                        branch_id = curr["branch_id"] or MAIN_BRANCH_ID
+                        cash_acc = default_cash_account_id(conn, branch_id)
+                        pay_row = conn.execute(
+                            "INSERT INTO payments (branch_id, student_id, amount, bus_amount, paid_on, method, note) "
+                            "VALUES (%s, %s, %s, %s, CURRENT_DATE, %s, %s) RETURNING *",
+                            (branch_id, record_id, diff, diff, "كاش", "سداد اشتراك الباص / دفعة إضافية"),
+                        ).fetchone()
+                        issued_by = actor.get("id") if actor else None
+                        issue_receipt(conn, pay_row["id"], issued_by=issued_by)
+                        post_ledger_entry(conn, cash_acc, "in", diff, "payments", pay_row["id"], pay_row["paid_on"], branch_id)
+
         if "has_allergies" in data:
             has_allergies = bool(data["has_allergies"])
             data["has_allergies"] = has_allergies
@@ -663,7 +701,7 @@ def _register(path: str, table: str) -> None:
             if "base_salary" in body:
                 raise ApiError(403, "forbidden", "ليس لديك صلاحية تحديد أو تعديل الراتب الأساسي")
         try:
-            row, details = _update_hook(conn, _repo(request, conn, table), table, record_id, dict(body))
+            row, details = _update_hook(conn, _repo(request, conn, table), table, record_id, dict(body), actor=user)
             if not row:
                 raise ApiError(404, "not_found", "السجل غير موجود")
             write_audit(conn, user["id"], "update", table, record_id, details)

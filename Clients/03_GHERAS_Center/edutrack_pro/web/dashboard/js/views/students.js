@@ -670,7 +670,11 @@ function openStudentForm(api, student) {
   const paidInputAttrs = { name: 'initial_payment_amount', type: 'number', step: '0.01', min: '0', placeholder: 'مثال: 200', value: value('initial_payment_amount') };
   if (editing) {
     feeInputAttrs.readonly = 'readonly';
+    feeInputAttrs.style = 'background: #f1f5f9; color: #64748b; cursor: not-allowed; border-color: #cbd5e1;';
+    feeInputAttrs.title = 'رسوم التسجيل محددة في الخطة المالية';
     paidInputAttrs.readonly = 'readonly';
+    paidInputAttrs.style = 'background: #f1f5f9; color: #64748b; cursor: not-allowed; border-color: #cbd5e1;';
+    paidInputAttrs.title = 'الدفعة الأولى محددة في السند الأصلي';
   }
   const feeInput = el('input', feeInputAttrs);
   const paidInput = el('input', paidInputAttrs);
@@ -688,9 +692,6 @@ function openStudentForm(api, student) {
   const hasBusSelect = select('has_bus_subscription', YES_NO, boolValue('has_bus_subscription'));
   const busFeeAttrs = { name: 'bus_fee', type: 'number', step: '0.01', min: '0', placeholder: 'مثال: 500', value: value('bus_fee') };
   const busPaidAttrs = { name: 'bus_paid', type: 'number', step: '0.01', min: '0', placeholder: 'مثال: 200', value: value('bus_paid') };
-  if (editing) {
-    busPaidAttrs.readonly = 'readonly';
-  }
   const busFeeInput = el('input', busFeeAttrs);
   const busPaidInput = el('input', busPaidAttrs);
   const busRemainingPreview = el('span', { id: 'bus-remaining-preview', style: 'font-weight: 700; color: #0f766e;' }, '0.00 ر.س');
@@ -941,12 +942,6 @@ function openStudentForm(api, student) {
     } else {
       payload.bus_fee = 0;
       payload.bus_paid = 0;
-    }
-
-    if (editing) {
-      delete payload.bus_paid; // immutable after registration
-    }
-
     // PostgreSQL nullable & check constraint guarantees
     ['birth_date', 'group_name', 'guardian_relation', 'national_id', 'father_phone', 'mother_phone', 'pickup_phone', 'registration_fee', 'initial_payment_amount'].forEach(k => {
       if (payload[k] === '') payload[k] = null;

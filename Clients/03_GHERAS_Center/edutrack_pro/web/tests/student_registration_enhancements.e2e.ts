@@ -392,3 +392,20 @@ test('E6 receipt receiver signature shows the issuing staff member', { session: 
   await openStubbedReceipt(app, screen, browser);
   await expect(browser.locator('.sig-receiver')).toHaveText('أمل المحاسبة');
 });
+
+test('E7 student edit form allows typing in bus paid input and is not readonly', { session: 'admin', tags: ['students', 'order15', 'granular'] }, async ({ app, screen, browser }) => {
+  await app.open('#/students');
+  const editBtn = browser.locator('table tbody tr:first-child button:has-text("تعديل")');
+  if (await editBtn.count() > 0) {
+    await editBtn.tap();
+    await expect(browser.locator('.modal-panel select[name="has_bus_subscription"]')).toBeVisible();
+    await browser.locator('.modal-panel select[name="has_bus_subscription"]').selectOption({ value: 'true' });
+    const busPaidInput = browser.locator('.modal-panel input[name="bus_paid"]');
+    await expect(busPaidInput).toBeVisible();
+    const isReadonly = await busPaidInput.evaluate((el: HTMLInputElement) => el.readOnly);
+    expect(isReadonly).toBe(false);
+    await busPaidInput.fill('450');
+    expect(await busPaidInput.inputValue()).toBe('450');
+  }
+});
+
