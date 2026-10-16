@@ -156,10 +156,12 @@ Autovemtech operates an autonomous multi-CLI fleet governed by [fleet_config.jso
 > However, **NEVER spawn more than ONE instance of `opencode-go/glm-5.3-flash` simultaneously** in OpenCode CLI to prevent provider concurrency lockouts (HTTP 429).
 > Worker B in Cline operates in parallel without collision, providing rapid execution redundancy.
 
-### Mandatory Testing & Verification Monopoly
+### Mandatory Testing & Verification Monopoly & Hybrid Web QA Pipeline ([C-96])
 > [!CAUTION]
-> **Exclusive Testing Rule**: `Claude Code CLI` is the **ONLY** agent authorized to execute test suites (`test`, `analyze`, lint audits) and grant final approval (`[APPROVED]`).
-> Neither Codex, OpenCode, Antigravity CLI (`agcli`), nor Antigravity IDE may run test commands or sign off on feature quality gates.
+> **Exclusive Testing & Sign-off Rule**: `Claude Code CLI` is the **ONLY** agent authorized to grant final architectural approval (`[APPROVED]`).
+> Neither Codex, OpenCode, Antigravity CLI (`agcli`), nor Antigravity IDE may unilaterally sign off on feature quality gates without Claude's sign-off.
+>
+> **Hybrid Web QA Delegation Standard ([C-96])**: To prevent token quota exhaustion on repetitive UI sweeps, **`Antigravity CLI (agcli)`** equipped with **`webapp-qa-tester`** (Playwright / Chrome DevTools) executes granular browser interactions (button clicks, form fills, DOM assertions, and screenshot verifications) locally ($0 cost). They compile a verified 100% green execution matrix and submit it to `Claude Code CLI` for compact review (<5,000 tokens), Devil's Advocate audit, and official `[APPROVED]` certification.
 
 ### Autonomous Consult-and-Execute Fleet Pipeline ([C-25] & Decision 80)
 > [!TIP]

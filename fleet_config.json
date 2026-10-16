@@ -134,8 +134,8 @@
       "id": "terminal_ui_engineer",
       "cli_tool": "Antigravity CLI (agcli)",
       "active_model": "Gemini 3.8 Flash (High Reasoning)",
-      "effort_level": "Autonomous Code Generation & Terminal Execution",
-      "assigned_role": "Autonomous Terminal Executor: UI Architecture, Jetpack Compose, Web Views & Domain Logic (NO TESTING)",
+      "effort_level": "Autonomous Code Generation, Terminal Execution & E2E Browser Testing",
+      "assigned_role": "Autonomous Terminal Executor & UI Testing Runner: UI Architecture, Jetpack Compose, Web Views, Domain Logic & Granular Browser E2E Testing via webapp-qa-tester (Packages execution evidence and test matrices for Claude Code final architectural sign-off)",
       "status": "Active",
       "exclusive_ownership_tree": [
         "Clients/",
@@ -146,7 +146,8 @@
       "assigned_skills": [
         "frontend-design-builder",
         "jetpack-compose-ui",
-        "ui-ux-design-lead"
+        "ui-ux-design-lead",
+        "webapp-qa-tester"
       ]
     },
     {
@@ -163,6 +164,41 @@
       "assigned_skills": [
         "persistent-memory-engine",
         "prompt-engineer"
+      ]
+    },
+    {
+      "id": "local_gemini_quad_fleet",
+      "cli_tool": "Antigravity CLI (agy / agcli)",
+      "active_model": "Gemini 3.8 Flash High (Google AI Pro Subscriptions - 4x Accounts)",
+      "invocation_command": "powershell.exe -NoProfile -File \"D:\\FleetProfiles\\agy-fleet.ps1\" -Prompt \"[prompt]\"",
+      "effort_level": "Massive 2M Context & Flat-Rate Subscription Worker Pool ($0 Token Cost)",
+      "assigned_role": "Autonomous 4-Account Local Gemini Fleet (D:\\FleetProfiles): Worker 1 (ja7563110275@gmail.com - UI/Compose/Web), Worker 2 (ibrahimalkateb224@gmail.com - Backend/Domain), Worker 3 (ibrahimalkateb9220@gmail.com - 2M Docs/A11y), Worker 4 (ayahowiedy123@gmail.com - Failover/Parallel). NO TESTING.",
+      "status": "Active (Local Workstation D:\\FleetProfiles - 4x Workers Operational)",
+      "multi_account_architecture": {
+        "enabled": true,
+        "accounts_count": 4,
+        "quota_multiplier": "4x Total Available Google AI Pro Quota ($0 Extra Cost)",
+        "concurrency_policy": "Local Profile Isolation (D:\\FleetProfiles\\Worker_{1..4}) with Round-Robin Failover & Direct Dispatch",
+        "runners": {
+          "worker_1": {"windows": "& 'D:\\FleetProfiles\\agy1.bat' \"[prompt]\"", "linux": "/mnt/d/FleetProfiles/agy1.sh \"[prompt]\"", "account": "ja7563110275@gmail.com", "role": "UI & Frontend (Compose / Web)"},
+          "worker_2": {"windows": "& 'D:\\FleetProfiles\\agy2.bat' \"[prompt]\"", "linux": "/mnt/d/FleetProfiles/agy2.sh \"[prompt]\"", "account": "ibrahimalkateb224@gmail.com", "role": "Backend Domain & APIs"},
+          "worker_3": {"windows": "& 'D:\\FleetProfiles\\agy3.bat' \"[prompt]\"", "linux": "/mnt/d/FleetProfiles/agy3.sh \"[prompt]\"", "account": "ibrahimalkateb9220@gmail.com", "role": "Large Context (2M) & Accessibility/Docs"},
+          "worker_4": {"windows": "& 'D:\\FleetProfiles\\agy4.bat' \"[prompt]\"", "linux": "/mnt/d/FleetProfiles/agy4.sh \"[prompt]\"", "account": "ayahowiedy123@gmail.com", "role": "Secondary Parallelism & Failover Pool"},
+          "auto_failover": {"windows": "& 'D:\\FleetProfiles\\agy-fleet.ps1' -Prompt \"[prompt]\"", "linux": "/mnt/d/FleetProfiles/agy-fleet.sh \"[prompt]\""}
+        }
+      },
+      "exclusive_ownership_tree": [
+        "Clients/",
+        "web/",
+        "app/ui/",
+        "scripts/scaffold/",
+        "migrations/"
+      ],
+      "assigned_skills": [
+        "frontend-design-builder",
+        "backend-architect",
+        "offline-sync-db",
+        "docs-fetcher-context"
       ]
     }
   ],

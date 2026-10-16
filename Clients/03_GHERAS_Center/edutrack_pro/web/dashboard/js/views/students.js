@@ -674,21 +674,91 @@ function openStudentForm(api, student) {
   }
   const feeInput = el('input', feeInputAttrs);
   const paidInput = el('input', paidInputAttrs);
-  const methodSelect = select('payment_method', [['كاش', 'كاش نقدي'], ['مدى', 'مدى / شبكة'], ['تحويل بنكي', 'تحويل بنكي'], ['Apple Pay', 'Apple Pay']], 'كاش');
+  const methodSelect = select('payment_method', [
+    ['كاش', 'كاش نقدي'],
+    ['مدى', 'مدى / شبكة'],
+    ['تحويل بنكي', 'تحويل بنكي'],
+    ['Apple Pay', 'Apple Pay'],
+    ['تابي', 'تابي (Tabby)'],
+    ['تمارا', 'تمارا (Tamara)']
+  ], 'كاش');
   if (editing) methodSelect.disabled = true;
+
+  // اشتراك الباص المدرسي
+  const hasBusSelect = select('has_bus_subscription', YES_NO, boolValue('has_bus_subscription'));
+  const busFeeAttrs = { name: 'bus_fee', type: 'number', step: '0.01', min: '0', placeholder: 'مثال: 500', value: value('bus_fee') };
+  const busPaidAttrs = { name: 'bus_paid', type: 'number', step: '0.01', min: '0', placeholder: 'مثال: 200', value: value('bus_paid') };
+  if (editing) {
+    busPaidAttrs.readonly = 'readonly';
+  }
+  const busFeeInput = el('input', busFeeAttrs);
+  const busPaidInput = el('input', busPaidAttrs);
+  const busRemainingPreview = el('span', { id: 'bus-remaining-preview', style: 'font-weight: 700; color: #0f766e;' }, '0.00 ر.س');
+
+  const updateBusRemaining = () => {
+    const fee = parseFloat(busFeeInput.value) || 0;
+    const paid = parseFloat(busPaidInput.value) || 0;
+    const remaining = Math.max(0, fee - paid);
+    busRemainingPreview.textContent = `${remaining.toFixed(2)} ر.س`;
+  };
+
+  busFeeInput.addEventListener('input', updateBusRemaining);
+  busPaidInput.addEventListener('input', updateBusRemaining);
+  updateBusRemaining();
+
+  const busFieldsContainer = el('div', {
+    style: `grid-column: 1 / -1; display: ${boolValue('has_bus_subscription') === 'true' ? 'grid' : 'none'}; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; background: #f0fdfa; border: 1px solid #99f6e4; border-radius: 8px; padding: 12px; margin-top: 4px;`
+  },
+    el('label', {}, el('span', { style: 'font-weight:600;' }, 'رسوم اشتراك الباص (ر.س)'), busFeeInput),
+    el('label', {}, el('span', { style: 'font-weight:600;' }, 'الدفعة المسددة للباص (ر.س)'), busPaidInput),
+    el('div', { style: 'display: flex; flex-direction: column; justify-content: center; padding: 4px;' },
+      el('span', { style: 'font-size: 12px; color: #64748b; font-weight: 600;' }, 'المتبقي من اشتراك الباص:'),
+      busRemainingPreview
+    )
+  );
+
+  hasBusSelect.addEventListener('change', () => {
+    const active = hasBusSelect.value === 'true';
+    busFieldsContainer.style.display = active ? 'grid' : 'none';
+    if (!active) {
+      busFeeInput.value = '';
+      busPaidInput.value = '';
+      updateBusRemaining();
+    }
+  });
+
+  // ملف الحساسية للطفل
+  const hasAllergiesSelect = select('has_allergies', YES_NO, boolValue('has_allergies'));
+  const allergyNotesTextarea = el('textarea', { name: 'allergy_notes', placeholder: 'يرجى توضيح نوع الحساسية (غذائية أو دوائية)...' }, value('allergy_notes'));
+  const allergyNotesField = el('label', { style: `grid-column: 1 / -1; display: ${boolValue('has_allergies') === 'true' ? 'grid' : 'none'};` },
+    el('span', { style: 'font-weight:600;' }, 'تفاصيل الحساسية (غذائية أو دوائية) *'),
+    allergyNotesTextarea
+  );
+  hasAllergiesSelect.addEventListener('change', () => {
+    allergyNotesField.style.display = hasAllergiesSelect.value === 'true' ? 'grid' : 'none';
+  });
 
   // خطة أقساط الرسوم (تظهر فقط عند الإنشاء مع رسوم متبقية غير مسددة)
   let countInput = null;
   let dateInput = null;
   let intervalSelect = null;
+  let datePickerWrap = null;
   const planInputs = [];
   if (!editing) {
     countInput = el('input', { name: 'installments_count', type: 'number', min: '1', step: '1', value: '1' });
-    dateInput = el('input', { name: 'next_due_date', type: 'date', min: isoTomorrow() });
+    datePickerWrap = createDatePicker({
+      name: 'next_due_date',
+      label: 'تاريخ الدفعة القادمة',
+      minDate: isoTomorrow(),
+      minYear: new Date().getFullYear(),
+      maxYear: new Date().getFullYear() + 2,
+      showAge: false
+    });
+    dateInput = datePickerWrap.querySelector('input[name="next_due_date"]');
     intervalSelect = select('interval_days', INTERVAL_OPTIONS, 30);
     planInputs.push(
       el('label', {}, el('span', {}, 'عدد الدفعات المتبقية'), countInput),
-      el('label', {}, el('span', {}, 'تاريخ الدفعة القادمة'), dateInput),
+      datePickerWrap,
       el('label', {}, el('span', {}, 'الفاصل بين الدفعات'), intervalSelect)
     );
   }
@@ -742,6 +812,8 @@ function openStudentForm(api, student) {
     el('label', {}, el('span', {}, 'المستوى السابق'), el('input', { name: 'previous_level', type: 'text', value: value('previous_level') })),
     el('label', {}, el('span', {}, 'صعوبات تعلم'), select('has_difficulties', YES_NO, boolValue('has_difficulties'))),
     el('label', {}, el('span', {}, 'تفاصيل الصعوبات'), el('textarea', { name: 'difficulty_notes' }, value('difficulty_notes'))),
+    el('label', {}, el('span', {}, 'يشكو الطفل من حساسية؟'), hasAllergiesSelect),
+    allergyNotesField,
     el('label', {}, el('span', {}, 'ملاحظات عن الطالب'), el('textarea', { name: 'child_notes' }, value('child_notes'))),
     el('label', {}, el('span', {}, 'ملاحظات تعليمية'), el('textarea', { name: 'education_notes' }, value('education_notes'))),
 
@@ -751,6 +823,10 @@ function openStudentForm(api, student) {
     el('label', {}, el('span', {}, 'رسوم التسجيل المقررة (ر.س)'), feeInput),
     el('label', {}, el('span', {}, 'الدفعة الأولى المسددة الآن (ر.س)'), paidInput),
     el('label', {}, el('span', {}, 'طريقة سداد الدفعة الأولى'), methodSelect),
+
+    el('label', {}, el('span', {}, 'الاشتراك في الباص'), hasBusSelect),
+    busFieldsContainer,
+
     planContainer,
     planSummary
   ];
@@ -851,6 +927,26 @@ function openStudentForm(api, student) {
     payload.room_id = payload.room_id || null;
     payload.gender = payload.gender || (editing ? (isGirl(student || {}) ? 'بنات' : 'بنين') : defaultGender);
 
+    payload.has_allergies = payload.has_allergies === 'true';
+    if (payload.has_allergies) {
+      payload.allergy_notes = payload.allergy_notes ? payload.allergy_notes.trim() : '';
+    } else {
+      payload.allergy_notes = null;
+    }
+
+    payload.has_bus_subscription = payload.has_bus_subscription === 'true';
+    if (payload.has_bus_subscription) {
+      payload.bus_fee = payload.bus_fee === '' ? 0 : Number(payload.bus_fee);
+      payload.bus_paid = payload.bus_paid === '' ? 0 : Number(payload.bus_paid);
+    } else {
+      payload.bus_fee = 0;
+      payload.bus_paid = 0;
+    }
+
+    if (editing) {
+      delete payload.bus_paid; // immutable after registration
+    }
+
     // PostgreSQL nullable & check constraint guarantees
     ['birth_date', 'group_name', 'guardian_relation', 'national_id', 'father_phone', 'mother_phone', 'pickup_phone', 'registration_fee', 'initial_payment_amount'].forEach(k => {
       if (payload[k] === '') payload[k] = null;
@@ -899,7 +995,8 @@ function openStudentForm(api, student) {
       if (!editing && createdStudent) {
         const paymentId = createdStudent.initial_payment?.id || createdStudent.initial_receipt?.payment_id;
         const initialAmount = parseFloat(payload.initial_payment_amount || payload.registration_fee || '0');
-        if (paymentId && initialAmount > 0) {
+        const busAmount = parseFloat(payload.bus_paid || '0');
+        if (paymentId && (initialAmount > 0 || busAmount > 0)) {
           toast('تم تسجيل الطالب وسند القبض، جاري التحويل لطباعة السند...');
           setTimeout(() => {
             window.location.href = `../print/templates/receipt.html?payment=${encodeURIComponent(paymentId)}`;

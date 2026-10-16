@@ -1,6 +1,6 @@
 import { el, toast, modal, fmtSAR, fmtDate } from '../ui.js';
 
-const PAYMENT_METHODS = ['كاش', 'تحويل بنكي', 'تابي', 'تقسيط المركز', 'مدى', 'Apple Pay', 'بطاقة'];
+const PAYMENT_METHODS = ['كاش', 'تحويل بنكي', 'تابي', 'تمارا', 'تقسيط المركز', 'مدى', 'Apple Pay', 'بطاقة'];
 const EXPENSE_METHODS = ['كاش', 'تحويل بنكي', 'مدى', 'بطاقة', 'Apple Pay'];
 const INTERVALS = [[30, 'شهري (كل 30 يوم)'], [14, 'كل 14 يوم'], [7, 'أسبوعي (كل 7 أيام)']];
 const KINDS = { cash: 'كاش', bank: 'بنك' };

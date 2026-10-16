@@ -147,7 +147,7 @@ async function downloadPdf(button, templateKey, label) {
   }
 }
 
-function injectToolbar(docTitle, templateKey) {
+function injectToolbar(docTitle, templateKey, data = null) {
   if (document.querySelector('.print-toolbar')) return;
   const currentKey = templateKey || getTemplateKey();
 
@@ -200,6 +200,43 @@ function injectToolbar(docTitle, templateKey) {
   `;
   printBtn.addEventListener('click', () => window.print());
 
+  actions.append(downloadBtn, printBtn);
+
+  if (currentKey === 'receipt' && data && data.guardian_whatsapp) {
+    const phone = String(data.guardian_whatsapp).trim();
+    if (phone) {
+      const centerName = data.center_name || 'مركز غراس';
+      const receiptNo = data.receipt_no || '';
+      const studentName = data.student_name || '';
+      const amountVal = Number(data.amount || 0).toFixed(2);
+      const receiptDate = data.date || '';
+
+      const lines = [
+        centerName,
+        `سند قبض رقم: ${receiptNo}`,
+        `الطالب: ${studentName}`,
+        `المبلغ المدفوع: ${amountVal} ريال`,
+        `التاريخ: ${receiptDate}`
+      ];
+      const messageText = lines.join('\n');
+      const shareUrl = `https://web.whatsapp.com/send?phone=${encodeURIComponent(phone)}&text=${encodeURIComponent(messageText)}`;
+
+      const whatsappBtn = document.createElement('a');
+      whatsappBtn.id = 'gheras-whatsapp-action';
+      whatsappBtn.className = 'print-toolbar-btn whatsapp-btn';
+      whatsappBtn.target = '_blank';
+      whatsappBtn.rel = 'noopener noreferrer';
+      whatsappBtn.href = shareUrl;
+      whatsappBtn.innerHTML = `
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="margin-left: 6px;">
+          <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
+        </svg>
+        مشاركة عبر واتساب
+      `;
+      actions.append(whatsappBtn);
+    }
+  }
+
   const closeBtn = document.createElement('button');
   closeBtn.type = 'button';
   closeBtn.className = 'print-toolbar-btn close-btn';
@@ -221,7 +258,7 @@ function injectToolbar(docTitle, templateKey) {
     }
   });
 
-  actions.append(downloadBtn, printBtn, closeBtn);
+  actions.append(closeBtn);
   toolbar.append(info, actions);
   document.body.prepend(toolbar);
 }
@@ -340,7 +377,7 @@ async function initPrintEngine() {
       document.title = `سند_قبض_${data.receipt_no}${studentPart}`;
     }
 
-    injectToolbar(document.title, templateKey);
+    injectToolbar(document.title, templateKey, data);
   } catch (err) {
     console.error('[PrintEngine] Fetch failed:', err);
     showError(err.message || 'حدث خطأ في الاتصال بالخادم أثناء جلب بيانات الطباعة');

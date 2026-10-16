@@ -1,6 +1,16 @@
 import { el, toast, modal, fmtSAR, fmtDate } from '../ui.js';
 
-const METHODS = ['كاش', 'تحويل بنكي', 'تابي', 'تقسيط المركز', 'مدى', 'Apple Pay', 'بطاقة'];
+const METHODS = [
+  ['كاش', 'كاش'],
+  ['تحويل بنكي', 'تحويل بنكي'],
+  ['تابي', 'تابي (Tabby)'],
+  ['تمارا', 'تمارا (Tamara)'],
+  ['تقسيط المركز', 'تقسيط المركز'],
+  ['مدى', 'مدى'],
+  ['Apple Pay', 'Apple Pay'],
+  ['بطاقة', 'بطاقة'],
+  ['جهاز نقاط بيع', 'جهاز نقاط بيع']
+];
 const INTERVALS = [[30, 'شهري (كل 30 يوم)'], [14, 'كل 14 يوم'], [7, 'أسبوعي (كل 7 أيام)']];
 
 let students = [];
@@ -176,7 +186,7 @@ function openPaymentForm(api) {
     el('label', {}, el('span', {}, 'الطالب'), studentSelect),
     el('label', {}, el('span', {}, 'القسط (اختياري)'), installmentSelect),
     el('label', {}, el('span', {}, 'المبلغ'), el('input', { name: 'amount', type: 'number', min: '0', step: '0.01', required: 'required' })),
-    el('label', {}, el('span', {}, 'طريقة الدفع'), select('method', METHODS.map(method => [method, method]), 'كاش', true)),
+    el('label', {}, el('span', {}, 'طريقة الدفع'), select('method', METHODS, 'كاش', true)),
     el('label', {}, el('span', {}, 'تاريخ الدفع'), el('input', { name: 'paid_on', type: 'date', required: 'required', value: fmtDate(new Date()) })),
     el('label', {}, el('span', {}, 'ملاحظة'), el('textarea', { name: 'note' }, ''))
   ];

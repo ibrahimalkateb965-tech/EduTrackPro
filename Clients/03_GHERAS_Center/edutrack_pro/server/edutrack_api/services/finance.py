@@ -8,6 +8,18 @@ from edutrack_api.errors import ApiError
 
 _CENT = Decimal("0.01")
 
+PAYMENT_METHODS = (
+    "كاش",
+    "تحويل بنكي",
+    "تابي",
+    "تقسيط المركز",
+    "مدى",
+    "Apple Pay",
+    "بطاقة",
+    "تمارا",
+    "جهاز نقاط بيع",
+)
+
 
 def _money(value) -> Decimal:
     return Decimal(str(value or 0)).quantize(_CENT, rounding=ROUND_HALF_UP)
@@ -49,7 +61,10 @@ def generate_installments(conn, plan_row: dict, *, down_payment=None, first_due=
 
 
 def allocate_payment(conn, payment_row: dict, installment_id: UUID | None) -> list[dict]:
-    remaining = _money(payment_row["amount"])
+    bus_portion = _money(payment_row.get("bus_amount", 0))
+    remaining = _money(payment_row["amount"]) - bus_portion
+    if remaining <= 0:
+        return []
     if installment_id:
         installments = conn.execute(
             "SELECT * FROM installments WHERE id = %s AND deleted_at IS NULL FOR UPDATE", (installment_id,)
@@ -82,9 +97,11 @@ def allocate_payment(conn, payment_row: dict, installment_id: UUID | None) -> li
     return touched
 
 
-def issue_receipt(conn, payment_id) -> dict:
-    row = conn.execute("INSERT INTO receipts (payment_id) VALUES (%s) ON CONFLICT (payment_id) DO UPDATE "
-                       "SET payment_id = EXCLUDED.payment_id RETURNING *", (payment_id,)).fetchone()
+def issue_receipt(conn, payment_id, issued_by=None) -> dict:
+    row = conn.execute("INSERT INTO receipts (payment_id, issued_by_user_id) VALUES (%s, %s) ON CONFLICT (payment_id) DO UPDATE "
+                       "SET payment_id = EXCLUDED.payment_id, "
+                       "issued_by_user_id = COALESCE(receipts.issued_by_user_id, EXCLUDED.issued_by_user_id) RETURNING *",
+                       (payment_id, issued_by)).fetchone()
     return dict(row)
 
 

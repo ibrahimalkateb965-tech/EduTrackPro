@@ -67,21 +67,22 @@ for _ in $(seq 1 40); do
 done
 [[ "$status" == healthy ]] || die "database did not become healthy"
 
-# A reused volume skips the initdb scripts; apply 001->014 ourselves (003 through 014 are idempotent).
+# A reused volume skips the initdb scripts; apply 001->015 ourselves (003 through 015 are idempotent).
 ALL_MIGRATIONS=(
   001_schema.sql 002_reference.sql 003_phase2.sql 004_phase3.sql 005_saturday.sql
   006_settings.sql 007_revoked_tokens_purge.sql 008_national_id_auth_and_student_role.sql
   009_whatsapp_auth_otp.sql 010_notifications_v2.sql 011_token_version.sql
   012_enterprise_expansion.sql 013_demo_accounts_seed.sql 014_dynamic_groups.sql
+  015_allergies_and_bus.sql
 )
 
 if [[ "$("${PSQL[@]}" -c "SELECT to_regclass('public.users') IS NOT NULL")" != "t" ]]; then
-  log "Empty database — applying migrations 001 -> 014"
+  log "Empty database — applying migrations 001 -> 015"
   for m in "${ALL_MIGRATIONS[@]}"; do
     "${PSQL[@]}" -f "/docker-entrypoint-initdb.d/$m" >/dev/null
   done
 else
-  log "Applying incremental idempotent migrations (003 -> 014)"
+  log "Applying incremental idempotent migrations (003 -> 015)"
   for m in "${ALL_MIGRATIONS[@]:2}"; do
     "${PSQL[@]}" -f "/docker-entrypoint-initdb.d/$m" >/dev/null || true
   done

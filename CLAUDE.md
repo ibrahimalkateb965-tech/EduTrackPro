@@ -26,6 +26,29 @@ You are operating as the **Master Orchestrator, Staff Architect, and Senior Code
    - Before executing non-trivial features, conduct a strict architectural audit against edge cases, token bloat, and regression risks.
 3. **Zero-Boilerplate Policy**:
    - Conserve Opus/Sonnet reasoning budget. Delegate raw DAO writing, schema migrations, and repetitive boilerplate to `OpenCode CLI` or `Codex CLI`.
+4. **Autonomous E2E Browser Testing & Quota Protection Standard ([C-96])**:
+   - **Do NOT exhaust reasoning quota** launching headless Chromium, running full Playwright sweeps, or testing dozens of individual button clicks and input fields during development.
+   - **Execution Lane**: Delegate interactive browser testing, button clicking, form validation, and DOM assertions to **`Antigravity CLI (agcli / Gemini 3.8 Flash High)`** equipped with **`webapp-qa-tester`** (Playwright / Chrome DevTools).
+   - **Evidence-Driven Submission**: `agcli` + `webapp-qa-tester` execute the full interactive run, verify that all button/field assertions pass (100% green matrix), and submit a compact execution evidence summary (< 5,000 tokens) to you.
+   - **Your Gatekeeping Role**: Review the evidence summary, inspect diffs, verify contracts and invariants (Rule 50, single split payment, Rule 57), perform your Devil's Advocate audit, and issue the formal architectural certification: **`[APPROVED]`**.
+
+### Local 4-Account Gemini Pro Fleet Matrix & Headless Invocation Protocol
+Claude Code CLI orchestrates the 4 dedicated local Google AI Pro accounts (`D:\FleetProfiles\Worker_{1..4}`) and OpenCode Zen via **direct headless dispatch (`[C-25]`)**:
+
+| Worker | Google Account / Role | Primary Scope | Headless Invocation Command |
+| :--- | :--- | :--- | :--- |
+| **Worker 1** | `ja7563110275@gmail.com` | UI Architecture, Jetpack Compose, Web Views, Components | Win: `& "D:\FleetProfiles\agy1.bat" "<prompt>"`<br>WSL: `/mnt/d/FleetProfiles/agy1.sh "<prompt>"` |
+| **Worker 2** | `ibrahimalkateb224@gmail.com` | Backend & Domain Logic, UseCases, Repositories, ViewModels | Win: `& "D:\FleetProfiles\agy2.bat" "<prompt>"`<br>WSL: `/mnt/d/FleetProfiles/agy2.sh "<prompt>"` |
+| **Worker 3** | `ibrahimalkateb9220@gmail.com` | 2M Context Ingestion, Docs, Accessibility Parity, Research | Win: `& "D:\FleetProfiles\agy3.bat" "<prompt>"`<br>WSL: `/mnt/d/FleetProfiles/agy3.sh "<prompt>"` |
+| **Worker 4** | `ayahowiedy123@gmail.com` | Secondary Parallelism, Fast Refactoring, Dynamic Failover Pool | Win: `& "D:\FleetProfiles\agy4.bat" "<prompt>"`<br>WSL: `/mnt/d/FleetProfiles/agy4.sh "<prompt>"` |
+| **Auto Failover** | Round-Robin across 1-4 | Cascades automatically if a worker exhausts quota or hits 429 | Win: `& "D:\FleetProfiles\agy-fleet.ps1" -Prompt "<prompt>"`<br>WSL: `/mnt/d/FleetProfiles/agy-fleet.sh "<prompt>"` |
+| **Worker Zen** | OpenCode Go (`GLM 5.3 Flash`) | DB Migrations, Schemas, CLI Plumbing, Gradle Builds | `opencode run --auto -m opencode-go/glm-5.3-flash "<prompt>"` |
+
+**Rules of Engagement:**
+1. **Zero Manual Copy-Paste:** Claude Code issues commands directly in terminal using the invocation strings above.
+2. **Strict Testing Monopoly:** Delegates write and build only. Claude Code audits diffs and runs `./gradlew test` / E2E suites exclusively.
+3. **Drive C: Zero-Write (`[C-82]`):** All profiles and cached artifacts remain quarantined in `D:\FleetProfiles\`.
+
 
 ---
 

@@ -1,3 +1,4 @@
+import re
 from datetime import date, datetime
 from decimal import Decimal
 from zoneinfo import ZoneInfo
@@ -125,6 +126,21 @@ def _installment_breakdown(conn, student_id, amount, balance, plan_id=None) -> d
     }
 
 
+def _normalize_guardian_whatsapp(phone: str | None) -> str:
+    if not phone:
+        return ""
+    digits = re.sub(r"\D", "", str(phone))
+    if digits.startswith("009665") and len(digits) == 14:
+        return digits[2:]
+    if digits.startswith("9665") and len(digits) == 12:
+        return digits
+    if digits.startswith("05") and len(digits) == 10:
+        return "966" + digits[1:]
+    if digits.startswith("5") and len(digits) == 9:
+        return "966" + digits
+    return ""
+
+
 @router.get("/print/receipt")
 @router.get("/print/receipt/{payment_id}")
 def receipt(
@@ -138,11 +154,25 @@ def receipt(
     pid = payment_id or payment or id
     if not pid:
         raise ApiError(400, "validation_error", "رقم الدفعة أو السند مطلوب")
+
+    select_fields = """r.receipt_no, r.issued_on, r.issued_by_user_id, p.amount, COALESCE(p.bus_amount, 0) AS bus_amount, p.method,
+               p.student_id, s.name AS student_name, s.has_bus_subscription,
+               COALESCE(s.bus_fee, 0) AS bus_fee, COALESCE(s.bus_paid, 0) AS bus_paid, COALESCE(s.bus_remaining, 0) AS bus_remaining,
+               s.guardian_phone, s.father_phone, s.mother_phone,
+               i.seq_no, i.fee_plan_id, b.balance,
+               COALESCE(st.name, u.username, '') AS receiver_name"""
+    from_joins = """FROM receipts r
+               JOIN payments p ON p.id = r.payment_id
+               JOIN students s ON s.id = p.student_id
+               LEFT JOIN users u ON u.id = r.issued_by_user_id
+               LEFT JOIN staff st ON st.id = u.staff_id
+               LEFT JOIN installments i ON i.id = p.installment_id
+               LEFT JOIN v_student_balance b ON b.student_id = s.id"""
+
     if str(pid).isdigit():
         item = conn.execute(
-            """SELECT r.receipt_no, r.issued_on, p.amount, p.method, p.student_id, s.name student_name, i.seq_no, i.fee_plan_id,
-               b.balance FROM receipts r JOIN payments p ON p.id=r.payment_id JOIN students s ON s.id=p.student_id
-               LEFT JOIN installments i ON i.id=p.installment_id LEFT JOIN v_student_balance b ON b.student_id=s.id
+            f"""SELECT {select_fields}
+               {from_joins}
                WHERE r.receipt_no=%s AND r.deleted_at IS NULL AND p.deleted_at IS NULL AND s.deleted_at IS NULL""",
             (int(pid),),
         ).fetchone()
@@ -152,23 +182,41 @@ def receipt(
     else:
         item = _one(
             conn,
-            """SELECT r.receipt_no, r.issued_on, p.amount, p.method, p.student_id, s.name student_name, i.seq_no, i.fee_plan_id,
-               b.balance FROM receipts r JOIN payments p ON p.id=r.payment_id JOIN students s ON s.id=p.student_id
-               LEFT JOIN installments i ON i.id=p.installment_id LEFT JOIN v_student_balance b ON b.student_id=s.id
+            f"""SELECT {select_fields}
+               {from_joins}
                WHERE p.id=%s AND r.deleted_at IS NULL AND p.deleted_at IS NULL AND s.deleted_at IS NULL""",
             (pid,),
             "الدفعة غير موجودة",
         )
+
+    amount = float(item["amount"])
+    bus_amount = float(item.get("bus_amount") or 0)
+    reg_paid = amount - bus_amount
+    has_bus = bool(item.get("has_bus_subscription") or bus_amount > 0)
+    bus_fee = float(item.get("bus_fee") or 0)
+    bus_paid_amount = bus_amount
+    bus_remaining = float(item.get("bus_remaining") or 0)
+
+    phone = item.get("guardian_phone") or item.get("father_phone") or item.get("mother_phone")
+    guardian_whatsapp = _normalize_guardian_whatsapp(phone)
+
     return _resp({
         "template": "receipt",
         "receipt_no": item["receipt_no"],
         "date": _date(item["issued_on"]),
         "student_name": item["student_name"],
         "method": item["method"],
-        "amount": item["amount"],
+        "amount": amount,
+        "registration_paid_amount": reg_paid,
         "installment_ref": item["seq_no"] or "—",
         "amount_words": arabic_amount_words(Decimal(str(item["amount"]))),
-        **_installment_breakdown(conn, item["student_id"], item["amount"], item["balance"], item["fee_plan_id"]),
+        "has_bus": has_bus,
+        "bus_fee": bus_fee,
+        "bus_paid_amount": bus_paid_amount,
+        "bus_remaining": bus_remaining,
+        "receiver_name": item.get("receiver_name") or "",
+        "guardian_whatsapp": guardian_whatsapp,
+        **_installment_breakdown(conn, item["student_id"], reg_paid, item["balance"], item["fee_plan_id"]),
     }, conn)
 
 

@@ -50,7 +50,7 @@
 
 @page page-a5-landscape {
   size: A5 landscape;
-  margin: 10mm;
+  margin: 6mm 8mm;
 }
 
 @page page-a4-landscape {
@@ -209,10 +209,16 @@ h4 {
 }
 
 /* A5 landscape receipt: keep the installment breakdown on one page */
+.page-a5-landscape .sheet {
+  page-break-inside: avoid;
+  break-inside: avoid;
+}
+
 .page-a5-landscape th,
 .page-a5-landscape td {
-  padding: 1.2mm 3mm;
-  line-height: 1.5;
+  padding: 0.9mm 2.5mm;
+  line-height: 1.35;
+  font-size: 9pt;
 }
 
 .page-a5-landscape tbody th,
@@ -221,16 +227,17 @@ h4 {
 }
 
 .page-a5-landscape .amount-words {
-  margin-top: 3mm;
-  padding: 1.5mm 3mm;
+  margin-top: 1.5mm;
+  padding: 1mm 2.5mm;
+  font-size: 8.5pt;
 }
 
 .page-a5-landscape .signatures {
-  margin-top: 4mm;
+  margin-top: 2.5mm;
 }
 
 .page-a5-landscape .signature .sig-line {
-  height: 8mm;
+  height: 6mm;
 }
 
 .doc-footer {
@@ -345,6 +352,19 @@ tr {
 .signature .sig-title {
   font-size: 8.5pt;
   color: var(--g-muted);
+}
+
+.sig-receiver {
+  font-size: 8.5pt;
+  font-weight: 700;
+  color: var(--g-text);
+  margin-top: 0.5mm;
+  line-height: 1.2;
+}
+
+.page-a5-landscape .sig-receiver {
+  font-size: 8pt;
+  margin-top: 0.5mm;
 }
 
 .amount-words {
@@ -533,7 +553,7 @@ tr {
   body.page-a5-landscape .sheet {
     width: 210mm;
     min-height: 148mm;
-    padding: 10mm;
+    padding: 6mm 8mm;
   }
 
   body.page-a4-landscape .sheet {
@@ -627,6 +647,19 @@ tr {
 
   .print-toolbar-btn.print-btn:hover {
     background: #e65100;
+    transform: translateY(-1px);
+  }
+
+  .print-toolbar-btn.whatsapp-btn {
+    background: #25d366;
+    color: #ffffff;
+    text-decoration: none;
+    box-shadow: 0 2px 8px rgba(37, 211, 102, 0.35);
+  }
+
+  .print-toolbar-btn.whatsapp-btn:hover {
+    background: #1ebd5a;
+    color: #ffffff;
     transform: translateY(-1px);
   }
 

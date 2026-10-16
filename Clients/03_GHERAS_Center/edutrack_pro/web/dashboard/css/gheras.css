@@ -312,3 +312,9 @@ body.auth-locked .app-shell{grid-template-columns:1fr}body.auth-locked .sidebar,
   border-radius: 6px !important;
   flex: 1;
 }
+
+/* Fix Chromium RTL date picker glyph inversion */
+input[type="date"] {
+  direction: ltr !important;
+  text-align: right !important;
+}

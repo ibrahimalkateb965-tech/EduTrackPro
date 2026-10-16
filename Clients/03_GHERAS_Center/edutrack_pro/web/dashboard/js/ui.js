@@ -29,8 +29,8 @@ export function calculateAge(birthDateStr) {
   return { years: Math.max(0, years), months: Math.max(0, months) };
 }
 
-export function createDatePicker({ name = 'birth_date', value = '', label = 'تاريخ الميلاد', minYear = 1970, maxYear = new Date().getFullYear(), showAge = true } = {}) {
-  const wrap = el('div', { class: 'g-datepicker-wrap' });
+export function createDatePicker({ name = 'birth_date', value = '', label = 'تاريخ الميلاد', minYear = 1970, maxYear = new Date().getFullYear(), showAge = true, minDate = '' } = {}) {
+  const wrap = el('div', { class: 'g-datepicker-wrap', 'data-name': name });
   const hiddenInput = el('input', { type: 'hidden', name, value: value || '' });
   const displayInput = el('input', {
     type: 'text',
@@ -50,13 +50,17 @@ export function createDatePicker({ name = 'birth_date', value = '', label = 'ت�
 
   const ageBadge = el('span', { class: 'g-datepicker-age', style: 'display: none;' });
 
-  function updateView(isoStr) {
+  function updateView(isoStr, triggerEvents = true) {
     hiddenInput.value = isoStr || '';
     if (!isoStr) {
       displayInput.value = '';
       clearBtn.style.display = 'none';
       ageBadge.style.display = 'none';
       ageBadge.textContent = '';
+      if (triggerEvents) {
+        hiddenInput.dispatchEvent(new Event('input', { bubbles: true }));
+        hiddenInput.dispatchEvent(new Event('change', { bubbles: true }));
+      }
       return;
     }
     const [y, m, d] = isoStr.split('-').map(Number);
@@ -74,16 +78,27 @@ export function createDatePicker({ name = 'birth_date', value = '', label = 'ت�
         }
       }
     }
+    if (triggerEvents) {
+      hiddenInput.dispatchEvent(new Event('input', { bubbles: true }));
+      hiddenInput.dispatchEvent(new Event('change', { bubbles: true }));
+    }
   }
 
-  updateView(value);
+  updateView(value, false);
 
   const popover = el('div', { class: 'g-cal-popover', style: 'display: none;' });
 
-  let viewYear = maxYear;
+  const currentYear = new Date().getFullYear();
+  let viewYear = (currentYear >= minYear && currentYear <= maxYear) ? currentYear : maxYear;
   let viewMonth = new Date().getMonth();
   if (value) {
     const parts = value.split('-').map(Number);
+    if (parts.length === 3 && parts[0] >= minYear && parts[0] <= maxYear) {
+      viewYear = parts[0];
+      viewMonth = parts[1] - 1;
+    }
+  } else if (minDate) {
+    const parts = minDate.split('-').map(Number);
     if (parts.length === 3 && parts[0] >= minYear && parts[0] <= maxYear) {
       viewYear = parts[0];
       viewMonth = parts[1] - 1;
@@ -144,18 +159,27 @@ export function createDatePicker({ name = 'birth_date', value = '', label = 'ت�
       const thisIso = `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
       const isSelected = selectedIso === thisIso;
       const isToday = todayStr === thisIso;
+      const isDisabled = Boolean(minDate && thisIso < minDate);
 
       let dayClass = 'g-cal-day';
       if (isSelected) dayClass += ' selected';
       if (isToday) dayClass += ' today';
+      if (isDisabled) dayClass += ' disabled';
 
-      const dayCell = el('button', { type: 'button', class: dayClass }, String(d));
-      dayCell.addEventListener('click', e => {
-        e.stopPropagation();
-        e.preventDefault();
-        updateView(thisIso);
-        closePopover();
-      });
+      const dayAttrs = { type: 'button', class: dayClass };
+      if (isDisabled) {
+        dayAttrs.disabled = 'disabled';
+      }
+
+      const dayCell = el('button', dayAttrs, String(d));
+      if (!isDisabled) {
+        dayCell.addEventListener('click', e => {
+          e.stopPropagation();
+          e.preventDefault();
+          updateView(thisIso);
+          closePopover();
+        });
+      }
       daysGrid.append(dayCell);
     }
   }
@@ -164,6 +188,12 @@ export function createDatePicker({ name = 'birth_date', value = '', label = 'ت�
     if (hiddenInput.value) {
       const [y, m] = hiddenInput.value.split('-').map(Number);
       if (y && m) {
+        viewYear = y;
+        viewMonth = m - 1;
+      }
+    } else if (minDate) {
+      const [y, m] = minDate.split('-').map(Number);
+      if (y && m && y >= minYear && y <= maxYear) {
         viewYear = y;
         viewMonth = m - 1;
       }
@@ -215,6 +245,9 @@ export function createDatePicker({ name = 'birth_date', value = '', label = 'ت�
     e.preventDefault();
     const now = new Date();
     const iso = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    if (minDate && iso < minDate) {
+      return;
+    }
     updateView(iso);
     closePopover();
   });

@@ -62,6 +62,18 @@
         </tr>
         {{/is_fully_paid}}
         {{/has_installments}}
+        {{#has_bus}}
+        <tr class="receipt-bus-row">
+          <th scope="row">رسوم اشتراك الباص</th>
+          <td>{{bus_fee}} ريال</td>
+          <th scope="row">المسدد من الباص</th>
+          <td>{{bus_paid_amount}} ريال</td>
+        </tr>
+        <tr class="receipt-bus-row">
+          <th scope="row">المتبقي من الباص</th>
+          <td colspan="3">{{bus_remaining}} ريال</td>
+        </tr>
+        {{/has_bus}}
       </tbody>
     </table>
 
@@ -79,6 +91,7 @@
     <div class="signature">
       <div class="sig-line"></div>
       <div class="sig-name">المستلم</div>
+      <div class="sig-receiver">{{receiver_name}}</div>
     </div>
   </div>
 
