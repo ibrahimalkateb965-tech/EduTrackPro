@@ -285,14 +285,9 @@ def test_receipt_template_contract(client, db, manager):
     assert offenders == {}
 
 
-def test_print_engine_never_targets_native_whatsapp():
-    # Scope: the print engine and its templates (order 15 D5). Native URI scheme (whatsapp://)
-    # is banned. Desktop targets web.whatsapp.com and mobile targets wa.me via responsive device detection.
-    sources = [WEB_ROOT / "print" / "print_engine.js", *sorted((WEB_ROOT / "print" / "templates").glob("*.html"))]
-    for path in sources:
-        text = path.read_text(encoding="utf-8")
-        for banned in ("whatsapp://",):
-            assert banned not in text, f"{path.name} uses {banned}"
+def test_print_engine_targets_web_on_desktop_and_native_on_mobile():
     engine = (WEB_ROOT / "print" / "print_engine.js").read_text(encoding="utf-8")
     assert "https://web.whatsapp.com/send" in engine
+    assert "whatsapp://send" in engine
     assert "https://wa.me/" in engine
+

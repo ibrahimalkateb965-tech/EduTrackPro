@@ -211,29 +211,37 @@ function injectToolbar(docTitle, templateKey, data = null) {
       const amountVal = Number(data.amount || 0).toFixed(2);
       const receiptDate = data.date || '';
 
-      const lines = [
-        centerName,
-        `سند قبض رقم: ${receiptNo}`,
-        `الطالب: ${studentName}`,
-        `المبلغ المدفوع: ${amountVal} ريال`,
-        `التاريخ: ${receiptDate}`
-      ];
-      const messageText = lines.join('\n');
-      const getShareUrl = () => {
-        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile/i.test(navigator.userAgent || '') || (window.innerWidth <= 768);
-        return isMobile
-          ? `https://wa.me/${encodeURIComponent(phone)}?text=${encodeURIComponent(messageText)}`
-          : `https://web.whatsapp.com/send?phone=${encodeURIComponent(phone)}&text=${encodeURIComponent(messageText)}`;
+      const isMobileDevice = () => {
+        const ua = navigator.userAgent || '';
+        const isTouch = (navigator.maxTouchPoints > 0) || ('ontouchstart' in window);
+        const isSmallScreen = Math.min(window.screen.width, window.screen.height) <= 768;
+        const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile/i.test(ua);
+        return isMobileUA || (isTouch && isSmallScreen) || (window.innerWidth <= 768);
       };
+
+      const desktopUrl = `https://web.whatsapp.com/send?phone=${encodeURIComponent(phone)}&text=${encodeURIComponent(messageText)}`;
+      const nativeUrl = `whatsapp://send?phone=${encodeURIComponent(phone)}&text=${encodeURIComponent(messageText)}`;
+      const fallbackWebUrl = `https://wa.me/${encodeURIComponent(phone)}?text=${encodeURIComponent(messageText)}`;
 
       const whatsappBtn = document.createElement('a');
       whatsappBtn.id = 'gheras-whatsapp-action';
       whatsappBtn.className = 'print-toolbar-btn whatsapp-btn';
       whatsappBtn.target = '_blank';
       whatsappBtn.rel = 'noopener noreferrer';
-      whatsappBtn.href = getShareUrl();
-      whatsappBtn.addEventListener('click', () => {
-        whatsappBtn.href = getShareUrl();
+      whatsappBtn.href = isMobileDevice() ? nativeUrl : desktopUrl;
+
+      whatsappBtn.addEventListener('click', (e) => {
+        if (isMobileDevice()) {
+          e.preventDefault();
+          window.location.href = nativeUrl;
+          setTimeout(() => {
+            if (document.hasFocus()) {
+              window.open(fallbackWebUrl, '_blank', 'noopener,noreferrer');
+            }
+          }, 1500);
+        } else {
+          whatsappBtn.href = desktopUrl;
+        }
       });
       whatsappBtn.innerHTML = `
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="margin-left: 6px;">
