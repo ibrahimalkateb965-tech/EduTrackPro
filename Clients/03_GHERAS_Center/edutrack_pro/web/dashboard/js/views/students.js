@@ -942,6 +942,8 @@ function openStudentForm(api, student) {
     } else {
       payload.bus_fee = 0;
       payload.bus_paid = 0;
+    }
+
     // PostgreSQL nullable & check constraint guarantees
     ['birth_date', 'group_name', 'guardian_relation', 'national_id', 'father_phone', 'mother_phone', 'pickup_phone', 'registration_fee', 'initial_payment_amount'].forEach(k => {
       if (payload[k] === '') payload[k] = null;

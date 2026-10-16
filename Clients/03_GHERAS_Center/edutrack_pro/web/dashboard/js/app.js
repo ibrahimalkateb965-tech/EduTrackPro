@@ -128,7 +128,7 @@ async function handleRoute() {
   loginActive = false;
   document.body.classList.remove('auth-locked');
   let view;
-  try { view = await import(`./views/${route}.js?v=3.4`); } catch (error) {
+  try { view = await import(`./views/${route}.js?v=3.5`); } catch (error) {
     toast('تعذر تحميل هذه الصفحة', true);
     return;
   }
