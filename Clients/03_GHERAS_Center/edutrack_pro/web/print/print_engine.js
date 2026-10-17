@@ -228,6 +228,9 @@ function injectToolbar(docTitle, templateKey, data = null) {
       const amountVal = Number(data.amount || 0).toFixed(2);
       const receiptDate = data.date || '';
 
+      const searchParams = new URLSearchParams(window.location.search);
+      const pidParam = searchParams.get('payment_id') || searchParams.get('payment') || searchParams.get('id') || receiptNo;
+
       const lines = [
         centerName,
         `سند قبض رقم: ${receiptNo}`,
@@ -241,10 +244,15 @@ function injectToolbar(docTitle, templateKey, data = null) {
       if (Number(data.remaining_balance || 0) > 0) {
         lines.push(`المتبقي: ${Number(data.remaining_balance).toFixed(2)} ريال`);
       }
+
+      const pdfUrl = data.public_pdf_url || `${window.location.origin}/api/v1/public/receipts/${pidParam}/pdf`;
+      lines.push('');
+      lines.push('📄 رابط تحميل وعرض سند القبض (PDF):');
+      lines.push(pdfUrl);
+
       const messageText = lines.join('\n');
       const encodedText = encodeURIComponent(messageText);
 
-      const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || '') || Boolean(navigator.userAgentData?.mobile);
       const whatsappBtn = document.createElement('a');
       whatsappBtn.id = 'gheras-whatsapp-action';
       whatsappBtn.className = 'print-toolbar-btn whatsapp-btn';
@@ -254,78 +262,20 @@ function injectToolbar(docTitle, templateKey, data = null) {
       whatsappBtn.href = `https://wa.me/${phone}?text=${encodedText}`;
       whatsappBtn.innerHTML = `
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="margin-left: 6px;">
-          <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
+          <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
         </svg>
         <span class="whatsapp-label">مشاركة عبر واتساب (PDF)</span>
       `;
 
-      let cachedShareFile = null;
-      whatsappBtn.addEventListener('click', async (e) => {
-        if (isMobile && typeof navigator.share === 'function') {
-          e.preventDefault();
-          const labelSpan = whatsappBtn.querySelector('.whatsapp-label');
-          if (cachedShareFile && navigator.canShare && navigator.canShare({ files: [cachedShareFile] })) {
-            try {
-              await navigator.share({
-                title: `سند قبض رقم ${receiptNo} - ${studentName}`,
-                text: messageText,
-                files: [cachedShareFile]
-              });
-              return;
-            } catch (sErr) {
-              if (sErr.name === 'AbortError') return;
-            }
-          }
-          whatsappBtn.setAttribute('aria-busy', 'true');
-          whatsappBtn.style.opacity = '0.75';
-          if (labelSpan) labelSpan.textContent = 'جارٍ تجهيز ملف PDF...';
-          try {
-            const pdfMeta = await requestPdfRender('receipt');
-            const pdfResp = await fetch(pdfMeta.url);
-            const pdfBlob = await pdfResp.blob();
-            const fileName = pdfMeta.filename || `سند_قبض_${receiptNo}.pdf`;
-            const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
-            cachedShareFile = file;
-            if (navigator.canShare && navigator.canShare({ files: [file] })) {
-              try {
-                await navigator.share({
-                  title: `سند قبض رقم ${receiptNo} - ${studentName}`,
-                  text: messageText,
-                  files: [file]
-                });
-              } catch (sErr) {
-                if (sErr.name === 'AbortError') return;
-                if (sErr.name === 'NotAllowedError') {
-                  if (labelSpan) labelSpan.textContent = 'الملف جاهز — اضغط للمشاركة 📄';
-                  return;
-                }
-                throw sErr;
-              }
-            } else {
-              window.location.href = `https://wa.me/${phone}?text=${encodedText}`;
-            }
-          } catch (err) {
-            console.warn('[PrintEngine] Web Share PDF fallback:', err);
-            window.location.href = `https://wa.me/${phone}?text=${encodedText}`;
-          } finally {
-            whatsappBtn.removeAttribute('aria-busy');
-            whatsappBtn.style.opacity = '1';
-            if (labelSpan && labelSpan.textContent !== 'الملف جاهز — اضغط للمشاركة 📄') {
-              labelSpan.textContent = 'مشاركة عبر واتساب (PDF)';
-            }
-          }
-          return;
-        }
-
-        // Desktop flow
+      whatsappBtn.addEventListener('click', () => {
         try {
           const dlBtn = document.getElementById('gheras-download-action');
           if (dlBtn) {
             downloadPdf(dlBtn, 'receipt', 'تنزيل السند (PDF)');
           }
-          showPrintToast('تم فتح المحادثة وتنزيل ملف السند (PDF) — قم بسحبه وإرفاقه في المحادثة 📎');
+          showPrintToast('تم فتح المحادثة وتضمين رابط السند (PDF) — جاري تنزيل نسخة من الملف 📎');
         } catch (err) {
-          console.warn('[PrintEngine] Desktop parallel PDF download:', err);
+          console.warn('[PrintEngine] Parallel PDF download:', err);
         }
       });
 

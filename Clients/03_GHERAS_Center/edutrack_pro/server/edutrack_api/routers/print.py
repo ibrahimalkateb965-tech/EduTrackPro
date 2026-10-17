@@ -1,12 +1,16 @@
+import os
 import re
 from datetime import date, datetime
 from decimal import Decimal
+from pathlib import Path
+from urllib.parse import parse_qs, quote
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import Response
 
-from edutrack_api.auth import require_roles
+from edutrack_api.auth import issue_token, require_roles
+from edutrack_api.config import get_settings
 from edutrack_api.db import get_conn
 from edutrack_api.errors import ApiError
 from edutrack_api.serializers import _convert, row_to_json
@@ -159,7 +163,7 @@ def receipt(
     if not pid:
         raise ApiError(400, "validation_error", "رقم الدفعة أو السند مطلوب")
 
-    select_fields = """r.receipt_no, r.issued_on, r.issued_by_user_id, p.amount, COALESCE(p.bus_amount, 0) AS bus_amount, p.method,
+    select_fields = """r.receipt_no, p.id AS payment_id, r.issued_on, r.issued_by_user_id, p.amount, COALESCE(p.bus_amount, 0) AS bus_amount, p.method,
                p.student_id, s.name AS student_name, s.has_bus_subscription,
                COALESCE(s.bus_fee, 0) AS bus_fee, COALESCE(s.bus_paid, 0) AS bus_paid, COALESCE(s.bus_remaining, 0) AS bus_remaining,
                s.guardian_phone, s.father_phone, s.mother_phone,
@@ -203,6 +207,8 @@ def receipt(
 
     phone = item.get("guardian_phone") or item.get("father_phone") or item.get("mother_phone")
     guardian_whatsapp = _normalize_guardian_whatsapp(phone)
+    payment_ref = item.get("payment_id") or pid
+    public_pdf_url = f"https://gheras.autovem.tech/api/v1/public/receipts/{payment_ref}/pdf"
 
     return _resp({
         "template": "receipt",
@@ -220,6 +226,7 @@ def receipt(
         "bus_remaining": bus_remaining,
         "receiver_name": item.get("receiver_name") or "",
         "guardian_whatsapp": guardian_whatsapp,
+        "public_pdf_url": public_pdf_url,
         **_installment_breakdown(conn, item["student_id"], reg_paid, item["balance"], item["fee_plan_id"]),
     }, conn)
 
@@ -645,6 +652,17 @@ def statistics(from_: str = Query(alias="from"), to: str = Query(), conn=Depends
     }, conn)
 
 
+def _receipt_cache_dir() -> Path:
+    p = Path(os.getenv("RECEIPT_PDF_CACHE_DIR", "/app/uploads/receipt_pdfs"))
+    try:
+        p.mkdir(parents=True, exist_ok=True)
+        return p
+    except Exception:
+        fallback = Path("/tmp/edutrack_receipt_pdfs")
+        fallback.mkdir(parents=True, exist_ok=True)
+        return fallback
+
+
 @router.post("/print/pdf/{template}")
 async def print_pdf(template: str, request: Request) -> dict:
     """Render the template to PDF; the query string is the print page's own query string.
@@ -658,6 +676,18 @@ async def print_pdf(template: str, request: Request) -> dict:
         raise ApiError(401, "unauthorized", "غير مصرح")
     doc = await pdf.render_pdf(request.app, template, request.url.query, authorization)
     token = pdf.store_download(doc)
+
+    # Persist receipt PDF to disk cache for instantaneous public link delivery
+    if template == "receipt":
+        try:
+            qs = parse_qs(request.url.query)
+            pid = qs.get("payment", [""])[0] or qs.get("payment_id", [""])[0] or qs.get("id", [""])[0]
+            if pid:
+                cache_dir = _receipt_cache_dir()
+                (cache_dir / f"receipt_{pid}.pdf").write_bytes(doc.content)
+        except Exception:
+            pass
+
     return {
         "url": f"/api/v1/print/pdf/download/{token}",
         "filename": f"{doc.title}.pdf",
@@ -675,4 +705,69 @@ async def print_pdf_download(token: str) -> Response:
         doc.content,
         media_type="application/pdf",
         headers={"Content-Disposition": pdf.content_disposition(doc), "Cache-Control": "no-store"},
+    )
+
+
+@router.get("/public/receipts/{payment_ref}/pdf")
+async def public_receipt_pdf(payment_ref: str, request: Request, conn=Depends(get_conn)) -> Response:
+    """Public capability endpoint to view/download official receipt PDF without login."""
+    item = conn.execute(
+        """SELECT r.receipt_no, p.id AS payment_id, s.name AS student_name
+           FROM payments p
+           JOIN receipts r ON r.payment_id = p.id
+           JOIN students s ON s.id = p.student_id
+           WHERE (p.id::text = %s OR r.receipt_no::text = %s)
+             AND p.deleted_at IS NULL AND r.deleted_at IS NULL AND s.deleted_at IS NULL
+           LIMIT 1""",
+        (payment_ref, payment_ref),
+    ).fetchone()
+    if not item:
+        raise ApiError(404, "not_found", "سند القبض غير موجود أو تم حذفه")
+
+    item = dict(item)
+    receipt_no = item["receipt_no"]
+    payment_id = str(item["payment_id"])
+    filename = f"سند_قبض_{receipt_no}.pdf"
+
+    cache_dir = _receipt_cache_dir()
+    cache_candidates = [
+        cache_dir / f"receipt_{payment_id}.pdf",
+        cache_dir / f"receipt_{receipt_no}.pdf",
+        cache_dir / f"receipt_{payment_ref}.pdf",
+    ]
+
+    for c in cache_candidates:
+        if c.is_file() and c.stat().st_size > 0:
+            return Response(
+                c.read_bytes(),
+                media_type="application/pdf",
+                headers={
+                    "Content-Disposition": f"inline; filename*=UTF-8''{quote(filename, safe='')}",
+                    "Cache-Control": "public, max-age=86400",
+                },
+            )
+
+    # Render on demand using internal system token
+    mgr = conn.execute(
+        "SELECT id, role, token_version FROM users WHERE role = 'manager' AND is_active = true AND deleted_at IS NULL LIMIT 1"
+    ).fetchone()
+    if not mgr:
+        mgr = {"id": payment_id, "role": "manager", "token_version": 1}
+    settings = get_settings()
+    internal_token = issue_token(dict(mgr), settings)
+    auth_header = f"Bearer {internal_token}"
+
+    doc = await pdf.render_pdf(request.app, "receipt", f"payment={payment_id}", auth_header)
+    try:
+        (cache_dir / f"receipt_{payment_id}.pdf").write_bytes(doc.content)
+    except Exception:
+        pass
+
+    return Response(
+        doc.content,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f"inline; filename*=UTF-8''{quote(filename, safe='')}",
+            "Cache-Control": "public, max-age=86400",
+        },
     )
