@@ -102,6 +102,39 @@ function renderMustache(template, data) {
   return rendered;
 }
 
+function showPrintToast(msg) {
+  let toastEl = document.querySelector('.print-toast');
+  if (!toastEl) {
+    toastEl = document.createElement('div');
+    toastEl.className = 'print-toast';
+    document.body.appendChild(toastEl);
+  }
+  toastEl.textContent = msg;
+  toastEl.classList.add('visible');
+  setTimeout(() => toastEl.classList.remove('visible'), 6000);
+}
+
+// Request PDF render from the server headless Chromium engine
+async function requestPdfRender(templateKey) {
+  const searchParams = new URLSearchParams(window.location.search);
+  searchParams.delete('token');
+  const queryString = searchParams.toString();
+  const token = getToken();
+  const headers = { 'Accept': 'application/json' };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  const response = await fetch(
+    `/api/v1/print/pdf/${encodeURIComponent(templateKey)}${queryString ? '?' + queryString : ''}`,
+    { method: 'POST', headers }
+  );
+  const data = await response.json().catch(() => null);
+  if (!response.ok || !data?.url) {
+    throw new Error(data?.error?.message || data?.detail || `خطأ استجابة الخادم (${response.status})`);
+  }
+  return data;
+}
+
 // Direct PDF download: the server renders this same template in headless Chromium
 // (POST /api/v1/print/pdf/<key>), so Arabic shaping and spacing match the print preview
 // and the file keeps real text. The browser then follows the returned short-lived URL as a
@@ -114,24 +147,8 @@ async function downloadPdf(button, templateKey, label) {
   button.setAttribute('aria-busy', 'true');
   labelEl.textContent = 'جارٍ تجهيز الملف...';
 
-  const searchParams = new URLSearchParams(window.location.search);
-  searchParams.delete('token');
-  const queryString = searchParams.toString();
-  const token = getToken();
-  const headers = { 'Accept': 'application/json' };
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-
   try {
-    const response = await fetch(
-      `/api/v1/print/pdf/${encodeURIComponent(templateKey)}${queryString ? '?' + queryString : ''}`,
-      { method: 'POST', headers }
-    );
-    const data = await response.json().catch(() => null);
-    if (!response.ok || !data?.url) {
-      throw new Error(data?.error?.message || data?.detail || `خطأ استجابة الخادم (${response.status})`);
-    }
+    const data = await requestPdfRender(templateKey);
     const link = document.createElement('a');
     link.href = data.url;
     document.body.append(link);
@@ -227,6 +244,7 @@ function injectToolbar(docTitle, templateKey, data = null) {
       const messageText = lines.join('\n');
       const encodedText = encodeURIComponent(messageText);
 
+      const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || '') || Boolean(navigator.userAgentData?.mobile);
       const whatsappBtn = document.createElement('a');
       whatsappBtn.id = 'gheras-whatsapp-action';
       whatsappBtn.className = 'print-toolbar-btn whatsapp-btn';
@@ -238,8 +256,79 @@ function injectToolbar(docTitle, templateKey, data = null) {
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="margin-left: 6px;">
           <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
         </svg>
-        مشاركة عبر واتساب
+        <span class="whatsapp-label">مشاركة عبر واتساب (PDF)</span>
       `;
+
+      let cachedShareFile = null;
+      whatsappBtn.addEventListener('click', async (e) => {
+        if (isMobile && typeof navigator.share === 'function') {
+          e.preventDefault();
+          const labelSpan = whatsappBtn.querySelector('.whatsapp-label');
+          if (cachedShareFile && navigator.canShare && navigator.canShare({ files: [cachedShareFile] })) {
+            try {
+              await navigator.share({
+                title: `سند قبض رقم ${receiptNo} - ${studentName}`,
+                text: messageText,
+                files: [cachedShareFile]
+              });
+              return;
+            } catch (sErr) {
+              if (sErr.name === 'AbortError') return;
+            }
+          }
+          whatsappBtn.setAttribute('aria-busy', 'true');
+          whatsappBtn.style.opacity = '0.75';
+          if (labelSpan) labelSpan.textContent = 'جارٍ تجهيز ملف PDF...';
+          try {
+            const pdfMeta = await requestPdfRender('receipt');
+            const pdfResp = await fetch(pdfMeta.url);
+            const pdfBlob = await pdfResp.blob();
+            const fileName = pdfMeta.filename || `سند_قبض_${receiptNo}.pdf`;
+            const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
+            cachedShareFile = file;
+            if (navigator.canShare && navigator.canShare({ files: [file] })) {
+              try {
+                await navigator.share({
+                  title: `سند قبض رقم ${receiptNo} - ${studentName}`,
+                  text: messageText,
+                  files: [file]
+                });
+              } catch (sErr) {
+                if (sErr.name === 'AbortError') return;
+                if (sErr.name === 'NotAllowedError') {
+                  if (labelSpan) labelSpan.textContent = 'الملف جاهز — اضغط للمشاركة 📄';
+                  return;
+                }
+                throw sErr;
+              }
+            } else {
+              window.location.href = `https://wa.me/${phone}?text=${encodedText}`;
+            }
+          } catch (err) {
+            console.warn('[PrintEngine] Web Share PDF fallback:', err);
+            window.location.href = `https://wa.me/${phone}?text=${encodedText}`;
+          } finally {
+            whatsappBtn.removeAttribute('aria-busy');
+            whatsappBtn.style.opacity = '1';
+            if (labelSpan && labelSpan.textContent !== 'الملف جاهز — اضغط للمشاركة 📄') {
+              labelSpan.textContent = 'مشاركة عبر واتساب (PDF)';
+            }
+          }
+          return;
+        }
+
+        // Desktop flow
+        try {
+          const dlBtn = document.getElementById('gheras-download-action');
+          if (dlBtn) {
+            downloadPdf(dlBtn, 'receipt', 'تنزيل السند (PDF)');
+          }
+          showPrintToast('تم فتح المحادثة وتنزيل ملف السند (PDF) — قم بسحبه وإرفاقه في المحادثة 📎');
+        } catch (err) {
+          console.warn('[PrintEngine] Desktop parallel PDF download:', err);
+        }
+      });
+
       actions.append(whatsappBtn);
     }
   }
