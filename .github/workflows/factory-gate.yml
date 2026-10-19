@@ -1,0 +1,20 @@
+name: factory-gate
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: factory-gate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  server:
+    if: startsWith(github.head_ref, 'factory/')
+    uses: ./.github/workflows/server.yml
+
+  android:
+    if: startsWith(github.head_ref, 'factory/')
+    uses: ./.github/workflows/android.yml

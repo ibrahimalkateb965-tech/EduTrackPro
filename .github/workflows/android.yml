@@ -10,6 +10,7 @@ on:
     paths:
       - "Clients/03_GHERAS_Center/edutrack_pro/mobile/**"
       - ".github/workflows/android.yml"
+  workflow_call:
   workflow_dispatch:
 
 permissions:

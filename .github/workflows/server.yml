@@ -1,0 +1,70 @@
+name: server
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "Clients/03_GHERAS_Center/edutrack_pro/server/**"
+      - "Clients/03_GHERAS_Center/edutrack_pro/db/postgres/**"
+  pull_request:
+    paths:
+      - "Clients/03_GHERAS_Center/edutrack_pro/server/**"
+      - "Clients/03_GHERAS_Center/edutrack_pro/db/postgres/**"
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: server-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: Clients/03_GHERAS_Center/edutrack_pro/server
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres_password
+          POSTGRES_DB: gheras_test
+          PGTZ: "<+03>-03"
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Apply database migrations
+        env:
+          PGPASSWORD: postgres_password
+        run: |
+          for f in $(ls ../db/postgres/*.sql | sort); do
+            psql -h localhost -U postgres -d gheras_test -v ON_ERROR_STOP=1 -f "$f"
+          done
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Sync dependencies
+        run: uv sync
+
+      - name: Install Playwright
+        run: uv run playwright install --with-deps --only-shell chromium
+
+      - name: Run pytest
+        env:
+          TEST_DATABASE_URL: postgresql://postgres:postgres_password@localhost:5432/gheras_test
+          DATABASE_URL: postgresql://gheras_app:change_me@localhost:5432/gheras_test
+        run: uv run pytest -q
