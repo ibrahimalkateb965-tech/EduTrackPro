@@ -22,6 +22,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -47,6 +48,8 @@ import sa.gheras.edutrack.ui.guardian.ChildEvaluationsScreen
 import sa.gheras.edutrack.ui.guardian.ChildEvaluationsViewModel
 import sa.gheras.edutrack.ui.guardian.ChildHomeworkScreen
 import sa.gheras.edutrack.ui.guardian.ChildHomeworkViewModel
+import sa.gheras.edutrack.ui.guardian.homework.HomeworkDetailScreen
+import sa.gheras.edutrack.ui.guardian.homework.HomeworkResultScreen
 import sa.gheras.edutrack.ui.guardian.ChildLessonsScreen
 import sa.gheras.edutrack.ui.guardian.ChildLessonsViewModel
 import sa.gheras.edutrack.ui.guardian.ChildSkillsScreen
@@ -68,6 +71,11 @@ import sa.gheras.edutrack.ui.teacher.AssignmentDetailScreen
 import sa.gheras.edutrack.ui.teacher.AssignmentDetailViewModel
 import sa.gheras.edutrack.ui.teacher.AssignmentsScreen
 import sa.gheras.edutrack.ui.teacher.AssignmentsViewModel
+import sa.gheras.edutrack.ui.teacher.homework.CreateHomeworkScreen
+import sa.gheras.edutrack.ui.teacher.homework.HomeworkPreviewScreen
+import sa.gheras.edutrack.ui.teacher.homework.ReviewSubmissionsScreen
+import sa.gheras.edutrack.ui.teacher.homework.GradeSubmissionScreen
+import sa.gheras.edutrack.ui.teacher.homework.TeacherHomeworkViewModel
 import sa.gheras.edutrack.ui.teacher.AttendanceSheetScreen
 import sa.gheras.edutrack.ui.teacher.AttendanceSheetViewModel
 import sa.gheras.edutrack.ui.teacher.EvaluationSheetScreen
@@ -278,7 +286,11 @@ fun RootNavHost(
                         onAction = { action ->
                             when (action) {
                                 is NotificationAction.OpenAssignment -> {
-                                    navController.navigate(AssignmentDetailRoute(action.assignmentId))
+                                    if (activeRole == Role.TEACHER) {
+                                        navController.navigate(ReviewSubmissionsRoute(action.assignmentId))
+                                    } else {
+                                        navController.navigate(AssignmentDetailRoute(action.assignmentId))
+                                    }
                                 }
                                 is NotificationAction.OpenAttendance -> {
                                     navController.navigate(AttendanceSheetRoute(action.roomId, action.date))
@@ -451,7 +463,10 @@ fun RootNavHost(
                     AssignmentsScreen(
                         viewModel = vm,
                         onAssignmentClick = { assignmentId ->
-                            navController.navigate(AssignmentDetailRoute(assignmentId))
+                            navController.navigate(ReviewSubmissionsRoute(assignmentId))
+                        },
+                        onCreateClick = {
+                            navController.navigate(CreateHomeworkRoute)
                         }
                     )
                 }
@@ -472,7 +487,93 @@ fun RootNavHost(
                     )
                     AssignmentDetailScreen(
                         viewModel = vm,
-                        onNavigateBack = { navController.popBackStack() }
+                        onNavigateBack = { navController.popBackStack() },
+                        onGradeSubmissionClick = { submissionId ->
+                            navController.navigate(GradeSubmissionRoute(submissionId))
+                        }
+                    )
+                }
+
+                composable<CreateHomeworkRoute> { backStackEntry ->
+                    val vm: TeacherHomeworkViewModel = viewModel(
+                        backStackEntry,
+                        factory = viewModelFactory {
+                            TeacherHomeworkViewModel(
+                                container.assignmentsRepository,
+                                container.studentsRepository,
+                                container.database.roomDao(),
+                                container.sessionStore
+                            )
+                        }
+                    )
+                    CreateHomeworkScreen(
+                        viewModel = vm,
+                        onNavigateBack = { navController.popBackStack() },
+                        onNavigateToPreview = { navController.navigate(HomeworkPreviewRoute) }
+                    )
+                }
+
+                composable<HomeworkPreviewRoute> { backStackEntry ->
+                    val parentEntry = remember(backStackEntry) {
+                        runCatching { navController.getBackStackEntry<CreateHomeworkRoute>() }.getOrNull()
+                    }
+                    val vm: TeacherHomeworkViewModel = if (parentEntry != null) {
+                        viewModel(
+                            parentEntry,
+                            factory = viewModelFactory {
+                                TeacherHomeworkViewModel(
+                                    container.assignmentsRepository,
+                                    container.studentsRepository,
+                                    container.database.roomDao(),
+                                    container.sessionStore
+                                )
+                            }
+                        )
+                    } else {
+                        viewModel(
+                            backStackEntry,
+                            factory = viewModelFactory {
+                                TeacherHomeworkViewModel(
+                                    container.assignmentsRepository,
+                                    container.studentsRepository,
+                                    container.database.roomDao(),
+                                    container.sessionStore
+                                )
+                            }
+                        )
+                    }
+                    HomeworkPreviewScreen(
+                        viewModel = vm,
+                        onNavigateBack = { navController.popBackStack() },
+                        onPublishedSuccess = {
+                            navController.popBackStack<CreateHomeworkRoute>(inclusive = true)
+                        }
+                    )
+                }
+
+                composable<ReviewSubmissionsRoute> { backStackEntry ->
+                    val route: ReviewSubmissionsRoute = backStackEntry.toRoute()
+                    ReviewSubmissionsScreen(
+                        assignmentId = route.assignmentId,
+                        assignmentsRepository = container.assignmentsRepository,
+                        studentsRepository = container.studentsRepository,
+                        onNavigateBack = { navController.popBackStack() },
+                        onGradeSubmission = { submissionId ->
+                            navController.navigate(GradeSubmissionRoute(submissionId))
+                        }
+                    )
+                }
+
+                composable<GradeSubmissionRoute> { backStackEntry ->
+                    val route: GradeSubmissionRoute = backStackEntry.toRoute()
+                    GradeSubmissionScreen(
+                        submissionId = route.submissionId,
+                        assignmentsRepository = container.assignmentsRepository,
+                        studentsRepository = container.studentsRepository,
+                        onNavigateBack = { navController.popBackStack() },
+                        onReviewedSuccess = {
+                            navController.popBackStack()
+                        }
                     )
                 }
 
@@ -582,6 +683,32 @@ fun RootNavHost(
                     )
                     ChildHomeworkScreen(
                         viewModel = vm,
+                        onNavigateBack = { navController.popBackStack() },
+                        onNavigateToDetail = { assignmentId ->
+                            navController.navigate(HomeworkDetailRoute(assignmentId, route.studentId))
+                        },
+                        onNavigateToResult = { assignmentId ->
+                            navController.navigate(HomeworkResultRoute(assignmentId, route.studentId))
+                        }
+                    )
+                }
+
+                composable<HomeworkDetailRoute> { backStackEntry ->
+                    val route: HomeworkDetailRoute = backStackEntry.toRoute()
+                    HomeworkDetailScreen(
+                        assignmentId = route.assignmentId,
+                        studentId = route.studentId,
+                        assignmentsRepository = container.assignmentsRepository,
+                        onNavigateBack = { navController.popBackStack() }
+                    )
+                }
+
+                composable<HomeworkResultRoute> { backStackEntry ->
+                    val route: HomeworkResultRoute = backStackEntry.toRoute()
+                    HomeworkResultScreen(
+                        assignmentId = route.assignmentId,
+                        studentId = route.studentId,
+                        assignmentsRepository = container.assignmentsRepository,
                         onNavigateBack = { navController.popBackStack() }
                     )
                 }

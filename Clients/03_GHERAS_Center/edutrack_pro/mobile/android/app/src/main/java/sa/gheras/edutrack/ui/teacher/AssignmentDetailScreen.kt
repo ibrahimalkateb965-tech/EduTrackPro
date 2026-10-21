@@ -111,12 +111,12 @@ data class FullScreenViewerTarget(
 fun AssignmentDetailScreen(
     viewModel: AssignmentDetailViewModel,
     onNavigateBack: () -> Unit,
+    onGradeSubmissionClick: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.uiState.collectAsState()
     val context = LocalContext.current
     var viewingTarget by remember { mutableStateOf<FullScreenViewerTarget?>(null) }
-    var gradingTarget by remember { mutableStateOf<StudentSubmissionStatus?>(null) }
 
     // Pull fresh submissions and files on entry and when resuming
     LifecycleResumeEffect(viewModel) {
@@ -526,36 +526,21 @@ fun AssignmentDetailScreen(
 
                                 Spacer(modifier = Modifier.height(10.dp))
                                 OutlinedButton(
-                                    onClick = { gradingTarget = item },
+                                    onClick = {
+                                        item.submission?.let { onGradeSubmissionClick(it.id) }
+                                    },
                                     modifier = Modifier.fillMaxWidth(),
                                     shape = RoundedCornerShape(8.dp)
                                 ) {
                                     Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(16.dp))
                                     Spacer(modifier = Modifier.width(6.dp))
-                                    Text(if (item.submission.grade != null) "تعديل تقييم الواجب" else "تقييم ورصد درجة الواجب")
+                                    Text(if (item.submission.grade != null) "مراجعة تقييم الواجب" else "تقييم الواجب ومراجعته")
                                 }
                             }
                         }
                     }
                 }
             }
-        }
-    }
-
-    // Teacher Grading Dialog
-    gradingTarget?.let { target ->
-        target.submission?.let { sub ->
-            TeacherGradingDialog(
-                studentName = target.student.name,
-                currentGrade = sub.grade,
-                currentFeedback = sub.feedback,
-                isGrading = state.isGrading,
-                onDismiss = { if (!state.isGrading) gradingTarget = null },
-                onConfirm = { grade, feedback ->
-                    viewModel.gradeSubmission(sub.id, grade, feedback)
-                    gradingTarget = null
-                }
-            )
         }
     }
 
@@ -566,107 +551,10 @@ fun AssignmentDetailScreen(
             submissions = state.studentSubmissions,
             onDismiss = { viewingTarget = null },
             onGradeClick = { targetStatus ->
-                gradingTarget = targetStatus
+                viewingTarget = null
+                targetStatus.submission?.let { onGradeSubmissionClick(it.id) }
             }
         )
-    }
-}
-
-@Composable
-private fun TeacherGradingDialog(
-    studentName: String,
-    currentGrade: Double?,
-    currentFeedback: String?,
-    isGrading: Boolean,
-    onDismiss: () -> Unit,
-    onConfirm: (Double, String?) -> Unit
-) {
-    var gradeText by remember { mutableStateOf(currentGrade?.let { Num.formatDecimal(it) } ?: "") }
-    var feedbackText by remember { mutableStateOf(currentFeedback ?: "") }
-    var validationError by remember { mutableStateOf<String?>(null) }
-
-    Dialog(onDismissRequest = onDismiss) {
-        Surface(
-            shape = RoundedCornerShape(16.dp),
-            color = MaterialTheme.colorScheme.surface,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(8.dp)
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text(
-                    text = "تقييم واجب الطالب: $studentName",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-
-                OutlinedTextField(
-                    value = gradeText,
-                    onValueChange = {
-                        gradeText = it
-                        validationError = null
-                    },
-                    label = { Text("الدرجة (مثال: 10 أو 9.5)") },
-                    isError = validationError != null,
-                    supportingText = validationError?.let { { Text(it, color = MaterialTheme.colorScheme.error) } },
-                    enabled = !isGrading,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(8.dp)
-                )
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                OutlinedTextField(
-                    value = feedbackText,
-                    onValueChange = { feedbackText = it },
-                    label = { Text("ملاحظات المعلم والتعليق (اختياري)") },
-                    placeholder = { Text("أحسنت عملاً، أو يرجى مراجعة المسألة الثانية...") },
-                    enabled = !isGrading,
-                    modifier = Modifier.fillMaxWidth(),
-                    maxLines = 3,
-                    shape = RoundedCornerShape(8.dp)
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End
-                ) {
-                    OutlinedButton(
-                        onClick = onDismiss,
-                        enabled = !isGrading,
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Text("إلغاء")
-                    }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Button(
-                        onClick = {
-                            val gradeVal = gradeText.toDoubleOrNull()
-                            if (gradeVal == null || gradeVal < 0) {
-                                validationError = "يرجى إدخال درجة رقمية صحيحة"
-                            } else {
-                                onConfirm(gradeVal, feedbackText.ifBlank { null })
-                            }
-                        },
-                        enabled = !isGrading && gradeText.isNotBlank(),
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        if (isGrading) {
-                            CircularProgressIndicator(
-                                strokeWidth = 2.dp,
-                                modifier = Modifier.size(16.dp),
-                                color = MaterialTheme.colorScheme.onPrimary
-                            )
-                        } else {
-                            Text("حفظ التقييم")
-                        }
-                    }
-                }
-            }
-        }
     }
 }
 

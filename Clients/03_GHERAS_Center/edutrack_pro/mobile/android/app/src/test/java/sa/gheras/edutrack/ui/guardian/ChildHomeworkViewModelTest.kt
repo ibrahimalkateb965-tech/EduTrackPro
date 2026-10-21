@@ -6,7 +6,6 @@ import androidx.test.core.app.ApplicationProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
@@ -72,7 +71,7 @@ class ChildHomeworkViewModelTest {
         roomId = null, groupName = null, createdAt = now, updatedAt = now
     )
 
-    private fun assignment(id: String, title: String, dueDate: LocalDate) = AssignmentEntity(
+    private fun assignment(id: String, title: String, dueDate: LocalDate?, isDraft: Boolean = false) = AssignmentEntity(
         id = id,
         branchId = "b1",
         title = title,
@@ -82,6 +81,7 @@ class ChildHomeworkViewModelTest {
         teacherUserId = "t1",
         instructions = "حفظ سورة النبأ",
         pageRef = "صفحة 582",
+        isDraft = isDraft,
         createdAt = now,
         updatedAt = now
     )
@@ -95,13 +95,22 @@ class ChildHomeworkViewModelTest {
         updatedAt = now
     )
 
-    private fun submission(id: String, assignmentId: String, studentId: String) = SubmissionEntity(
+    private fun submission(
+        id: String,
+        assignmentId: String,
+        studentId: String,
+        status: String = "submitted",
+        attemptNumber: Int = 1,
+        gradeLevel: String? = null
+    ) = SubmissionEntity(
         id = id,
         branchId = "b1",
         assignmentId = assignmentId,
         studentId = studentId,
+        attemptNumber = attemptNumber,
+        gradeLevel = gradeLevel,
         submittedAt = now,
-        status = "submitted",
+        status = status,
         grade = null,
         feedback = null,
         createdAt = now,
@@ -116,25 +125,31 @@ class ChildHomeworkViewModelTest {
     )
 
     @Test
-    fun `loads assignments within 60 days with submitted and unsubmitted status`() = runBlocking {
+    fun `loads published assignments only and computes 5 tabs counts`() = runBlocking {
         db.studentDao().upsertAll(listOf(student("s1", "سعود علي")))
         db.assignmentDao().upsertAll(
             listOf(
-                assignment("a1", "واجب التلاوة", today),
-                assignment("a2", "واجب التجويد", today.minusDays(10)),
-                assignment("a3", "واجب قديم جدا", today.minusDays(75)) // Outside 60 days
+                assignment("a1", "واجب التلاوة (مطلوب)", today),
+                assignment("a2", "واجب التجويد (قيد المراجعة)", today.minusDays(2)),
+                assignment("a3", "واجب الحفظ (تمت المراجعة)", today.minusDays(5)),
+                assignment("a4", "واجب التفسير (إعادة الحل)", today.minusDays(1)),
+                assignment("a_draft", "مسودة لا تظهر", today, isDraft = true)
             )
         )
         db.assignmentStudentDao().upsertAll(
             listOf(
                 studentLink("link1", "a1", "s1"),
                 studentLink("link2", "a2", "s1"),
-                studentLink("link3", "a3", "s1")
+                studentLink("link3", "a3", "s1"),
+                studentLink("link4", "a4", "s1"),
+                studentLink("link5", "a_draft", "s1")
             )
         )
         db.submissionDao().upsertAll(
             listOf(
-                submission("sub1", "a1", "s1")
+                submission("sub2", "a2", "s1", status = "submitted"),
+                submission("sub3", "a3", "s1", status = "graded", gradeLevel = "EXCELLENT"),
+                submission("sub4", "a4", "s1", status = "revision_requested")
             )
         )
 
@@ -143,49 +158,58 @@ class ChildHomeworkViewModelTest {
 
         assertFalse(state.isLoading)
         assertEquals("سعود علي", state.studentName)
-        assertEquals(2, state.items.size)
+        assertEquals(4, state.items.size) // Draft excluded!
 
-        val item1 = state.items.first { it.assignment.id == "a1" }
-        assertTrue(item1.isSubmitted)
-        assertNotNull(item1.submission)
-
-        val item2 = state.items.first { it.assignment.id == "a2" }
-        assertFalse(item2.isSubmitted)
-        assertNull(item2.submission)
+        // Verify tab counts
+        assertEquals(4, state.counts[HomeworkTab.ALL])
+        assertEquals(1, state.counts[HomeworkTab.PENDING])
+        assertEquals(1, state.counts[HomeworkTab.SUBMITTED])
+        assertEquals(1, state.counts[HomeworkTab.GRADED])
+        assertEquals(1, state.counts[HomeworkTab.REVISION_REQUESTED])
     }
 
     @Test
-    fun `submitting with empty image list sets validation error`() = runBlocking {
+    fun `selectTab filters items appropriately`() = runBlocking {
+        db.studentDao().upsertAll(listOf(student("s1", "سعود علي")))
+        db.assignmentDao().upsertAll(
+            listOf(
+                assignment("a1", "واجب 1", today),
+                assignment("a2", "واجب 2", today)
+            )
+        )
+        db.assignmentStudentDao().upsertAll(
+            listOf(
+                studentLink("link1", "a1", "s1"),
+                studentLink("link2", "a2", "s1")
+            )
+        )
+        db.submissionDao().upsertAll(
+            listOf(
+                submission("sub2", "a2", "s1", status = "submitted")
+            )
+        )
+
         val vm = createVm("s1")
-        val context = ApplicationProvider.getApplicationContext<Context>()
 
-        val job = launch { vm.uiState.collect {} }
+        // Default ALL: 2 items
+        val allState = vm.uiState.first { !it.isLoading && it.items.isNotEmpty() }
+        assertEquals(2, allState.items.size)
 
-        vm.submitHomework(context, "a1", emptyList(), "ملاحظة")
+        // Select PENDING: 1 item (a1)
+        vm.selectTab(HomeworkTab.PENDING)
+        val pendingState = vm.uiState.first { it.selectedTab == HomeworkTab.PENDING }
+        assertEquals(1, pendingState.items.size)
+        assertEquals("a1", pendingState.items[0].assignment.id)
 
-        val state = vm.uiState.first { it.submissionError != null }
-        assertEquals("يرجى التقاط أو اختيار صورة واحدة على الأقل للواجب", state.submissionError)
-        assertFalse(state.isSubmitting)
+        // Select SUBMITTED: 1 item (a2)
+        vm.selectTab(HomeworkTab.SUBMITTED)
+        val submittedState = vm.uiState.first { it.selectedTab == HomeworkTab.SUBMITTED }
+        assertEquals(1, submittedState.items.size)
+        assertEquals("a2", submittedState.items[0].assignment.id)
 
-        job.cancel()
-    }
-
-    @Test
-    fun `clearStatus resets submission error and success state`() = runBlocking {
-        val vm = createVm("s1")
-        val context = ApplicationProvider.getApplicationContext<Context>()
-
-        val job = launch { vm.uiState.collect {} }
-
-        vm.submitHomework(context, "a1", emptyList())
-        val errorState = vm.uiState.first { it.submissionError != null }
-        assertNotNull(errorState.submissionError)
-
-        vm.clearStatus()
-        val clearedState = vm.uiState.first { it.submissionError == null }
-        assertNull(clearedState.submissionError)
-        assertFalse(clearedState.submissionSuccess)
-
-        job.cancel()
+        // Select GRADED: 0 items
+        vm.selectTab(HomeworkTab.GRADED)
+        val gradedState = vm.uiState.first { it.selectedTab == HomeworkTab.GRADED }
+        assertEquals(0, gradedState.items.size)
     }
 }

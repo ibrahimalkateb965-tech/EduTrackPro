@@ -192,16 +192,18 @@ class Outbox(
             PendingWriteEntity.KIND_NOTIFICATION_BROADCAST -> {
                 // Server fans out to target recipients.
             }
-            PendingWriteEntity.KIND_ASSIGNMENT -> {
+            PendingWriteEntity.KIND_ASSIGNMENT,
+            PendingWriteEntity.KIND_ASSIGNMENT_CREATE -> {
                 val assignmentId = json.optString("assignment_id")
                 val title = json.optString("title")
                 val subject = json.optString("subject").takeIf { it.isNotBlank() }
-                val dueDateStr = json.optString("due_date")
-                val dueDate = DateParsers.parseLocalDate(dueDateStr) ?: LocalDate.parse(dueDateStr)
+                val dueDateStr = json.optString("due_date").takeIf { it.isNotBlank() }
+                val dueDate = dueDateStr?.let { DateParsers.parseLocalDate(it) }
                 val instructions = json.optString("instructions").takeIf { it.isNotBlank() }
                 val pageRef = json.optString("page_ref").takeIf { it.isNotBlank() }
                 val teacherUserId = json.optString("teacher_user_id").takeIf { it.isNotBlank() } ?: me
                 val branchId = json.optString("branch_id").takeIf { it.isNotBlank() }
+                val isDraft = json.optBoolean("is_draft", false)
 
                 val entity = AssignmentEntity(
                     id = assignmentId,
@@ -213,6 +215,7 @@ class Outbox(
                     teacherUserId = teacherUserId,
                     instructions = instructions,
                     pageRef = pageRef,
+                    isDraft = isDraft,
                     createdAt = now,
                     updatedAt = now,
                     deletedAt = null
@@ -234,6 +237,51 @@ class Outbox(
                         )
                     }
                     db.assignmentStudentDao().upsertAll(links)
+                }
+            }
+            PendingWriteEntity.KIND_SUBMISSION_CREATE -> {
+                val assignmentId = json.getString("assignment_id")
+                val studentId = json.getString("student_id")
+                val submissionId = json.optString("submission_id").ifBlank { "local:${UUID.randomUUID()}" }
+                val attemptNumber = json.optInt("attempt_number", 1)
+                val isLate = json.optBoolean("is_late", false)
+                val note = json.optString("note").takeIf { it.isNotBlank() }
+                val parentId = json.optString("parent_submission_id").takeIf { it.isNotBlank() }
+
+                val entity = SubmissionEntity(
+                    id = submissionId,
+                    branchId = json.optString("branch_id").takeIf { it.isNotBlank() },
+                    assignmentId = assignmentId,
+                    studentId = studentId,
+                    attemptNumber = attemptNumber,
+                    parentSubmissionId = parentId,
+                    gradeLevel = null,
+                    revisionNote = null,
+                    teacherFeedbackKey = null,
+                    isLate = isLate,
+                    submittedAt = now,
+                    status = "submitted",
+                    feedback = note,
+                    createdAt = now,
+                    updatedAt = now,
+                    deletedAt = null
+                )
+                db.submissionDao().upsert(entity)
+
+                val fileKeysArray = json.optJSONArray("files")
+                if (fileKeysArray != null && fileKeysArray.length() > 0) {
+                    val files = (0 until fileKeysArray.length()).map { i ->
+                        val key = fileKeysArray.getString(i)
+                        SubmissionFileEntity(
+                            id = "local:$submissionId:$i",
+                            branchId = null,
+                            submissionId = submissionId,
+                            storageKey = key,
+                            createdAt = now,
+                            updatedAt = now
+                        )
+                    }
+                    db.submissionFileDao().upsertAll(files)
                 }
             }
             PendingWriteEntity.KIND_CREATE_PICKUP_DELEGATE -> {

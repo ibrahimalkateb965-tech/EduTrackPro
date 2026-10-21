@@ -50,6 +50,24 @@ data object TeacherAssignmentsRoute : Route
 data class AssignmentDetailRoute(val assignmentId: String) : Route
 
 @Serializable
+data object CreateHomeworkRoute : Route {
+    override val isForm: Boolean get() = true
+}
+
+@Serializable
+data object HomeworkPreviewRoute : Route {
+    override val isForm: Boolean get() = true
+}
+
+@Serializable
+data class ReviewSubmissionsRoute(val assignmentId: String) : Route
+
+@Serializable
+data class GradeSubmissionRoute(val submissionId: String) : Route {
+    override val isForm: Boolean get() = true
+}
+
+@Serializable
 data object NotificationsRoute : Route
 
 // ---- Guardian Graph ----
@@ -64,6 +82,14 @@ data class ChildEvaluationsRoute(val studentId: String) : Route
 
 @Serializable
 data class ChildHomeworkRoute(val studentId: String) : Route
+
+@Serializable
+data class HomeworkDetailRoute(val assignmentId: String, val studentId: String) : Route {
+    override val isForm: Boolean get() = true
+}
+
+@Serializable
+data class HomeworkResultRoute(val assignmentId: String, val studentId: String) : Route
 
 @Serializable
 data class ChildLessonsRoute(val studentId: String) : Route

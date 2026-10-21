@@ -9,13 +9,12 @@ from fastapi.middleware.cors import CORSMiddleware
 
 import os
 from pathlib import Path
-from starlette.staticfiles import StaticFiles
 
 from edutrack_api import __version__
 from edutrack_api.config import Settings, get_settings
 from edutrack_api.db import introspect_columns, make_pool
 from edutrack_api.errors import register_handlers
-from edutrack_api.routers import attendance, auth, crud, importer, me, pickup, print, reports, student_photos
+from edutrack_api.routers import assignments, attendance, auth, crud, importer, me, media, pickup, print, reports, student_photos
 from edutrack_api.routers import settings as settings_router
 
 
@@ -60,6 +59,8 @@ def create_app() -> FastAPI:
     api.include_router(me.router)
     api.include_router(student_photos.router)
     api.include_router(pickup.router)
+    api.include_router(assignments.router)
+    api.include_router(media.router)
     api.include_router(crud.router)
 
     @api.get("/health")
@@ -69,8 +70,6 @@ def create_app() -> FastAPI:
     app.include_router(api)
     upload_dir = Path(os.getenv("UPLOAD_DIR", "uploads")).resolve()
     upload_dir.mkdir(parents=True, exist_ok=True)
-    app.mount("/api/v1/static/uploads", StaticFiles(directory=str(upload_dir)), name="api_uploads")
-    app.mount("/static/uploads", StaticFiles(directory=str(upload_dir)), name="uploads")
     return app
 
 

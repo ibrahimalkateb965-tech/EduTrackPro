@@ -59,7 +59,7 @@ fun TeacherChildPrepScreen(
     val request = uiState.requests.firstOrNull { it.id == requestId }
     var checkedItems by remember { mutableStateOf(prepChecklistItems.map { false }) }
 
-    LaunchedEffect(requestId) {
+    LaunchedEffect(request?.status) {
         if (request?.status == PickupStatus.NOTIFIED) {
             viewModel.startPrep(requestId)
         }
@@ -190,7 +190,7 @@ fun TeacherChildPrepScreen(
 
                     Button(
                         onClick = { viewModel.markReady(requestId) { onNavigateBack() } },
-                        enabled = !uiState.isLoading,
+                        enabled = !uiState.isLoading && canMarkReady(request?.status),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         if (uiState.isLoading) {
@@ -206,3 +206,5 @@ fun TeacherChildPrepScreen(
         }
     }
 }
+
+fun canMarkReady(status: PickupStatus?): Boolean = status == PickupStatus.IN_PREP

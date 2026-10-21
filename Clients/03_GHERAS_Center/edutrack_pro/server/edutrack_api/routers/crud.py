@@ -664,6 +664,8 @@ def _register(path: str, table: str) -> None:
 
     def create_row(body: dict, request: Request, user: dict = Depends(require_roles("manager", "supervisor")), conn=Depends(get_conn)):
         _allowed(user, table, True)
+        if table in ("assignments", "submissions"):
+            raise ApiError(405, "method_not_allowed", f"لا يمكن إنشاء سجلات {table} عبر الواجهة العامة المباشرة")
         if table == "students":
             body = {k: v for k, v in body.items() if k != "photo_url"}  # written only by POST /students/{id}/photo
         if table == "evaluations" and user.get("role") == "supervisor":
@@ -685,6 +687,8 @@ def _register(path: str, table: str) -> None:
 
     def update_row(record_id: UUID, body: dict, request: Request, user: dict = Depends(require_roles("manager", "supervisor")), conn=Depends(get_conn)):
         _allowed(user, table, True)
+        if table in ("assignments", "submissions"):
+            raise ApiError(405, "method_not_allowed", f"لا يمكن تعديل سجلات {table} عبر الواجهة العامة المباشرة")
         if table == "students":
             body = {k: v for k, v in body.items() if k != "photo_url"}  # written only by POST /students/{id}/photo
         if table == "evaluations" and user.get("role") == "supervisor":

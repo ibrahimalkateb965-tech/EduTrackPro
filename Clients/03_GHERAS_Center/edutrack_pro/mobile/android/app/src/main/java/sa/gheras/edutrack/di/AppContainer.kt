@@ -35,7 +35,8 @@ class AppContainer(private val context: Context) {
                 GherasDatabase.MIGRATION_1_2,
                 GherasDatabase.MIGRATION_2_3,
                 GherasDatabase.MIGRATION_3_4,
-                GherasDatabase.MIGRATION_4_5
+                GherasDatabase.MIGRATION_4_5,
+                GherasDatabase.MIGRATION_5_6
             )
             .fallbackToDestructiveMigrationOnDowngrade()
             .build()

@@ -70,10 +70,10 @@ import java.time.LocalDate
 fun AssignmentsScreen(
     viewModel: AssignmentsViewModel,
     onAssignmentClick: (String) -> Unit,
+    onCreateClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.uiState.collectAsState()
-    var showCreateDialog by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
@@ -106,7 +106,7 @@ fun AssignmentsScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         floatingActionButton = {
             ExtendedFloatingActionButton(
-                onClick = { showCreateDialog = true },
+                onClick = onCreateClick,
                 icon = { Icon(Icons.Default.Add, contentDescription = null) },
                 text = { Text("تكليف جديد", fontWeight = FontWeight.Bold) },
                 containerColor = MaterialTheme.colorScheme.primary,
@@ -232,32 +232,6 @@ fun AssignmentsScreen(
                 }
             }
         }
-    }
-
-    if (showCreateDialog) {
-        CreateAssignmentDialog(
-            rooms = state.rooms,
-            onDismiss = { showCreateDialog = false },
-            onSubmit = { title, subject, roomId, dueDate, instructions, pageRef, attachments, onDialogError ->
-                viewModel.createAssignment(
-                    title = title,
-                    subject = subject,
-                    roomId = roomId,
-                    dueDate = dueDate,
-                    instructions = instructions,
-                    pageRef = pageRef,
-                    attachments = attachments,
-                    onSuccess = {
-                        showCreateDialog = false
-                        scope.launch { snackbarHostState.showSnackbar("تم حفظ التكليف بنجاح") }
-                    },
-                    onError = { err ->
-                        onDialogError(err)
-                        scope.launch { snackbarHostState.showSnackbar(err) }
-                    }
-                )
-            }
-        )
     }
 }
 
@@ -406,6 +380,7 @@ fun AssignmentCard(
                         tint = if (item.isPastDue) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
                     )
                     val dueText = when {
+                        assign.dueDate == null -> "موعد التسليم: غير محدد"
                         assign.dueDate.isEqual(now) -> "تاريخ التسليم: اليوم"
                         assign.dueDate.isEqual(now.plusDays(1)) -> "تاريخ التسليم: غداً"
                         assign.dueDate.isBefore(now) -> "تاريخ التسليم: ${assign.dueDate} (منتهي)"
@@ -415,7 +390,7 @@ fun AssignmentCard(
                         text = dueText,
                         style = MaterialTheme.typography.bodySmall,
                         color = if (item.isPastDue) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
-                        fontWeight = if (assign.dueDate.isEqual(now) || item.isPastDue) FontWeight.Bold else FontWeight.Normal
+                        fontWeight = if (assign.dueDate?.isEqual(now) == true || item.isPastDue) FontWeight.Bold else FontWeight.Normal
                     )
                 }
 

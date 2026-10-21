@@ -352,7 +352,7 @@ _LESSON_FROM = "lesson_logs l JOIN schedules sc ON sc.id = l.schedule_id JOIN ro
 
 _SUBMISSION_FILES = (
     "(SELECT COALESCE(json_agg(json_build_object('id', f.id, 'storage_key', f.storage_key, "
-    "'url', CASE WHEN starts_with(f.storage_key, 'http') THEN f.storage_key ELSE '/api/v1/static/uploads/' || f.storage_key END, "
+    "'url', CASE WHEN starts_with(f.storage_key, 'http') THEN f.storage_key ELSE '/api/v1/me/files/' || f.storage_key END, "
     "'width', f.width, 'height', f.height) ORDER BY f.created_at, f.id), '[]'::json) "
     "FROM submission_files f WHERE f.submission_id = sb.id AND f.deleted_at IS NULL) AS files"
 )
@@ -392,12 +392,34 @@ def list_assignments(conn, scope: Scope, filters: dict, limit: int, offset: int)
         return [], 0
     where = ["a.deleted_at IS NULL"]
     params: dict = {"student_ids": list(scope.student_ids)}
+    if scope.role == "guardian":
+        where.append("a.is_draft = FALSE")
     # `narrow` tightens the link subquery to one student; it is only ever applied on
     # top of the scope set, so an out-of-scope student_id yields an empty page, not a leak.
     narrow = ""
+    extra_cols = ""
     if filters.get("student_id") is not None:
         narrow = " AND x.student_id = %(student_id)s"
         params["student_id"] = filters["student_id"]
+        extra_cols = (
+            ", CASE "
+            "WHEN NOT EXISTS (SELECT 1 FROM submissions sb WHERE sb.assignment_id = a.id AND sb.student_id = %(student_id)s AND sb.deleted_at IS NULL) THEN 'pending' "
+            "WHEN (SELECT sb.status FROM submissions sb WHERE sb.assignment_id = a.id AND sb.student_id = %(student_id)s AND sb.deleted_at IS NULL ORDER BY sb.attempt_number DESC LIMIT 1) = 'submitted' THEN 'submitted' "
+            "WHEN (SELECT sb.status FROM submissions sb WHERE sb.assignment_id = a.id AND sb.student_id = %(student_id)s AND sb.deleted_at IS NULL ORDER BY sb.attempt_number DESC LIMIT 1) = 'graded' THEN 'graded' "
+            "WHEN (SELECT sb.status FROM submissions sb WHERE sb.assignment_id = a.id AND sb.student_id = %(student_id)s AND sb.deleted_at IS NULL ORDER BY sb.attempt_number DESC LIMIT 1) IN ('revision_requested', 'returned') THEN 'revision_requested' "
+            "ELSE 'pending' END AS display_status, "
+            "(SELECT sb.grade_level FROM submissions sb WHERE sb.assignment_id = a.id AND sb.student_id = %(student_id)s AND sb.deleted_at IS NULL ORDER BY sb.attempt_number DESC LIMIT 1) AS grade_level"
+        )
+        status_filter = filters.get("status")
+        if status_filter in ("pending", "submitted", "graded", "revision_requested"):
+            if status_filter == "pending":
+                where.append("NOT EXISTS (SELECT 1 FROM submissions sb WHERE sb.assignment_id = a.id AND sb.student_id = %(student_id)s AND sb.deleted_at IS NULL)")
+            elif status_filter == "revision_requested":
+                where.append("(SELECT sb.status FROM submissions sb WHERE sb.assignment_id = a.id AND sb.student_id = %(student_id)s AND sb.deleted_at IS NULL ORDER BY sb.attempt_number DESC LIMIT 1) IN ('revision_requested', 'returned')")
+            else:
+                where.append("(SELECT sb.status FROM submissions sb WHERE sb.assignment_id = a.id AND sb.student_id = %(student_id)s AND sb.deleted_at IS NULL ORDER BY sb.attempt_number DESC LIMIT 1) = %(status_filter)s")
+                params["status_filter"] = status_filter
+
     linked = (
         "EXISTS (SELECT 1 FROM assignment_students x WHERE x.assignment_id = a.id AND x.deleted_at IS NULL "
         f"AND x.student_id = ANY(%(student_ids)s){narrow})"
@@ -413,7 +435,7 @@ def list_assignments(conn, scope: Scope, filters: dict, limit: int, offset: int)
         where.append(linked)
     _opt(where, params, filters, "due_from", "a.due_date >= %(due_from)s")
     _opt(where, params, filters, "due_to", "a.due_date <= %(due_to)s")
-    sql = _select(f"a.*, {_ASSIGNMENT_STUDENTS}", "assignments a", where, "a.due_date DESC, a.id")
+    sql = _select(f"a.*, {_ASSIGNMENT_STUDENTS}{extra_cols}", "assignments a", where, "a.due_date DESC, a.id")
     return _run(conn, sql, params, limit, offset)
 
 
@@ -540,329 +562,5 @@ def upsert_lesson_log(conn, scope: Scope, body: dict) -> dict:
         {"schedule_id": str(body["schedule_id"]), "date": body["date"].isoformat(), "status": body["status"]},
     )
     return row
-
-
-def create_assignment(conn, scope: Scope, body: dict) -> dict:
-    if scope.role != "teacher":
-        raise ApiError(403, "forbidden", "إضافة التكليفات متاحة للمعلمين فقط")
-
-    student_ids = body.get("student_ids") or []
-    if student_ids:
-        scope.assert_students(student_ids)
-
-    subject = body.get("subject")
-    if subject == "عام":
-        subject = None
-    valid_subjects = ("القرآن", "لغتي", "الإنجليزي", "الرياضيات")
-    if subject is not None and subject not in valid_subjects:
-        raise ApiError(422, "invalid_subject", f"المادة غير صالحة. المواد المسموحة هي: {', '.join(valid_subjects)}")
-
-    user_row = conn.execute("SELECT branch_id FROM users WHERE id = %s", (scope.user_id,)).fetchone()
-    branch_id = user_row["branch_id"] if user_row and user_row.get("branch_id") else None
-    if not branch_id and student_ids:
-        s_row = conn.execute("SELECT branch_id FROM students WHERE id = %s", (student_ids[0],)).fetchone()
-        if s_row and s_row.get("branch_id"):
-            branch_id = s_row["branch_id"]
-    if not branch_id:
-        raise ApiError(422, "branch_missing", "لا يوجد فرع مرتبط بهذا المعلم أو بطلاب التكليف")
-
-    params = {
-        "branch_id": branch_id,
-        "title": body["title"],
-        "subject": subject,
-        "kind": body.get("kind") or "homework",
-        "due_date": body["due_date"],
-        "teacher_user_id": scope.user_id,
-        "instructions": body.get("instructions"),
-        "page_ref": body.get("page_ref"),
-    }
-    assignment_id = body.get("id")
-    if assignment_id:
-        params["id"] = assignment_id
-        sql = """
-            INSERT INTO assignments (id, branch_id, title, subject, kind, due_date, teacher_user_id, instructions, page_ref)
-            VALUES (%(id)s, %(branch_id)s, %(title)s, %(subject)s, %(kind)s, %(due_date)s, %(teacher_user_id)s, %(instructions)s, %(page_ref)s)
-            ON CONFLICT (id) DO UPDATE SET
-                title = EXCLUDED.title,
-                subject = EXCLUDED.subject,
-                due_date = EXCLUDED.due_date,
-                instructions = EXCLUDED.instructions,
-                page_ref = EXCLUDED.page_ref,
-                updated_at = now()
-            WHERE assignments.teacher_user_id = EXCLUDED.teacher_user_id
-            RETURNING *, (xmax = 0) AS is_inserted
-        """
-    else:
-        sql = """
-            INSERT INTO assignments (branch_id, title, subject, kind, due_date, teacher_user_id, instructions, page_ref)
-            VALUES (%(branch_id)s, %(title)s, %(subject)s, %(kind)s, %(due_date)s, %(teacher_user_id)s, %(instructions)s, %(page_ref)s)
-            RETURNING *, true AS is_inserted
-        """
-    row = conn.execute(sql, params).fetchone()
-    if not row:
-        raise ApiError(403, "forbidden", "لا يمكنك تعديل تكليف لمعلم آخر أو التكليف غير موجود")
-
-    is_inserted = bool(row.get("is_inserted", False))
-    action = "create" if is_inserted else "update"
-
-    for sid in student_ids:
-        existing = conn.execute(
-            "SELECT id FROM assignment_students WHERE assignment_id = %s AND student_id = %s AND deleted_at IS NULL",
-            (row["id"], sid),
-        ).fetchone()
-        if not existing:
-            conn.execute(
-                "INSERT INTO assignment_students (branch_id, assignment_id, student_id) VALUES (%s, %s, %s)",
-                (branch_id, row["id"], sid),
-            )
-
-    write_audit(
-        conn,
-        scope.user_id,
-        action,
-        "assignments",
-        row["id"],
-        {"title": body["title"], "due_date": body["due_date"].isoformat()},
-    )
-
-    # Batch B5: Assignment notification producer (on creation)
-    if is_inserted and student_ids:
-        # 1. Guardians of target students
-        g_rows = conn.execute("""
-            SELECT u.id AS user_id, sg.student_id, s.name AS student_name
-            FROM users u
-            JOIN student_guardians sg ON sg.guardian_id = u.guardian_id
-            JOIN students s ON s.id = sg.student_id
-            WHERE sg.student_id = ANY(%s)
-              AND sg.deleted_at IS NULL
-              AND u.is_active = true
-              AND u.deleted_at IS NULL
-              AND u.id <> %s
-        """, (student_ids, scope.user_id)).fetchall()
-
-        # 2. Student users
-        s_rows = conn.execute("""
-            SELECT u.id AS user_id, u.student_id, s.name AS student_name
-            FROM users u
-            JOIN students s ON s.id = u.student_id
-            WHERE u.student_id = ANY(%s)
-              AND u.is_active = true
-              AND u.deleted_at IS NULL
-              AND u.id <> %s
-        """, (student_ids, scope.user_id)).fetchall()
-
-        ins_notif = """
-            INSERT INTO notifications (
-                branch_id, user_id, kind, title, body, target_type, target_id,
-                priority, sender_user_id, action_url, sent_at
-            ) VALUES (
-                %s, %s, 'assignment', %s, %s, 'assignment', %s,
-                'normal', %s, %s, now()
-            )
-        """
-        seen_targets = set()
-        for r in list(g_rows) + list(s_rows):
-            u_id = r["user_id"]
-            st_id = r["student_id"]
-            st_name = r["student_name"]
-            key = (u_id, st_id)
-            if key in seen_targets:
-                continue
-            seen_targets.add(key)
-
-            notif_title = f"واجب جديد: {body['title']}"
-            notif_body = f"تم إضافة واجب جديد للطالب/ـة {st_name} لمادة {subject}، موعد التسليم: {body['due_date']}"
-            act_url = f"gheras://assignment?id={row['id']}&student_id={st_id}"
-            conn.execute(ins_notif, (
-                branch_id, u_id, notif_title, notif_body, str(row["id"]),
-                scope.user_id, act_url
-            ))
-
-    return row
-
-
-def create_submission(
-    conn,
-    scope: Scope,
-    assignment_id: UUID,
-    student_id: UUID,
-    files_data: list[dict],
-    notes: str | None = None
-) -> dict:
-    scope.assert_students([student_id])
-
-    a_row = conn.execute(
-        "SELECT id, branch_id, title, subject, teacher_user_id FROM assignments WHERE id = %s AND deleted_at IS NULL",
-        (assignment_id,)
-    ).fetchone()
-    if not a_row:
-        raise ApiError(404, "not_found", "التكليف غير موجود")
-
-    branch_id = a_row["branch_id"]
-
-    existing_link = conn.execute(
-        "SELECT id FROM assignment_students WHERE assignment_id = %s AND student_id = %s AND deleted_at IS NULL",
-        (assignment_id, student_id)
-    ).fetchone()
-    if not existing_link:
-        conn.execute(
-            "INSERT INTO assignment_students (branch_id, assignment_id, student_id) VALUES (%s, %s, %s)",
-            (branch_id, assignment_id, student_id)
-        )
-
-    sub = conn.execute(
-        "SELECT id FROM submissions WHERE assignment_id = %s AND student_id = %s AND deleted_at IS NULL",
-        (assignment_id, student_id)
-    ).fetchone()
-
-    if sub:
-        sub_id = sub["id"]
-        conn.execute(
-            "UPDATE submissions SET submitted_at = now(), status = 'submitted', feedback = NULL, updated_at = now() WHERE id = %s",
-            (sub_id,)
-        )
-        conn.execute(
-            "UPDATE submission_files SET deleted_at = now(), updated_at = now() WHERE submission_id = %s AND deleted_at IS NULL",
-            (sub_id,)
-        )
-    else:
-        sub_row = conn.execute(
-            "INSERT INTO submissions (branch_id, assignment_id, student_id, submitted_at, status) "
-            "VALUES (%s, %s, %s, now(), 'submitted') RETURNING id",
-            (branch_id, assignment_id, student_id)
-        ).fetchone()
-        sub_id = sub_row["id"]
-
-    for f in files_data:
-        conn.execute(
-            """
-            INSERT INTO submission_files (branch_id, submission_id, storage_key, width, height, bytes, sha256)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
-            """,
-            (branch_id, sub_id, f["storage_key"], f.get("width"), f.get("height"), f.get("bytes"), f.get("sha256"))
-        )
-
-    teacher_user_id = a_row.get("teacher_user_id")
-    if teacher_user_id and teacher_user_id != scope.user_id:
-        st_row = conn.execute("SELECT name FROM students WHERE id = %s", (student_id,)).fetchone()
-        st_name = st_row["name"] if st_row else "الطالب"
-        ins_notif = """
-            INSERT INTO notifications (
-                branch_id, user_id, kind, title, body, target_type, target_id,
-                priority, sender_user_id, action_url, sent_at
-            ) VALUES (
-                %s, %s, 'assignment', %s, %s, 'assignment', %s,
-                'normal', %s, %s, now()
-            )
-        """
-        conn.execute(ins_notif, (
-            branch_id,
-            teacher_user_id,
-            "تسليم واجب جديد",
-            f"قام الطالب {st_name} بتسليم حل: {a_row['title']}",
-            assignment_id,
-            scope.user_id,
-            f"gheras://assignment?id={assignment_id}&student_id={student_id}"
-        ))
-
-    write_audit(
-        conn,
-        scope.user_id,
-        "submit_homework",
-        "submissions",
-        sub_id,
-        {"assignment_id": str(assignment_id), "student_id": str(student_id), "pages": len(files_data)}
-    )
-
-    sql = f"""
-        SELECT sb.*, a.title AS assignment_title, s.name AS student_name, {_SUBMISSION_FILES}
-        FROM submissions sb
-        JOIN assignments a ON a.id = sb.assignment_id
-        JOIN students s ON s.id = sb.student_id
-        WHERE sb.id = %s
-    """
-    return conn.execute(sql, (sub_id,)).fetchone()
-
-
-def grade_submission(
-    conn,
-    scope: Scope,
-    submission_id: UUID,
-    grade: float,
-    feedback: str | None = None
-) -> dict:
-    if scope.role != "teacher":
-        raise ApiError(403, "forbidden")
-
-    sub = conn.execute(
-        """
-        SELECT sb.id, sb.assignment_id, sb.student_id, sb.branch_id, a.title AS assignment_title, a.teacher_user_id, s.name AS student_name
-        FROM submissions sb
-        JOIN assignments a ON a.id = sb.assignment_id
-        JOIN students s ON s.id = sb.student_id
-        WHERE sb.id = %s AND sb.deleted_at IS NULL
-        """,
-        (submission_id,)
-    ).fetchone()
-    if not sub:
-        raise ApiError(404, "not_found", "التسليم غير موجود")
-
-    if sub["teacher_user_id"] != scope.user_id and sub["student_id"] not in scope.student_ids:
-        raise ApiError(403, "forbidden", "لا تملك صلاحية تقييم هذا التسليم")
-
-    conn.execute(
-        "UPDATE submissions SET grade = %s, feedback = %s, status = 'graded', updated_at = now() WHERE id = %s",
-        (grade, feedback, submission_id)
-    )
-
-    st_id = sub["student_id"]
-    g_rows = conn.execute("""
-        SELECT u.id AS user_id FROM users u
-        JOIN student_guardians sg ON sg.guardian_id = u.guardian_id
-        WHERE sg.student_id = %s AND sg.deleted_at IS NULL AND u.is_active = true AND u.deleted_at IS NULL
-    """, (st_id,)).fetchall()
-
-    s_rows = conn.execute("""
-        SELECT u.id AS user_id FROM users u
-        WHERE u.student_id = %s AND u.is_active = true AND u.deleted_at IS NULL
-    """, (st_id,)).fetchall()
-
-    ins_notif = """
-        INSERT INTO notifications (
-            branch_id, user_id, kind, title, body, target_type, target_id,
-            priority, sender_user_id, action_url, sent_at
-        ) VALUES (
-            %s, %s, 'assignment', %s, %s, 'assignment', %s,
-            'normal', %s, %s, now()
-        )
-    """
-    for r in list(g_rows) + list(s_rows):
-        conn.execute(ins_notif, (
-            sub["branch_id"],
-            r["user_id"],
-            "تم تصحيح الواجب",
-            f"تم رصد درجة الواجب: {grade} للطالب {sub['student_name']} في واجب: {sub['assignment_title']}",
-            sub["assignment_id"],
-            scope.user_id,
-            f"gheras://assignment?id={sub['assignment_id']}&student_id={st_id}"
-        ))
-
-    write_audit(
-        conn,
-        scope.user_id,
-        "grade_homework",
-        "submissions",
-        submission_id,
-        {"grade": grade, "feedback": feedback}
-    )
-
-    sql = f"""
-        SELECT sb.*, a.title AS assignment_title, s.name AS student_name, {_SUBMISSION_FILES}
-        FROM submissions sb
-        JOIN assignments a ON a.id = sb.assignment_id
-        JOIN students s ON s.id = sb.student_id
-        WHERE sb.id = %s
-    """
-    return conn.execute(sql, (submission_id,)).fetchone()
 
 

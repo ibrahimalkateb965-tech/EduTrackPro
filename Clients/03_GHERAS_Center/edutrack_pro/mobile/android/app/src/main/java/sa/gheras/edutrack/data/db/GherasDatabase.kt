@@ -62,7 +62,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         SubmissionFileEntity::class,
         SyncStateEntity::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -198,6 +198,55 @@ abstract class GherasDatabase : RoomDatabase() {
                 """.trimIndent())
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_pickup_delegates_student_id` ON `pickup_delegates` (`student_id`)")
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_pickup_delegates_client_request_id` ON `pickup_delegates` (`client_request_id`)")
+            }
+        }
+
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // 1. Rebuild assignments table to make due_date nullable and add is_draft
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `assignments_new` (
+                        `id` TEXT NOT NULL,
+                        `branch_id` TEXT,
+                        `title` TEXT NOT NULL,
+                        `subject` TEXT,
+                        `kind` TEXT,
+                        `due_date` TEXT,
+                        `teacher_user_id` TEXT,
+                        `instructions` TEXT,
+                        `page_ref` TEXT,
+                        `is_draft` INTEGER NOT NULL DEFAULT 0,
+                        `created_at` TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+                        `updated_at` TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+                        `deleted_at` TEXT,
+                        PRIMARY KEY(`id`)
+                    )
+                """.trimIndent())
+                db.execSQL("""
+                    INSERT INTO `assignments_new` (
+                        `id`, `branch_id`, `title`, `subject`, `kind`, `due_date`,
+                        `teacher_user_id`, `instructions`, `page_ref`, `is_draft`,
+                        `created_at`, `updated_at`, `deleted_at`
+                    )
+                    SELECT 
+                        `id`, `branch_id`, `title`, `subject`, `kind`, `due_date`,
+                        `teacher_user_id`, `instructions`, `page_ref`, 0,
+                        `created_at`, `updated_at`, `deleted_at`
+                    FROM `assignments`
+                """.trimIndent())
+                db.execSQL("DROP TABLE `assignments`")
+                db.execSQL("ALTER TABLE `assignments_new` RENAME TO `assignments`")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_assignments_teacher_user_id` ON `assignments` (`teacher_user_id`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_assignments_due_date` ON `assignments` (`due_date`)")
+
+                // 2. Add new columns and indices to submissions table
+                db.execSQL("ALTER TABLE `submissions` ADD COLUMN `attempt_number` INTEGER NOT NULL DEFAULT 1")
+                db.execSQL("ALTER TABLE `submissions` ADD COLUMN `parent_submission_id` TEXT")
+                db.execSQL("ALTER TABLE `submissions` ADD COLUMN `grade_level` TEXT")
+                db.execSQL("ALTER TABLE `submissions` ADD COLUMN `revision_note` TEXT")
+                db.execSQL("ALTER TABLE `submissions` ADD COLUMN `teacher_feedback_key` TEXT")
+                db.execSQL("ALTER TABLE `submissions` ADD COLUMN `is_late` INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_submissions_assignment_id_student_id_attempt_number` ON `submissions` (`assignment_id`, `student_id`, `attempt_number`)")
             }
         }
     }

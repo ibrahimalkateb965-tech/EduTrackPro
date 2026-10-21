@@ -138,7 +138,7 @@ class AssignmentsViewModel(
 
         // Map all assignments with their rooms and stats
         val mappedItems = assignments.filter {
-            !it.dueDate.isBefore(sixtyDaysAgo) && !it.dueDate.isAfter(sixtyDaysAhead)
+            it.dueDate == null || (!it.dueDate.isBefore(sixtyDaysAgo) && !it.dueDate.isAfter(sixtyDaysAhead))
         }.map { assignment ->
             val links = linksByAssignment[assignment.id] ?: emptyList()
             val linkedStudents = links.mapNotNull { studentMap[it.studentId] }
@@ -161,7 +161,7 @@ class AssignmentsViewModel(
             }
 
             val isCompleted = assignedCount > 0 && submittedCount >= assignedCount
-            val isPastDue = !isCompleted && assignment.dueDate.isBefore(now)
+            val isPastDue = !isCompleted && assignment.dueDate?.isBefore(now) == true
 
             AssignmentItem(
                 assignment = assignment,
@@ -213,7 +213,7 @@ class AssignmentsViewModel(
                     (it.assignment.subject?.contains(q, ignoreCase = true) == true) ||
                     it.roomName.contains(q, ignoreCase = true)
             }
-        }.sortedByDescending { it.assignment.dueDate }
+        }.sortedByDescending { it.assignment.dueDate ?: LocalDate.MIN }
 
         AssignmentsUiState(
             assignments = searchFiltered,
@@ -265,7 +265,7 @@ class AssignmentsViewModel(
         title: String,
         subject: String?,
         roomId: String?,
-        dueDate: LocalDate,
+        dueDate: LocalDate?,
         instructions: String?,
         pageRef: String?,
         attachments: List<MediaAttachment>,

@@ -19,6 +19,7 @@ import sa.gheras.edutrack.data.remote.dto.BroadcastBody
 import sa.gheras.edutrack.data.remote.dto.BroadcastResultDto
 import sa.gheras.edutrack.data.remote.dto.ClearReadBody
 import sa.gheras.edutrack.data.remote.dto.CreateAssignmentBody
+import sa.gheras.edutrack.data.remote.dto.CreateAssignmentRequest
 import sa.gheras.edutrack.data.remote.dto.DailyEvalItemBody
 import sa.gheras.edutrack.data.remote.dto.Envelope
 import sa.gheras.edutrack.data.remote.dto.EvaluationDto
@@ -29,10 +30,16 @@ import sa.gheras.edutrack.data.remote.dto.NotificationDto
 import sa.gheras.edutrack.data.remote.dto.PickupDelegatesResponse
 import sa.gheras.edutrack.data.remote.dto.ProfileDto
 import sa.gheras.edutrack.data.remote.dto.ReceiptDto
+import sa.gheras.edutrack.data.remote.dto.ReminderPreviewResponse
+import sa.gheras.edutrack.data.remote.dto.ReviewSubmissionRequest
 import sa.gheras.edutrack.data.remote.dto.RoomDto
 import sa.gheras.edutrack.data.remote.dto.ScheduleDto
+import sa.gheras.edutrack.data.remote.dto.SendReminderRequest
+import sa.gheras.edutrack.data.remote.dto.SendReminderResponse
 import sa.gheras.edutrack.data.remote.dto.SkillProgressDto
 import sa.gheras.edutrack.data.remote.dto.StudentDto
+import sa.gheras.edutrack.data.remote.dto.SubmitAssignmentRequest
+import sa.gheras.edutrack.data.remote.dto.TeacherSubmissionsResponse
 import sa.gheras.edutrack.data.remote.dto.UploadResponseDto
 import sa.gheras.edutrack.data.remote.dto.SubmissionDto
 
@@ -182,4 +189,51 @@ interface MeApi {
         @Path("submissionId") submissionId: String,
         @Body body: sa.gheras.edutrack.data.remote.dto.GradeSubmissionBody
     ): SubmissionDto
+
+    // --- Modern M2 Homework & Submission API ---
+
+    @POST("assignments")
+    suspend fun createAssignmentModern(@Body body: CreateAssignmentRequest): AssignmentDto
+
+    @POST("assignments/{id}/publish")
+    suspend fun publishAssignment(@Path("id") id: String): Response<Unit>
+
+    @GET("assignments/{id}/submissions")
+    suspend fun getAssignmentSubmissions(@Path("id") id: String): TeacherSubmissionsResponse
+
+    @POST("assignments/{id}/submit")
+    suspend fun submitAssignment(
+        @Path("id") id: String,
+        @Body body: SubmitAssignmentRequest
+    ): SubmissionDto
+
+    @POST("submissions/{id}/review")
+    suspend fun reviewSubmission(
+        @Path("id") id: String,
+        @Body body: ReviewSubmissionRequest
+    ): SubmissionDto
+
+    @GET("assignments/{id}/reminders")
+    suspend fun previewAssignmentReminders(
+        @Path("id") id: String,
+        @Query("kind") kind: String? = null
+    ): ReminderPreviewResponse
+
+    @POST("assignments/{id}/reminders")
+    suspend fun sendAssignmentReminders(
+        @Path("id") id: String,
+        @Body body: SendReminderRequest
+    ): SendReminderResponse
+
+    @POST("uploads")
+    suspend fun uploadMedia(
+        @Header("X-Filename") filename: String,
+        @Body body: RequestBody
+    ): UploadResponseDto
+
+    @Multipart
+    @POST("uploads")
+    suspend fun uploadMediaMultipart(
+        @Part file: MultipartBody.Part
+    ): UploadResponseDto
 }

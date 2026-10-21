@@ -176,7 +176,8 @@ class OutboxWorker(
                 )
                 meApi.postBroadcast(body)
             }
-            PendingWriteEntity.KIND_ASSIGNMENT -> {
+            PendingWriteEntity.KIND_ASSIGNMENT,
+            PendingWriteEntity.KIND_ASSIGNMENT_CREATE -> {
                 val studentIdsList = mutableListOf<String>()
                 val arr = json.optJSONArray("student_ids")
                 if (arr != null) {
@@ -260,6 +261,53 @@ class OutboxWorker(
                 val delegateId = json.getString("delegate_id")
                 container.pickupApi.deleteDelegate(delegateId)
             }
+            PendingWriteEntity.KIND_SUBMISSION_CREATE -> {
+                val assignmentId = json.getString("assignment_id")
+                val studentId = json.getString("student_id")
+                val note = json.optString("note").takeIf { it.isNotBlank() }
+                val clientRequestId = json.optString("client_request_id").takeIf { it.isNotBlank() }
+                val filesArray = json.optJSONArray("files")
+                val filesList = mutableListOf<String>()
+                if (filesArray != null) {
+                    for (i in 0 until filesArray.length()) {
+                        filesList.add(filesArray.getString(i))
+                    }
+                }
+
+                val finalStorageKeys = filesList.map { keyOrPath ->
+                    val localFile = File(keyOrPath)
+                    if (localFile.exists() && localFile.isFile) {
+                        val mediaType = when (localFile.extension.lowercase()) {
+                            "pdf" -> "application/pdf".toMediaTypeOrNull()
+                            "jpg", "jpeg" -> "image/jpeg".toMediaTypeOrNull()
+                            "png" -> "image/png".toMediaTypeOrNull()
+                            "mp4" -> "video/mp4".toMediaTypeOrNull()
+                            "m4a", "aac" -> "audio/mp4".toMediaTypeOrNull()
+                            "mp3" -> "audio/mpeg".toMediaTypeOrNull()
+                            else -> "application/octet-stream".toMediaTypeOrNull()
+                        }
+                        val uploadRes = meApi.uploadMedia(localFile.name, localFile.asRequestBody(mediaType))
+                        uploadRes.storageKey ?: uploadRes.url
+                    } else {
+                        keyOrPath
+                    }
+                }
+
+                val req = sa.gheras.edutrack.data.remote.dto.SubmitAssignmentRequest(
+                    studentId = studentId,
+                    note = note,
+                    files = finalStorageKeys,
+                    clientRequestId = clientRequestId
+                )
+                val res = meApi.submitAssignment(assignmentId, req)
+
+                val entity = AssignmentMappers.submissionToEntity(res)
+                db.submissionDao().upsert(entity)
+                if (res.files.isNotEmpty()) {
+                    val fileEntities = AssignmentMappers.submissionFilesToEntities(res)
+                    db.submissionFileDao().replaceScope(entity.id, fileEntities)
+                }
+            }
         }
     }
 
@@ -307,7 +355,8 @@ class OutboxWorker(
                 val dateStr = json.optString("date")
                 db.lessonLogDao().deleteById("local:$scheduleId:$dateStr")
             }
-            PendingWriteEntity.KIND_ASSIGNMENT -> {
+            PendingWriteEntity.KIND_ASSIGNMENT,
+            PendingWriteEntity.KIND_ASSIGNMENT_CREATE -> {
                 val assignmentId = json.optString("assignment_id")
                 db.assignmentStudentDao().deleteByAssignment(assignmentId)
                 db.assignmentDao().deleteById(assignmentId)
@@ -340,6 +389,13 @@ class OutboxWorker(
                 val existing = db.pickupDao().getDelegateByIdIncludingDeleted(delegateId)
                 if (existing != null) {
                     db.pickupDao().upsert(existing.copy(deletedAt = null))
+                }
+            }
+            PendingWriteEntity.KIND_SUBMISSION_CREATE -> {
+                val submissionId = json.optString("submission_id")
+                if (submissionId.isNotBlank()) {
+                    db.submissionFileDao().deleteBySubmission(submissionId)
+                    db.submissionDao().deleteById(submissionId)
                 }
             }
         }

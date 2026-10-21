@@ -17,10 +17,11 @@ data class AssignmentEntity(
     val title: String,
     val subject: String?,
     val kind: String?,
-    @ColumnInfo(name = "due_date") val dueDate: LocalDate,
+    @ColumnInfo(name = "due_date") val dueDate: LocalDate? = null,
     @ColumnInfo(name = "teacher_user_id") val teacherUserId: String?,
     val instructions: String?,
     @ColumnInfo(name = "page_ref") val pageRef: String?,
+    @ColumnInfo(name = "is_draft", defaultValue = "0") val isDraft: Boolean = false,
     @ColumnInfo(name = "created_at", defaultValue = "(strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))") val createdAt: Instant,
     @ColumnInfo(name = "updated_at", defaultValue = "(strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))") val updatedAt: Instant,
     @ColumnInfo(name = "deleted_at") val deletedAt: Instant? = null

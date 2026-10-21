@@ -33,8 +33,14 @@ interface AssignmentDao {
     @Query("UPDATE assignments SET deleted_at = :deletedAt, updated_at = :updatedAt WHERE id = :id")
     suspend fun markDeleted(id: String, deletedAt: Instant, updatedAt: Instant)
 
+    @Query("UPDATE assignments SET is_draft = 0, updated_at = :updatedAt WHERE id = :id")
+    suspend fun markPublished(id: String, updatedAt: Instant)
+
     @Query("SELECT * FROM assignments WHERE id = :id")
     suspend fun getById(id: String): AssignmentEntity?
+
+    @Query("SELECT * FROM assignments WHERE id = :id AND is_draft = 0 AND deleted_at IS NULL")
+    suspend fun getPublishedById(id: String): AssignmentEntity?
 
     @Query("SELECT * FROM assignments WHERE deleted_at IS NULL ORDER BY due_date DESC")
     fun observeAll(): Flow<List<AssignmentEntity>>
@@ -44,18 +50,38 @@ interface AssignmentDao {
         SELECT assignments.* FROM assignments
         INNER JOIN assignment_students ON assignment_students.assignment_id = assignments.id
         WHERE assignment_students.student_id = :studentId
+          AND assignments.is_draft = 0
           AND assignments.deleted_at IS NULL
           AND assignment_students.deleted_at IS NULL
-        ORDER BY assignments.due_date DESC
+        ORDER BY assignments.due_date DESC NULLS LAST, assignments.created_at DESC
         """
     )
     fun observeByStudent(studentId: String): Flow<List<AssignmentEntity>>
 
+    @Query(
+        """
+        SELECT assignments.* FROM assignments
+        INNER JOIN assignment_students ON assignment_students.assignment_id = assignments.id
+        WHERE assignment_students.student_id = :studentId
+          AND assignments.is_draft = 0
+          AND assignments.deleted_at IS NULL
+          AND assignment_students.deleted_at IS NULL
+        ORDER BY assignments.due_date DESC NULLS LAST, assignments.created_at DESC
+        """
+    )
+    fun observePublishedByStudent(studentId: String): Flow<List<AssignmentEntity>>
+
     @Query("SELECT * FROM assignments WHERE deleted_at IS NULL AND due_date BETWEEN :from AND :to ORDER BY due_date")
     fun observeDueBetween(from: LocalDate, to: LocalDate): Flow<List<AssignmentEntity>>
 
-    @Query("SELECT * FROM assignments WHERE deleted_at IS NULL AND teacher_user_id = :teacherUserId ORDER BY due_date DESC")
+    @Query("SELECT * FROM assignments WHERE deleted_at IS NULL AND teacher_user_id = :teacherUserId ORDER BY created_at DESC")
     fun observeByTeacher(teacherUserId: String): Flow<List<AssignmentEntity>>
+
+    @Query("SELECT * FROM assignments WHERE deleted_at IS NULL AND teacher_user_id = :teacherUserId AND is_draft = 1 ORDER BY updated_at DESC")
+    fun observeDraftsByTeacher(teacherUserId: String): Flow<List<AssignmentEntity>>
+
+    @Query("SELECT * FROM assignments WHERE deleted_at IS NULL AND teacher_user_id = :teacherUserId AND is_draft = 0 ORDER BY created_at DESC")
+    fun observePublishedByTeacher(teacherUserId: String): Flow<List<AssignmentEntity>>
 
     @Query("DELETE FROM assignments")
     suspend fun clear()

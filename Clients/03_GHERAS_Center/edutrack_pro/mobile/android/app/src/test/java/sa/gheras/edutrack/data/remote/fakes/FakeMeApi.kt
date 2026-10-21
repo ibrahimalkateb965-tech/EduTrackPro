@@ -9,6 +9,15 @@ import sa.gheras.edutrack.data.remote.dto.GradeSubmissionBody
 import sa.gheras.edutrack.data.remote.dto.AttendanceDto
 import sa.gheras.edutrack.data.remote.dto.AttendanceItemBody
 import sa.gheras.edutrack.data.remote.dto.AssignmentDto
+import sa.gheras.edutrack.data.remote.dto.CreateAssignmentRequest
+import sa.gheras.edutrack.data.remote.dto.ReminderPreviewResponse
+import sa.gheras.edutrack.data.remote.dto.ReminderRecipientDto
+import sa.gheras.edutrack.data.remote.dto.ReviewSubmissionRequest
+import sa.gheras.edutrack.data.remote.dto.SendReminderRequest
+import sa.gheras.edutrack.data.remote.dto.SendReminderResponse
+import sa.gheras.edutrack.data.remote.dto.SubmitAssignmentRequest
+import sa.gheras.edutrack.data.remote.dto.TeacherAssignmentStatsDto
+import sa.gheras.edutrack.data.remote.dto.TeacherSubmissionsResponse
 import sa.gheras.edutrack.data.remote.dto.BroadcastBody
 import sa.gheras.edutrack.data.remote.dto.BroadcastResultDto
 import sa.gheras.edutrack.data.remote.dto.ClearReadBody
@@ -106,6 +115,109 @@ class FakeMeApi : MeApi {
             status = "graded",
             grade = body.grade,
             feedback = body.feedback
+        )
+    }
+
+    override suspend fun createAssignmentModern(body: CreateAssignmentRequest): AssignmentDto {
+        return AssignmentDto(
+            id = "assign_modern_1",
+            title = body.title,
+            subject = body.subject,
+            kind = body.kind,
+            dueDate = body.dueDate,
+            instructions = body.instructions,
+            pageRef = body.pageRef,
+            isDraft = body.isDraft,
+            studentIds = body.studentIds
+        )
+    }
+
+    override suspend fun publishAssignment(id: String): Response<Unit> {
+        return Response.success(Unit)
+    }
+
+    override suspend fun getAssignmentSubmissions(id: String): TeacherSubmissionsResponse {
+        return TeacherSubmissionsResponse(
+            stats = TeacherAssignmentStatsDto(total = 1, pending = 0, submitted = 1, graded = 0, revisionRequested = 0),
+            items = listOf(
+                SubmissionDto(
+                    id = "sub_teacher_1",
+                    assignmentId = id,
+                    studentId = "student_1",
+                    attemptNumber = 1,
+                    status = "submitted"
+                )
+            )
+        )
+    }
+
+    override suspend fun submitAssignment(id: String, body: SubmitAssignmentRequest): SubmissionDto {
+        return SubmissionDto(
+            id = "sub_submit_1",
+            assignmentId = id,
+            studentId = body.studentId,
+            attemptNumber = 1,
+            status = "submitted",
+            feedback = body.note
+        )
+    }
+
+    override suspend fun reviewSubmission(id: String, body: ReviewSubmissionRequest): SubmissionDto {
+        return SubmissionDto(
+            id = id,
+            assignmentId = "asgn_1",
+            studentId = "student_1",
+            status = body.status,
+            gradeLevel = body.gradeLevel,
+            grade = body.grade,
+            feedback = body.feedback,
+            revisionNote = body.revisionNote,
+            teacherFeedbackKey = body.teacherFeedbackKey
+        )
+    }
+
+    override suspend fun previewAssignmentReminders(id: String, kind: String?): ReminderPreviewResponse {
+        return ReminderPreviewResponse(
+            count = 1,
+            students = listOf(
+                ReminderRecipientDto(
+                    studentId = "student_1",
+                    studentName = "Zaid",
+                    status = kind ?: "pending"
+                )
+            )
+        )
+    }
+
+    override suspend fun sendAssignmentReminders(id: String, body: SendReminderRequest): SendReminderResponse {
+        return SendReminderResponse(
+            sent = 1,
+            cooldownRemainingSeconds = null,
+            recipients = listOf(
+                ReminderRecipientDto(
+                    studentId = body.studentId ?: "student_1",
+                    studentName = "Zaid",
+                    status = body.kind ?: "pending"
+                )
+            )
+        )
+    }
+
+    override suspend fun uploadMedia(filename: String, body: RequestBody): UploadResponseDto {
+        return UploadResponseDto(
+            storageKey = "uploads/$filename",
+            url = "https://example.com/api/v1/me/files/uploads/$filename",
+            filename = filename,
+            bytes = 1024L
+        )
+    }
+
+    override suspend fun uploadMediaMultipart(file: MultipartBody.Part): UploadResponseDto {
+        return UploadResponseDto(
+            storageKey = "uploads/multipart_file",
+            url = "https://example.com/api/v1/me/files/uploads/multipart_file",
+            filename = "multipart_file",
+            bytes = 1024L
         )
     }
 }

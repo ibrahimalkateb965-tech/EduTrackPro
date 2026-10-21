@@ -17,10 +17,11 @@ object AssignmentMappers {
             title = dto.title,
             subject = dto.subject,
             kind = dto.kind ?: "homework",
-            dueDate = DateParsers.parseLocalDate(dto.dueDate) ?: LocalDate.now(),
+            dueDate = dto.dueDate?.let { DateParsers.parseLocalDate(it) },
             teacherUserId = dto.teacherUserId,
             instructions = dto.instructions ?: dto.description,
             pageRef = dto.pageRef,
+            isDraft = dto.isDraft,
             createdAt = DateParsers.parseInstant(dto.createdAt),
             updatedAt = DateParsers.parseInstant(dto.updatedAt),
             deletedAt = dto.deletedAt?.let { DateParsers.parseInstant(it) }
@@ -48,6 +49,12 @@ object AssignmentMappers {
             branchId = defaultBranchId,
             assignmentId = dto.assignmentId,
             studentId = dto.studentId,
+            attemptNumber = dto.attemptNumber,
+            parentSubmissionId = dto.parentSubmissionId,
+            gradeLevel = dto.gradeLevel,
+            revisionNote = dto.revisionNote,
+            teacherFeedbackKey = dto.teacherFeedbackKey,
+            isLate = dto.isLate,
             submittedAt = DateParsers.parseInstant(dto.submittedAt),
             status = dto.status ?: "submitted",
             grade = dto.grade,
@@ -74,6 +81,28 @@ object AssignmentMappers {
                 updatedAt = now,
                 deletedAt = null
             )
+        }
+    }
+
+    fun gradeLevelToBadgeArabic(gradeLevel: String?): String {
+        return when (gradeLevel?.lowercase()?.trim()) {
+            "excellent" -> "ممتاز"
+            "very_good" -> "جيد جدًا"
+            "good" -> "جيد"
+            "needs_improvement" -> "يحتاج إلى تحسين"
+            else -> gradeLevel ?: "غير محدد"
+        }
+    }
+
+    fun normalizeGradeArabicToAscii(arabicGrade: String?): String? {
+        if (arabicGrade == null) return null
+        val norm = arabicGrade.trim().replace("داً", "دًا")
+        return when (norm) {
+            "ممتاز" -> "excellent"
+            "جيد جدًا", "جيد جداً" -> "very_good"
+            "جيد" -> "good"
+            "يحتاج إلى تحسين" -> "needs_improvement"
+            else -> null
         }
     }
 }
