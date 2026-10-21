@@ -25,24 +25,35 @@ MIGRATION_PATH = Path(__file__).resolve().parents[2] / "db" / "postgres" / "017_
 
 def test_anchored_regex_url_rewriting_logic(db):
     """Verify that PostgreSQL regexp_replace in 017:164 correctly converts legacy upload URLs without doubling prefixes (R4-1)."""
-    # Execute actual SQL regexp_replace against Postgres
-    res = db.execute("""
-        SELECT 
-            regexp_replace('Check attachment at https://gheras.autovem.tech/api/v1/static/uploads/sheet1.pdf', '(https?://[^/"\\s]+)?/api/v1/static/uploads/', '/api/v1/me/files/', 'g') as case1,
-            regexp_replace('Review file /api/v1/static/uploads/audio_lesson.mp3 for details', '(https?://[^/"\\s]+)?/api/v1/static/uploads/', '/api/v1/me/files/', 'g') as case2,
-            regexp_replace('<img src="/api/v1/static/uploads/diagram.png" />', '(https?://[^/"\\s]+)?/api/v1/static/uploads/', '/api/v1/me/files/', 'g') as case3
-    """).fetchone()
+    # 1. Seed a legacy assignment with static upload URLs in instructions
+    teacher_id = db.execute("INSERT INTO users (username, role) VALUES ('legacy_teacher', 'teacher') RETURNING id").fetchone()["id"]
+    ass_id = db.execute("""
+        INSERT INTO assignments (teacher_user_id, title, due_date, instructions)
+        VALUES (%s, 'Legacy HW', '2026-10-30', 'Check attachment at https://gheras.autovem.tech/api/v1/static/uploads/sheet1.pdf and also /api/v1/static/uploads/audio.mp3')
+        RETURNING id
+    """, (teacher_id,)).fetchone()["id"]
+    db.commit()
 
-    # Case 1: Absolute URL with domain
-    assert res["case1"] == 'Check attachment at /api/v1/me/files/sheet1.pdf'
-    assert '/api/v1/api/v1/' not in res["case1"]
+    # 2. Re-apply 017 migration to exercise step 9 against real seeded row
+    with open(MIGRATION_PATH, "r", encoding="utf-8") as f:
+        sql = f.read()
+    db.execute(sql)
+    db.commit()
 
-    # Case 2: Relative URL
-    assert res["case2"] == 'Review file /api/v1/me/files/audio_lesson.mp3 for details'
-    assert '/api/v1/api/v1/' not in res["case2"]
+    # 3. Read back rewritten instructions
+    rewritten = db.execute("SELECT instructions FROM assignments WHERE id = %s", (ass_id,)).fetchone()["instructions"]
+    assert rewritten == 'Check attachment at /api/v1/me/files/sheet1.pdf and also /api/v1/me/files/audio.mp3'
+    assert '/api/v1/api/v1/' not in rewritten
+    assert '/static/uploads/' not in rewritten
 
-    # Case 3: URL inside HTML tags or markdown
-    assert res["case3"] == '<img src="/api/v1/me/files/diagram.png" />'
+    # 4. Verify assignment_files backfill from step 9
+    af_keys = [
+        r["storage_key"] for r in db.execute(
+            "SELECT storage_key FROM assignment_files WHERE assignment_id = %s", (ass_id,)
+        ).fetchall()
+    ]
+    assert "sheet1.pdf" in af_keys
+    assert "audio.mp3" in af_keys
 
 
 def test_migration_017_idempotent(db):

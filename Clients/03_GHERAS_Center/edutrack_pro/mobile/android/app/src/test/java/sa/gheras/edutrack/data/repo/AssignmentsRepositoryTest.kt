@@ -50,16 +50,18 @@ class AssignmentsRepositoryTest {
         )
 
         // Seed students
-        db.studentDao().upsert(
-            StudentEntity(
-                id = "student_1",
-                branchId = "b1",
-                name = "Ahmad",
-                gender = "MALE",
-                createdAt = now,
-                updatedAt = now
+        kotlinx.coroutines.runBlocking {
+            db.studentDao().upsert(
+                StudentEntity(
+                    id = "student_1",
+                    branchId = "b1",
+                    name = "Ahmad",
+                    gender = "MALE",
+                    createdAt = now,
+                    updatedAt = now
+                )
             )
-        )
+        }
     }
 
     @After

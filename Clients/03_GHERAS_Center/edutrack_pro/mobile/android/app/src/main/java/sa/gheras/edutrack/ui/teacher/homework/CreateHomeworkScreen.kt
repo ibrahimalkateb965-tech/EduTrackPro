@@ -186,7 +186,7 @@ fun CreateHomeworkScreen(
 
                             Text("المادة:", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
                             Spacer(modifier = Modifier.height(6.dp))
-                            val subjects = listOf("القرآن الكريم", "التجويد", "التفسير", "الفقه", "عام")
+                            val subjects = listOf("القرآن الكريم", "لغتي", "الرياضيات", "الإنجليزي", "قدرات", "عام")
                             LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 items(subjects) { subj ->
                                     FilterChip(

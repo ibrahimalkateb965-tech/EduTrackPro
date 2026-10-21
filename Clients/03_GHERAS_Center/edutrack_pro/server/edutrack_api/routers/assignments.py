@@ -22,7 +22,7 @@ _CONN = Depends(get_conn)
 class AssignmentCreateIn(BaseModel):
     id: UUID | None = None
     title: str = Field(..., min_length=1)
-    subject: str = "عام"
+    subject: str = "القرآن الكريم"
     instructions: str = ""
     room_id: UUID | None = None
     student_ids: list[UUID] | None = None

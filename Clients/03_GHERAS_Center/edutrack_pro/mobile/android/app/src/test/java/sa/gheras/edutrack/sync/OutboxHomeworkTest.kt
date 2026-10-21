@@ -38,32 +38,34 @@ class OutboxHomeworkTest {
         outbox = Outbox(context, db) { "guardian_user_1" }
 
         // Seed student and assignment
-        db.studentDao().upsert(
-            StudentEntity(
-                id = "student_1",
-                branchId = "b1",
-                name = "Omar",
-                gender = "MALE",
-                createdAt = now,
-                updatedAt = now
+        kotlinx.coroutines.runBlocking {
+            db.studentDao().upsert(
+                StudentEntity(
+                    id = "student_1",
+                    branchId = "b1",
+                    name = "Omar",
+                    gender = "MALE",
+                    createdAt = now,
+                    updatedAt = now
+                )
             )
-        )
-        db.assignmentDao().upsert(
-            AssignmentEntity(
-                id = "asgn_1",
-                branchId = "b1",
-                title = "Math 101",
-                subject = "Math",
-                kind = "homework",
-                dueDate = LocalDate.of(2026, 10, 25),
-                teacherUserId = "teacher_1",
-                instructions = "Solve 1 to 5",
-                pageRef = null,
-                isDraft = false,
-                createdAt = now,
-                updatedAt = now
+            db.assignmentDao().upsert(
+                AssignmentEntity(
+                    id = "asgn_1",
+                    branchId = "b1",
+                    title = "Math 101",
+                    subject = "Math",
+                    kind = "homework",
+                    dueDate = LocalDate.of(2026, 10, 25),
+                    teacherUserId = "teacher_1",
+                    instructions = "Solve 1 to 5",
+                    pageRef = null,
+                    isDraft = false,
+                    createdAt = now,
+                    updatedAt = now
+                )
             )
-        )
+        }
     }
 
     @After

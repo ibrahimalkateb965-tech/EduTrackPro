@@ -91,8 +91,8 @@ def create_assignment(conn, scope: Scope, body: dict) -> dict:
         raise ApiError(403, "forbidden", "المعلمة فقط مصرح لها بإنشاء الواجبات")
 
     room_id = body.get("room_id")
-    if room_id and scope.room_ids and room_id not in scope.room_ids:
-        raise ApiError(403, "out_of_scope", "الفصل المحدد خارج نطاق المعلمة")
+    if room_id:
+        scope.assert_rooms([room_id])
 
     assignment_id = body.get("id")
     if assignment_id:
@@ -102,7 +102,7 @@ def create_assignment(conn, scope: Scope, body: dict) -> dict:
 
     branch_id = body.get("branch_id") or UUID("00000000-0000-0000-0000-000000000001")
     title = body["title"]
-    subject = body.get("subject", "عام")
+    subject = body.get("subject") or "القرآن الكريم"
     instructions = body.get("instructions", "")
     due_date = body.get("due_date")  # Nullable in M2 (H7)
     is_draft = body.get("is_draft", False)
@@ -162,13 +162,17 @@ def create_assignment(conn, scope: Scope, body: dict) -> dict:
         ).fetchall()
         target_students = [r["id"] for r in st_rows]
 
-    if target_students:
-        for sid in target_students:
-            conn.execute("""
-                INSERT INTO assignment_students (branch_id, assignment_id, student_id)
-                VALUES (%s, %s, %s)
-                ON CONFLICT (assignment_id, student_id) DO NOTHING
-            """, (branch_id, ass_id, sid))
+    if not target_students:
+        raise ApiError(422, "no_students", "يجب تحديد طالب واحد على الأقل للواجب")
+
+    scope.assert_students(target_students)
+
+    for sid in target_students:
+        conn.execute("""
+            INSERT INTO assignment_students (branch_id, assignment_id, student_id)
+            VALUES (%s, %s, %s)
+            ON CONFLICT (assignment_id, student_id) DO NOTHING
+        """, (branch_id, ass_id, sid))
 
     write_audit(conn, scope.user_id, "create_assignment", "assignments", ass_id, {"title": title, "is_draft": is_draft})
 

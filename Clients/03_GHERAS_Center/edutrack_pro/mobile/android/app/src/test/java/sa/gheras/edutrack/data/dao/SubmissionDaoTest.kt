@@ -89,8 +89,10 @@ class SubmissionDaoTest {
             updatedAt = now
         )
 
-        studentDao.upsertAll(listOf(student, student2))
-        assignmentDao.upsertAll(listOf(assignment1, assignment2))
+        kotlinx.coroutines.runBlocking {
+            studentDao.upsertAll(listOf(student, student2))
+            assignmentDao.upsertAll(listOf(assignment1, assignment2))
+        }
     }
 
     @After

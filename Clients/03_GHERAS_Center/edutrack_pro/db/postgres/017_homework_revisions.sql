@@ -179,7 +179,20 @@ FROM assignments a,
      LATERAL regexp_matches(a.instructions, '/api/v1/me/files/([^"''\s\)]+)', 'g') AS m
 ON CONFLICT DO NOTHING;
 
+-- 10. ترقية قيود المواد الدراسية المعتمدة لمركز غراس القرآني والمدرسي (K7)
+ALTER TABLE assignments DROP CONSTRAINT IF EXISTS chk_assignments_subject;
+ALTER TABLE assignments ADD CONSTRAINT chk_assignments_subject 
+    CHECK (subject IS NULL OR subject IN ('القرآن الكريم', 'القرآن', 'لغتي', 'الرياضيات', 'الإنجليزي', 'قدرات', 'عام'));
+
+-- 11. قيد التفرد لجدول assignment_students لمنع التكرار ودعم ON CONFLICT (K8)
+DELETE FROM assignment_students a USING assignment_students b 
+WHERE a.id > b.id AND a.assignment_id = b.assignment_id AND a.student_id = b.student_id;
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_assignment_students 
+ON assignment_students (assignment_id, student_id);
+
 GRANT SELECT, INSERT, UPDATE ON assignments TO gheras_app;
+GRANT SELECT, INSERT, UPDATE, DELETE ON assignment_students TO gheras_app;
 GRANT SELECT, INSERT, UPDATE ON staged_uploads TO gheras_app;
 GRANT SELECT, INSERT, UPDATE ON assignment_files TO gheras_app;
 GRANT SELECT, INSERT, UPDATE ON submissions TO gheras_app;

@@ -81,7 +81,7 @@ def test_publish_assignment_owner_and_foreign_404(db, client, setup_data):
         f"{API}/assignments",
         json={
             "title": "واجب التوحيد",
-            "subject": "دراسات إسلامية",
+            "subject": "القرآن الكريم",
             "room_id": str(env["room_id"]),
             "is_draft": True,
         },
@@ -112,8 +112,8 @@ def test_review_ascii_grade_and_attempt_guards(db, client, setup_data):
     res_ass = client.post(
         f"{API}/assignments",
         json={
-            "title": "واجب العلوم",
-            "subject": "علوم",
+            "title": "واجب لغتي",
+            "subject": "لغتي",
             "room_id": str(env["room_id"]),
             "is_draft": False,
         },
@@ -258,3 +258,44 @@ def test_reminders_dry_run_and_individual_exclusion(db, client, setup_data):
     assert "طالب تجربة 2" in preview2["target_students"]
     assert preview2["skipped_count"] == 1
     assert "طالب تجربة 1" in preview2["skipped_students"]
+
+
+def test_teacher_scope_enforcement_on_create(db, client, setup_data):
+    """Teacher cannot create assignment for an out-of-scope room (P3) or student (P4)."""
+    env = setup_data
+
+    # Teacher 2 has no rooms or students assigned
+    # P3: Out of scope room -> 403
+    res_p3 = client.post(
+        f"{API}/assignments",
+        json={
+            "title": "واجب غير مصرح للغرفة",
+            "room_id": str(env["room_id"]),
+            "is_draft": True,
+        },
+        headers=env["t2_headers"],
+    )
+    assert res_p3.status_code == 403, res_p3.text
+
+    # P4: Out of scope student_ids -> 403
+    res_p4 = client.post(
+        f"{API}/assignments",
+        json={
+            "title": "واجب غير مصرح للطلاب",
+            "student_ids": [str(env["s1_id"])],
+            "is_draft": True,
+        },
+        headers=env["t2_headers"],
+    )
+    assert res_p4.status_code == 403, res_p4.text
+
+    # Empty students list with no room -> 422
+    res_no_students = client.post(
+        f"{API}/assignments",
+        json={
+            "title": "واجب بلا طلاب",
+            "is_draft": True,
+        },
+        headers=env["t1_headers"],
+    )
+    assert res_no_students.status_code == 422, res_no_students.text

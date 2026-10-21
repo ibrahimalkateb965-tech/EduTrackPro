@@ -1,6 +1,6 @@
 package sa.gheras.edutrack.data.remote
 
-import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFactory
+import retrofit2.converter.kotlinx.serialization.asConverterFactory
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
@@ -59,7 +59,7 @@ class PickupApiEndpointTest {
 
     @Test
     fun testGetRequestByIdPath_hasSingleApiV1Prefix() = runBlocking {
-        server.enqueue(MockResponse().setResponseCode(200).setBody("""{"id":"req-123","status":"notified"}"""))
+        server.enqueue(MockResponse().setResponseCode(200).setBody("""{"id":"req-123","student_id":"std-1","status":"notified"}"""))
         api.getRequestById("req-123")
 
         val request = server.takeRequest()
@@ -69,7 +69,7 @@ class PickupApiEndpointTest {
 
     @Test
     fun testCreateRequestPath_hasSingleApiV1Prefix() = runBlocking {
-        server.enqueue(MockResponse().setResponseCode(200).setBody("""{"id":"req-123","status":"notified"}"""))
+        server.enqueue(MockResponse().setResponseCode(200).setBody("""{"id":"req-123","student_id":"std-1","status":"notified"}"""))
         api.createRequest(CreatePickupRequest(studentId = "std-1"))
 
         val request = server.takeRequest()
@@ -79,7 +79,7 @@ class PickupApiEndpointTest {
 
     @Test
     fun testHandoverPath_hasSingleApiV1Prefix() = runBlocking {
-        server.enqueue(MockResponse().setResponseCode(200).setBody("""{"id":"req-123","status":"completed"}"""))
+        server.enqueue(MockResponse().setResponseCode(200).setBody("""{"id":"req-123","student_id":"std-1","status":"completed"}"""))
         api.handover(
             "req-123",
             HandoverRequest(

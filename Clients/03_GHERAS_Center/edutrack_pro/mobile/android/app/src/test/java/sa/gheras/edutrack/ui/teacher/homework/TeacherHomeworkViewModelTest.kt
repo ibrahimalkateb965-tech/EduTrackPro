@@ -62,14 +62,16 @@ class TeacherHomeworkViewModelTest {
         studentsRepo = StudentsRepository(db.studentDao())
 
         // Seed room and students
-        db.roomDao().upsert(RoomEntity("room_1", "حلقة الإمام نافع", "quran", "b1"))
-        db.studentDao().upsertAll(
-            listOf(
-                StudentEntity("s1", "b1", "Zaid", "MALE", roomId = "room_1", createdAt = now, updatedAt = now),
-                StudentEntity("s2", "b1", "Omar", "MALE", roomId = "room_1", createdAt = now, updatedAt = now),
-                StudentEntity("s3", "b1", "Ali", "MALE", roomId = null, createdAt = now, updatedAt = now)
+        runBlocking {
+            db.roomDao().upsert(RoomEntity("room_1", "حلقة الإمام نافع", "quran", "b1"))
+            db.studentDao().upsertAll(
+                listOf(
+                    StudentEntity(id = "s1", branchId = "b1", name = "Zaid", gender = "MALE", roomId = "room_1", createdAt = now, updatedAt = now),
+                    StudentEntity(id = "s2", branchId = "b1", name = "Omar", gender = "MALE", roomId = "room_1", createdAt = now, updatedAt = now),
+                    StudentEntity(id = "s3", branchId = "b1", name = "Ali", gender = "MALE", roomId = null, createdAt = now, updatedAt = now)
+                )
             )
-        )
+        }
     }
 
     @After
