@@ -148,6 +148,7 @@ def create_assignment(conn, scope: Scope, body: dict) -> dict:
                 branch_id, assignment_id, uploaded_by_user_id, storage_key,
                 media_type, file_name, bytes
             ) VALUES (%s, %s, %s, %s, %s, %s, %s)
+            ON CONFLICT (assignment_id, storage_key) DO NOTHING
         """, (
             branch_id, ass_id, scope.user_id, f["storage_key"],
             f.get("media_type", "image"), f.get("file_name"), f.get("bytes", 0)

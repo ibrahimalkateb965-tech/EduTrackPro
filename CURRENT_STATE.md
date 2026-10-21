@@ -995,3 +995,12 @@ All 6 blocking defects (K1–K6) identified in Claude Code CLI's audit report ha
 - **K10 (TeacherHomeworkViewModelTest RoomEntity)**: Provided full named arguments with `createdAt` and `updatedAt` for `RoomEntity` constructor in `TeacherHomeworkViewModelTest.kt:66`.
 - **K2 Nit (Migration Test Password Hash)**: Provided required `password_hash` in `users` insert in `test_homework_migration.py:29`.
 - **Verification**: Python files compiled cleanly with 0 errors. Ready for Claude Code CLI Round 4 certification run.
+
+### 2026-10-21: M2 Gate Re-Audit Round 4 Rework (S2-R4 + A2-R4) Completed
+- **K17 (Outbox modern routes & payload)**: Updated `OutboxWorker.kt` to target modern `POST assignments` (`createAssignmentModern`) and `POST uploads` (`uploadMedia`). Updated `CreateAssignmentRequest` to include `id`, `room_id`, nullable `due_date`, `is_draft`, and full `files` payload with storage keys. Added `HomeworkApiEndpointTest.kt` MockWebServer contract test asserting routes without `me/` prefix.
+- **K18 (Server edit files upsert)**: Added `ON CONFLICT (assignment_id, storage_key) DO NOTHING` in `assignment_repo.py:150` so re-posting existing files on assignment edit does not return 409.
+- **K19 (Migration 017 duplicate instructions link)**: In `017_homework_revisions.sql` Step 9, placed `uq_assignment_files_assignment_storage_key` index prior to insert, and used `SELECT DISTINCT ... ON CONFLICT (assignment_id, storage_key) DO NOTHING` so multiple occurrences of the same file in an assignment's instructions do not abort deploy/re-run.
+- **K20 (Android tests resolution)**:
+  - In `TeacherHomeworkViewModelTest.kt`, added `vm.toggleStudentSelection("s1")` to `testSaveAsDraft` and `testPublishNow` to satisfy the non-empty student selection guard.
+  - In `FakeMeApi.kt`, implemented `submissionsStore` tracking with accurate `attemptNumber`, `parentSubmissionId`, and preserved `assignmentId` in `reviewSubmission`, resolving the Room FK constraint violation in `AssignmentsRepositoryTest:150`.
+- **Verification**: Server 5 files + `test_m2r3_probe.py` (22/22 green in Round 4), `test_m2r4_probe.py` verified. Ready for Claude Code CLI Round 5 audit and certification.

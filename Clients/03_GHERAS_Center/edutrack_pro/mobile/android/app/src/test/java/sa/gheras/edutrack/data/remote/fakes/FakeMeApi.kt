@@ -151,22 +151,36 @@ class FakeMeApi : MeApi {
         )
     }
 
+    val submissionsStore = mutableMapOf<String, SubmissionDto>()
+
     override suspend fun submitAssignment(id: String, body: SubmitAssignmentRequest): SubmissionDto {
-        return SubmissionDto(
-            id = "sub_submit_1",
+        val subId = "sub_submit_${submissionsStore.size + 1}"
+        val prevAttempts = submissionsStore.values.count { it.assignmentId == id && it.studentId == body.studentId }
+        val attemptNo = prevAttempts + 1
+        val parentId = submissionsStore.values.findLast { it.assignmentId == id && it.studentId == body.studentId }?.id
+        val dto = SubmissionDto(
+            id = subId,
             assignmentId = id,
             studentId = body.studentId,
-            attemptNumber = 1,
+            attemptNumber = attemptNo,
+            parentSubmissionId = parentId,
+            isLate = true,
             status = "submitted",
             feedback = body.note
         )
+        submissionsStore[subId] = dto
+        return dto
     }
 
     override suspend fun reviewSubmission(id: String, body: ReviewSubmissionRequest): SubmissionDto {
-        return SubmissionDto(
+        val existing = submissionsStore[id]
+        val updated = SubmissionDto(
             id = id,
-            assignmentId = "asgn_1",
-            studentId = "student_1",
+            assignmentId = existing?.assignmentId ?: "asgn_1",
+            studentId = existing?.studentId ?: "student_1",
+            attemptNumber = existing?.attemptNumber ?: 1,
+            parentSubmissionId = existing?.parentSubmissionId,
+            isLate = existing?.isLate ?: true,
             status = body.status,
             gradeLevel = body.gradeLevel,
             grade = body.grade,
@@ -174,6 +188,8 @@ class FakeMeApi : MeApi {
             revisionNote = body.revisionNote,
             teacherFeedbackKey = body.teacherFeedbackKey
         )
+        submissionsStore[id] = updated
+        return updated
     }
 
     override suspend fun previewAssignmentReminders(id: String, kind: String?): ReminderPreviewResponse {

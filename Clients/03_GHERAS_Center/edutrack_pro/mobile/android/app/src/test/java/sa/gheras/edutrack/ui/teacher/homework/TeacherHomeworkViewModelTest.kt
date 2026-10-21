@@ -128,6 +128,7 @@ class TeacherHomeworkViewModelTest {
         vm.updateTitle("حفظ سورة الكهف")
         vm.updateSubject("القرآن الكريم")
         vm.updateDueDate(LocalDate.of(2026, 11, 1))
+        vm.toggleStudentSelection("s1")
 
         var doneAssignmentId: String? = null
         vm.saveAsDraft { id -> doneAssignmentId = id }
@@ -146,6 +147,7 @@ class TeacherHomeworkViewModelTest {
 
         vm.updateTitle("تلاوة سورة يس")
         vm.updateDueDate(null) // Optional null dueDate
+        vm.toggleStudentSelection("s1")
 
         var publishedId: String? = null
         vm.publishNow { id -> publishedId = id }

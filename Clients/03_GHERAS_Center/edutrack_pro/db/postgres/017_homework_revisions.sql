@@ -159,14 +159,21 @@ CREATE TABLE IF NOT EXISTS assignment_reminder_recipients (
 CREATE INDEX IF NOT EXISTS idx_reminder_recipients_reminder ON assignment_reminder_recipients (reminder_id);
 CREATE INDEX IF NOT EXISTS idx_reminder_recipients_student_reminder ON assignment_reminder_recipients (student_id, reminder_id);
 
+-- فهرس فريد لملفات الواجبات لمنع تكرار الروابط عند إعادة تطبيق الترحيل (K16/K18/K19)
+DELETE FROM assignment_files a USING assignment_files b
+WHERE a.id > b.id AND a.assignment_id = b.assignment_id AND a.storage_key = b.storage_key;
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_assignment_files_assignment_storage_key
+ON assignment_files (assignment_id, storage_key);
+
 -- 9. التحديث المعياري لروابط التعليمات السابقة وربطها في assignment_files (R4-1)
 UPDATE assignments 
 SET instructions = regexp_replace(instructions, '(https?://[^/"\s]+)?/api/v1/static/uploads/', '/api/v1/me/files/', 'g')
 WHERE instructions LIKE '%/static/uploads/%';
 
--- إدراج ملفات المعلمة السابقة في assignment_files لتجاوز فحص الـ ACL (K16 guard)
+-- إدراج ملفات المعلمة السابقة في assignment_files لتجاوز فحص الـ ACL (K16/K19 guard)
 INSERT INTO assignment_files (branch_id, assignment_id, uploaded_by_user_id, storage_key, media_type, file_name, bytes, created_at)
-SELECT a.branch_id, a.id, a.teacher_user_id,
+SELECT DISTINCT a.branch_id, a.id, a.teacher_user_id,
        m[1] AS storage_key,
        CASE WHEN m[1] ~* '\.(mp3|m4a|aac)$' THEN 'audio'
             WHEN m[1] ~* '\.(mp4)$' THEN 'video'
@@ -177,17 +184,7 @@ SELECT a.branch_id, a.id, a.teacher_user_id,
        a.created_at
 FROM assignments a,
      LATERAL regexp_matches(a.instructions, '/api/v1/me/files/([^"''\s\)]+)', 'g') AS m
-WHERE NOT EXISTS (
-    SELECT 1 FROM assignment_files af
-    WHERE af.assignment_id = a.id AND af.storage_key = m[1]
-);
-
--- فهرس فريد لملفات الواجبات لمنع تكرار الروابط عند إعادة تطبيق الترحيل (K16)
-DELETE FROM assignment_files a USING assignment_files b
-WHERE a.id > b.id AND a.assignment_id = b.assignment_id AND a.storage_key = b.storage_key;
-
-CREATE UNIQUE INDEX IF NOT EXISTS uq_assignment_files_assignment_storage_key
-ON assignment_files (assignment_id, storage_key);
+ON CONFLICT (assignment_id, storage_key) DO NOTHING;
 
 -- 10. ترقية قيود المواد الدراسية المعتمدة لمركز غراس القرآني والمدرسي (K7)
 ALTER TABLE assignments DROP CONSTRAINT IF EXISTS chk_assignments_subject;

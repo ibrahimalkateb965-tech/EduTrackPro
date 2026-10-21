@@ -41,9 +41,11 @@ data class AssignmentDto(
 
 @Serializable
 data class CreateAssignmentRequest(
+    val id: String? = null,
     val title: String,
     val subject: String? = null,
     val kind: String = "homework",
+    @SerialName("room_id") val roomId: String? = null,
     @SerialName("due_date") val dueDate: String? = null,
     val instructions: String? = null,
     @SerialName("page_ref") val pageRef: String? = null,

@@ -186,12 +186,28 @@ class OutboxWorker(
                     }
                 }
 
+                val filesList = mutableListOf<sa.gheras.edutrack.data.remote.dto.AssignmentFileDto>()
+                val fArr = json.optJSONArray("files")
+                if (fArr != null) {
+                    for (i in 0 until fArr.length()) {
+                        val fObj = fArr.getJSONObject(i)
+                        filesList.add(
+                            sa.gheras.edutrack.data.remote.dto.AssignmentFileDto(
+                                storageKey = fObj.optString("storage_key").takeIf { it.isNotBlank() },
+                                mediaType = fObj.optString("media_type", "image"),
+                                fileName = fObj.optString("file_name").takeIf { it.isNotBlank() },
+                                bytes = fObj.optLong("bytes", 0L)
+                            )
+                        )
+                    }
+                }
+
                 var instructions = json.optString("instructions").takeIf { it.isNotBlank() }
                 if (!instructions.isNullOrBlank()) {
                     val (cleanText, attachments) = sa.gheras.edutrack.ui.teacher.media.AssignmentMediaParser.parse(instructions)
                     var hasUploaded = false
                     val updatedAttachments = attachments.map { att ->
-                        if (!att.uri.startsWith("http://") && !att.uri.startsWith("https://")) {
+                        if (!att.uri.startsWith("http://") && !att.uri.startsWith("https://") && !att.uri.startsWith("/api/")) {
                             val file = File(att.uri)
                             if (file.exists() && file.isFile) {
                                 if (file.length() > 25 * 1024 * 1024) {
@@ -206,8 +222,22 @@ class OutboxWorker(
                                     else -> "application/octet-stream".toMediaTypeOrNull()
                                 }
                                 val reqBody = file.asRequestBody(mediaType)
-                                val res = meApi.uploadAttachment(file.name, reqBody)
+                                val res = meApi.uploadMedia(file.name, reqBody)
                                 hasUploaded = true
+                                val storageKey = res.storageKey ?: res.url.substringAfterLast("/")
+                                filesList.add(
+                                    sa.gheras.edutrack.data.remote.dto.AssignmentFileDto(
+                                        storageKey = storageKey,
+                                        mediaType = when (file.extension.lowercase()) {
+                                            "pdf" -> "document"
+                                            "mp3", "m4a", "aac" -> "audio"
+                                            "mp4" -> "video"
+                                            else -> "image"
+                                        },
+                                        fileName = file.name,
+                                        bytes = file.length()
+                                    )
+                                )
                                 att.copy(uri = res.url)
                             } else {
                                 att
@@ -229,16 +259,23 @@ class OutboxWorker(
                     }
                 }
 
-                val body = CreateAssignmentBody(
+                val dueDateStr = json.optString("due_date").takeIf { it.isNotBlank() && it != "null" }
+                val isDraftVal = json.optBoolean("is_draft", false)
+                val roomIdVal = json.optString("room_id").takeIf { it.isNotBlank() }
+
+                val body = sa.gheras.edutrack.data.remote.dto.CreateAssignmentRequest(
                     id = json.optString("assignment_id").takeIf { it.isNotBlank() },
                     title = json.getString("title"),
                     subject = json.optString("subject").takeIf { it.isNotBlank() },
-                    dueDate = json.getString("due_date"),
+                    roomId = roomIdVal,
+                    dueDate = dueDateStr,
                     instructions = instructions,
                     pageRef = json.optString("page_ref").takeIf { it.isNotBlank() },
-                    studentIds = studentIdsList
+                    studentIds = studentIdsList,
+                    isDraft = isDraftVal,
+                    files = filesList
                 )
-                val res = meApi.postAssignment(body)
+                val res = meApi.createAssignmentModern(body)
                 db.assignmentDao().upsert(AssignmentMappers.assignmentToEntity(res))
                 val serverLinks = AssignmentMappers.assignmentStudentsToEntities(res)
                 if (serverLinks.isNotEmpty()) {

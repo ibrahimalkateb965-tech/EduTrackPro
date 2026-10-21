@@ -146,6 +146,7 @@ class TeacherHomeworkViewModel(
                     pageRef = state.pageRef.trim().takeIf { it.isNotBlank() },
                     teacherUserId = teacherUserId,
                     studentIds = state.selectedStudentIds.toList(),
+                    roomId = state.selectedRoomId,
                     isDraft = isDraft
                 )
 

@@ -75,6 +75,7 @@ class AssignmentsRepository(
         teacherUserId: String?,
         studentIds: List<String>,
         branchId: String? = null,
+        roomId: String? = null,
         isDraft: Boolean = false,
         files: List<AssignmentFileDto> = emptyList()
     ): AssignmentEntity = withContext(Dispatchers.IO) {
@@ -118,6 +119,7 @@ class AssignmentsRepository(
                 put("assignment_id", assignmentId)
                 put("title", title)
                 if (subject != null) put("subject", subject)
+                if (roomId != null) put("room_id", roomId)
                 if (dueDate != null) put("due_date", dueDate.toString())
                 if (instructions != null) put("instructions", instructions)
                 if (pageRef != null) put("page_ref", pageRef)
@@ -127,6 +129,19 @@ class AssignmentsRepository(
                 val arr = JSONArray()
                 studentIds.forEach { arr.put(it) }
                 put("student_ids", arr)
+                if (files.isNotEmpty()) {
+                    val fArr = JSONArray()
+                    files.forEach { f ->
+                        val fObj = JSONObject().apply {
+                            if (f.storageKey != null) put("storage_key", f.storageKey)
+                            if (f.mediaType != null) put("media_type", f.mediaType)
+                            if (f.fileName != null) put("file_name", f.fileName)
+                            if (f.bytes != null) put("bytes", f.bytes)
+                        }
+                        fArr.put(fObj)
+                    }
+                    put("files", fArr)
+                }
             }.toString()
 
             val naturalKey = "assignment:$assignmentId"
