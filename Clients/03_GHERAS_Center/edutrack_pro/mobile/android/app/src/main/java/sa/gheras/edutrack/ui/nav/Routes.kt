@@ -73,3 +73,28 @@ data class ChildSkillsRoute(val studentId: String) : Route
 
 @Serializable
 data class FeesRoute(val studentId: String) : Route
+
+// ---- Pickup Graph ----
+@Serializable
+data class PickupRequestRoute(val studentId: String) : Route
+
+@Serializable
+data class PickupTrackingRoute(val requestId: String) : Route
+
+@Serializable
+data class PickupEarlyLeaveRoute(val studentId: String) : Route {
+    override val isForm: Boolean get() = true
+}
+
+@Serializable
+data object TeacherPickupQueueRoute : Route
+
+@Serializable
+data class TeacherChildPrepRoute(val requestId: String) : Route
+
+@Serializable
+data object SupervisorPickupRoute : Route
+
+@Serializable
+data class SupervisorHandoverRoute(val requestId: String) : Route
+

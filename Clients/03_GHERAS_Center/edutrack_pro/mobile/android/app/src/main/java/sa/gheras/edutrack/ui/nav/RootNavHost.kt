@@ -55,6 +55,10 @@ import sa.gheras.edutrack.ui.guardian.FeesScreen
 import sa.gheras.edutrack.ui.guardian.FeesViewModel
 import sa.gheras.edutrack.ui.guardian.GuardianHomeScreen
 import sa.gheras.edutrack.ui.guardian.GuardianHomeViewModel
+import sa.gheras.edutrack.ui.guardian.pickup.PickupEarlyLeaveScreen
+import sa.gheras.edutrack.ui.guardian.pickup.PickupRequestScreen
+import sa.gheras.edutrack.ui.guardian.pickup.PickupTrackingScreen
+import sa.gheras.edutrack.ui.guardian.pickup.PickupViewModel
 import sa.gheras.edutrack.ui.login.LoginScreen
 import sa.gheras.edutrack.ui.login.LoginViewModel
 import sa.gheras.edutrack.ui.notifications.NotificationAction
@@ -76,6 +80,12 @@ import sa.gheras.edutrack.ui.teacher.StudentsScreen
 import sa.gheras.edutrack.ui.teacher.StudentsViewModel
 import sa.gheras.edutrack.ui.teacher.TeacherHomeScreen
 import sa.gheras.edutrack.ui.teacher.TeacherHomeViewModel
+import sa.gheras.edutrack.ui.supervisor.pickup.SupervisorGateViewModel
+import sa.gheras.edutrack.ui.supervisor.pickup.SupervisorHandoverScreen
+import sa.gheras.edutrack.ui.supervisor.pickup.SupervisorPickupScreen
+import sa.gheras.edutrack.ui.teacher.pickup.TeacherChildPrepScreen
+import sa.gheras.edutrack.ui.teacher.pickup.TeacherPickupQueueScreen
+import sa.gheras.edutrack.ui.teacher.pickup.TeacherPickupViewModel
 
 @Composable
 fun RootNavHost(
@@ -107,6 +117,12 @@ fun RootNavHost(
                 } else if (state.role == Role.GUARDIAN || state.role == Role.STUDENT) {
                     if (currentDestination?.contains("guardian") != true) {
                         navController.navigate(GuardianHomeRoute) {
+                            popUpTo(0) { inclusive = true }
+                        }
+                    }
+                } else if (state.role == Role.SUPERVISOR || state.role == Role.MANAGER) {
+                    if (currentDestination?.contains("supervisor") != true && currentDestination?.contains("pickup") != true) {
+                        navController.navigate(SupervisorPickupRoute) {
                             popUpTo(0) { inclusive = true }
                         }
                     }
@@ -203,6 +219,8 @@ fun RootNavHost(
                             val user = container.sessionStore.user
                             if (user?.role == Role.TEACHER) {
                                 navController.navigate(TeacherHomeRoute) { popUpTo(0) { inclusive = true } }
+                            } else if (user?.role == Role.SUPERVISOR || user?.role == Role.MANAGER) {
+                                navController.navigate(SupervisorPickupRoute) { popUpTo(0) { inclusive = true } }
                             } else {
                                 navController.navigate(GuardianHomeRoute) { popUpTo(0) { inclusive = true } }
                             }
@@ -311,6 +329,9 @@ fun RootNavHost(
                         },
                         onLessonLogClick = { scheduleId, date ->
                             navController.navigate(LessonLogRoute(scheduleId, date))
+                        },
+                        onPickupQueueClick = {
+                            navController.navigate(TeacherPickupQueueRoute)
                         }
                     )
                 }
@@ -455,6 +476,35 @@ fun RootNavHost(
                     )
                 }
 
+                composable<TeacherPickupQueueRoute> {
+                    val vm: TeacherPickupViewModel = viewModel(
+                        factory = viewModelFactory {
+                            TeacherPickupViewModel(container.pickupRepository)
+                        }
+                    )
+                    TeacherPickupQueueScreen(
+                        viewModel = vm,
+                        onNavigateBack = { navController.popBackStack() },
+                        onPrepClick = { requestId ->
+                            navController.navigate(TeacherChildPrepRoute(requestId))
+                        }
+                    )
+                }
+
+                composable<TeacherChildPrepRoute> { backStackEntry ->
+                    val route: TeacherChildPrepRoute = backStackEntry.toRoute()
+                    val vm: TeacherPickupViewModel = viewModel(
+                        factory = viewModelFactory {
+                            TeacherPickupViewModel(container.pickupRepository)
+                        }
+                    )
+                    TeacherChildPrepScreen(
+                        requestId = route.requestId,
+                        viewModel = vm,
+                        onNavigateBack = { navController.popBackStack() }
+                    )
+                }
+
                 // ---- Guardian Graph ----
                 composable<GuardianHomeRoute> {
                     val vm: GuardianHomeViewModel = viewModel(
@@ -477,6 +527,9 @@ fun RootNavHost(
                         onLessonsClick = { studentId -> navController.navigate(ChildLessonsRoute(studentId)) },
                         onSkillsClick = { studentId -> navController.navigate(ChildSkillsRoute(studentId)) },
                         onFeesClick = { studentId -> navController.navigate(FeesRoute(studentId)) },
+                        onPickupClick = { studentId ->
+                            navController.navigate(PickupRequestRoute(studentId))
+                        },
                         showFees = activeRole != Role.STUDENT
                     )
                 }
@@ -580,6 +633,90 @@ fun RootNavHost(
                         }
                     )
                     FeesScreen(viewModel = vm)
+                }
+
+                // ---- Guardian Pickup Graph ----
+                composable<PickupRequestRoute> { backStackEntry ->
+                    val route: PickupRequestRoute = backStackEntry.toRoute()
+                    val vm: PickupViewModel = viewModel(
+                        factory = viewModelFactory {
+                            PickupViewModel(
+                                route.studentId,
+                                container.studentsRepository,
+                                container.pickupRepository
+                            )
+                        }
+                    )
+                    PickupRequestScreen(
+                        viewModel = vm,
+                        onNavigateBack = { navController.popBackStack() },
+                        onEarlyLeaveClick = { navController.navigate(PickupEarlyLeaveRoute(route.studentId)) },
+                        onRequestSuccess = { requestId ->
+                            navController.navigate(PickupTrackingRoute(requestId)) {
+                                popUpTo<PickupRequestRoute> { inclusive = true }
+                            }
+                        }
+                    )
+                }
+
+                composable<PickupTrackingRoute> { backStackEntry ->
+                    val route: PickupTrackingRoute = backStackEntry.toRoute()
+                    PickupTrackingScreen(
+                        requestId = route.requestId,
+                        pickupRepository = container.pickupRepository,
+                        onNavigateBack = { navController.popBackStack() }
+                    )
+                }
+
+                composable<PickupEarlyLeaveRoute> { backStackEntry ->
+                    val route: PickupEarlyLeaveRoute = backStackEntry.toRoute()
+                    val vm: PickupViewModel = viewModel(
+                        factory = viewModelFactory {
+                            PickupViewModel(
+                                route.studentId,
+                                container.studentsRepository,
+                                container.pickupRepository
+                            )
+                        }
+                    )
+                    PickupEarlyLeaveScreen(
+                        viewModel = vm,
+                        onNavigateBack = { navController.popBackStack() },
+                        onRequestSuccess = { requestId ->
+                            navController.navigate(PickupTrackingRoute(requestId)) {
+                                popUpTo<PickupEarlyLeaveRoute> { inclusive = true }
+                            }
+                        }
+                    )
+                }
+
+                // ---- Supervisor Graph ----
+                composable<SupervisorPickupRoute> {
+                    val vm: SupervisorGateViewModel = viewModel(
+                        factory = viewModelFactory {
+                            SupervisorGateViewModel(container.pickupRepository)
+                        }
+                    )
+                    SupervisorPickupScreen(
+                        viewModel = vm,
+                        onNavigateToHandover = { requestId ->
+                            navController.navigate(SupervisorHandoverRoute(requestId))
+                        }
+                    )
+                }
+
+                composable<SupervisorHandoverRoute> { backStackEntry ->
+                    val route: SupervisorHandoverRoute = backStackEntry.toRoute()
+                    val vm: SupervisorGateViewModel = viewModel(
+                        factory = viewModelFactory {
+                            SupervisorGateViewModel(container.pickupRepository)
+                        }
+                    )
+                    SupervisorHandoverScreen(
+                        requestId = route.requestId,
+                        viewModel = vm,
+                        onNavigateBack = { navController.popBackStack() }
+                    )
                 }
             }
         }

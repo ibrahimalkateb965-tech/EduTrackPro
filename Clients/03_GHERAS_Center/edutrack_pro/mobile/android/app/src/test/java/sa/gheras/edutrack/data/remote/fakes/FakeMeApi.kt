@@ -20,6 +20,7 @@ import sa.gheras.edutrack.data.remote.dto.InstallmentDto
 import sa.gheras.edutrack.data.remote.dto.LessonLogBody
 import sa.gheras.edutrack.data.remote.dto.LessonLogDto
 import sa.gheras.edutrack.data.remote.dto.NotificationDto
+import sa.gheras.edutrack.data.remote.dto.PickupDelegatesResponse
 import sa.gheras.edutrack.data.remote.dto.ProfileCenterDto
 import sa.gheras.edutrack.data.remote.dto.ProfileDto
 import sa.gheras.edutrack.data.remote.dto.ProfileScopeDto
@@ -57,6 +58,7 @@ class FakeMeApi : MeApi {
     override suspend fun listSkillProgress(limit: Int, offset: Int, studentId: String?, subject: String?) = Envelope<SkillProgressDto>()
     override suspend fun listInstallments(limit: Int, offset: Int, studentId: String?, status: String?) = Envelope<InstallmentDto>()
     override suspend fun listReceipts(limit: Int, offset: Int, studentId: String?) = Envelope<ReceiptDto>()
+    override suspend fun listPickupDelegates(): PickupDelegatesResponse = PickupDelegatesResponse(emptyList())
     override suspend fun postAttendanceBatch(items: List<AttendanceItemBody>) = Response.success(Unit)
     override suspend fun postDailyEvaluationsBatch(items: List<DailyEvalItemBody>) = Response.success(Unit)
     override suspend fun postAssignment(body: CreateAssignmentBody) = AssignmentDto(

@@ -180,6 +180,8 @@ fun AccountScreen(
                             Role.TEACHER -> "معلم"
                             Role.GUARDIAN -> "ولي أمر"
                             Role.STUDENT -> "طالب"
+                            Role.SUPERVISOR -> "مشرفة"
+                            Role.MANAGER -> "مدير"
                             null -> ""
                         }
                         if (roleLabel.isNotBlank()) {

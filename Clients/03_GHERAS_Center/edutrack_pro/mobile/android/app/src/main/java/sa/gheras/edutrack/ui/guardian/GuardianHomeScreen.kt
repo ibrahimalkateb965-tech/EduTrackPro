@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.Assignment
 import androidx.compose.material.icons.filled.AutoStories
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CreditCard
+import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.FactCheck
 import androidx.compose.material.icons.filled.Grading
 import androidx.compose.material.icons.filled.HelpOutline
@@ -67,6 +68,7 @@ fun GuardianHomeScreen(
     onLessonsClick: (studentId: String) -> Unit,
     onSkillsClick: (studentId: String) -> Unit,
     onFeesClick: (studentId: String) -> Unit,
+    onPickupClick: (studentId: String) -> Unit = {},
     showFees: Boolean = true,
     modifier: Modifier = Modifier
 ) {
@@ -211,7 +213,18 @@ fun GuardianHomeScreen(
                         )
                     }
 
-                    // 2. Latest Evaluations
+                    // 2. Pickup Request
+                    item {
+                        GuardianActionCard(
+                            title = "طلب استلام الطالب",
+                            subtitle = "استلام عادي أو استئذان مبكر",
+                            icon = Icons.Default.DirectionsCar,
+                            accentColor = MaterialTheme.colorScheme.primary,
+                            onClick = { onPickupClick(child.id) }
+                        )
+                    }
+
+                    // 3. Latest Evaluations
                     item {
                         val evalsSummary = if (state.latestEvaluations.isNotEmpty()) {
                             state.latestEvaluations.joinToString(" • ") { "${it.subject}: ${Num.formatInt(it.value.toInt())}/10" }
@@ -227,7 +240,7 @@ fun GuardianHomeScreen(
                         )
                     }
 
-                    // 3. Homework Due
+                    // 4. Homework Due
                     item {
                         GuardianActionCard(
                             title = "الواجبات والتكليفات",
@@ -241,7 +254,7 @@ fun GuardianHomeScreen(
                         )
                     }
 
-                    // 4. Lessons & Curriculum
+                    // 5. Lessons & Curriculum
                     item {
                         GuardianActionCard(
                             title = "الدروس وسجل الحصص",
@@ -251,7 +264,7 @@ fun GuardianHomeScreen(
                         )
                     }
 
-                    // 5. Skills
+                    // 6. Skills
                     item {
                         GuardianActionCard(
                             title = "المهارات المكتسبة",
@@ -261,7 +274,7 @@ fun GuardianHomeScreen(
                         )
                     }
 
-                    // 6. Fees (Hidden for student role)
+                    // 7. Fees (Hidden for student role)
                     if (showFees) {
                         item {
                             val feeSubtitle = if (state.nextUnpaidInstallment != null) {

@@ -10,6 +10,7 @@ import sa.gheras.edutrack.data.dao.EvaluationDao
 import sa.gheras.edutrack.data.dao.InstallmentDao
 import sa.gheras.edutrack.data.dao.LessonLogDao
 import sa.gheras.edutrack.data.dao.NotificationDao
+import sa.gheras.edutrack.data.dao.PickupDao
 import sa.gheras.edutrack.data.dao.PendingWriteDao
 import sa.gheras.edutrack.data.dao.ReceiptDao
 import sa.gheras.edutrack.data.dao.RoomDao
@@ -26,6 +27,7 @@ import sa.gheras.edutrack.data.entity.EvaluationEntity
 import sa.gheras.edutrack.data.entity.InstallmentEntity
 import sa.gheras.edutrack.data.entity.LessonLogEntity
 import sa.gheras.edutrack.data.entity.NotificationEntity
+import sa.gheras.edutrack.data.entity.PickupDelegateEntity
 import sa.gheras.edutrack.data.entity.PendingWriteEntity
 import sa.gheras.edutrack.data.entity.ReceiptEntity
 import sa.gheras.edutrack.data.entity.RoomEntity
@@ -49,6 +51,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         LessonLogEntity::class,
         NotificationEntity::class,
         PendingWriteEntity::class,
+        PickupDelegateEntity::class,
         ReceiptEntity::class,
         RoomEntity::class,
         ScheduleEntity::class,
@@ -59,7 +62,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         SubmissionFileEntity::class,
         SyncStateEntity::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -71,6 +74,7 @@ abstract class GherasDatabase : RoomDatabase() {
     abstract fun installmentDao(): InstallmentDao
     abstract fun lessonLogDao(): LessonLogDao
     abstract fun notificationDao(): NotificationDao
+    abstract fun pickupDao(): PickupDao
     abstract fun pendingWriteDao(): PendingWriteDao
     abstract fun receiptDao(): ReceiptDao
     abstract fun roomDao(): RoomDao
@@ -88,7 +92,8 @@ abstract class GherasDatabase : RoomDatabase() {
      * Clears run in reverse-dependency order so every `RESTRICT` foreign key holds at each step:
      * submission_files → submissions → assignment_students → assignments →
      * student_attendance / evaluations / skill_progress / lesson_logs →
-     * receipts → installments → students → schedules → rooms (notifications are FK-free).
+     * pickup_delegates → receipts → installments → students →
+     * schedules → rooms (notifications are FK-free).
      * Inserts then run in forward (parent-first) order.
      *
      * `pending_writes` is never cleared by a pull; after the upserts, [reapplyPending] receives the
@@ -111,6 +116,7 @@ abstract class GherasDatabase : RoomDatabase() {
         lessonLogDao().clear()
         receiptDao().clearAll()
         installmentDao().clearAll()
+        pickupDao().clearAll()
         studentDao().clear()
         scheduleDao().clear()
         roomDao().clear()
@@ -120,6 +126,7 @@ abstract class GherasDatabase : RoomDatabase() {
         roomDao().upsertAll(payload.rooms)
         scheduleDao().upsertAll(payload.schedules)
         studentDao().upsertAll(payload.students)
+        pickupDao().upsertAll(payload.pickupDelegates)
         installmentDao().upsertAll(payload.installments)
         receiptDao().upsertAll(payload.receipts)
         studentAttendanceDao().upsertAll(payload.attendance)
@@ -167,6 +174,30 @@ abstract class GherasDatabase : RoomDatabase() {
         val MIGRATION_3_4 = object : Migration(3, 4) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE students ADD COLUMN photo_url TEXT")
+            }
+        }
+
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `pickup_delegates` (
+                        `id` TEXT NOT NULL,
+                        `student_id` TEXT NOT NULL,
+                        `name` TEXT NOT NULL,
+                        `phone` TEXT NOT NULL,
+                        `relation` TEXT NOT NULL,
+                        `is_approved` INTEGER NOT NULL DEFAULT 1,
+                        `client_request_id` TEXT,
+                        `national_id_masked` TEXT,
+                        `created_at` TEXT,
+                        `updated_at` TEXT,
+                        `deleted_at` TEXT,
+                        PRIMARY KEY(`id`),
+                        FOREIGN KEY(`student_id`) REFERENCES `students`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT
+                    )
+                """.trimIndent())
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_pickup_delegates_student_id` ON `pickup_delegates` (`student_id`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_pickup_delegates_client_request_id` ON `pickup_delegates` (`client_request_id`)")
             }
         }
     }

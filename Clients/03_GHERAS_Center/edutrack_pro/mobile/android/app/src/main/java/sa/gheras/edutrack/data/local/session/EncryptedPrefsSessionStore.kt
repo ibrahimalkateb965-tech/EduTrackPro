@@ -73,6 +73,8 @@ class EncryptedPrefsSessionStore(private val context: Context) : SessionStore {
                 val role = when {
                     roleStr.contains("STUDENT") -> Role.STUDENT
                     roleStr.contains("GUARDIAN") -> Role.GUARDIAN
+                    roleStr.contains("SUPERVISOR") -> Role.SUPERVISOR
+                    roleStr.contains("MANAGER") -> Role.MANAGER
                     else -> Role.TEACHER
                 }
                 SessionUser(

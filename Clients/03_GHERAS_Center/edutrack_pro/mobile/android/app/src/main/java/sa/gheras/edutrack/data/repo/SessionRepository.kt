@@ -71,9 +71,11 @@ class SessionRepository(
                 "teacher" -> Role.TEACHER
                 "guardian" -> Role.GUARDIAN
                 "student" -> Role.STUDENT
+                "supervisor" -> Role.SUPERVISOR
+                "manager" -> Role.MANAGER
                 else -> {
                     try { authApi.logout() } catch (_: Exception) {}
-                    return@withContext Result.failure(IllegalStateException("هذا التطبيق مخصص للطلاب وأولياء الأمور والمعلمين — استخدم لوحة التحكم على الويب"))
+                    return@withContext Result.failure(IllegalStateException("هذا التطبيق مخصص للطلاب وأولياء الأمور والمعلمين والإداريين — استخدم لوحة التحكم على الويب"))
                 }
             }
             val user = SessionUser(
@@ -90,16 +92,18 @@ class SessionRepository(
 
             store.saveLogin(response.token, user)
 
-            // Profile check
-            try {
-                val profile = meApi.profile()
-                store.saveProfile(profile)
-            } catch (e: Exception) {
-                if (e is retrofit2.HttpException && e.code() == 403) {
-                    store.clear()
-                    db.clearAllTables()
-                    _state.value = SessionState.SignedOut
-                    return@withContext Result.failure(e)
+            // Profile check (skipped for staff roles: /me/profile returns 403)
+            if (role != Role.SUPERVISOR && role != Role.MANAGER) {
+                try {
+                    val profile = meApi.profile()
+                    store.saveProfile(profile)
+                } catch (e: Exception) {
+                    if (e is retrofit2.HttpException && e.code() == 403) {
+                        store.clear()
+                        db.clearAllTables()
+                        _state.value = SessionState.SignedOut
+                        return@withContext Result.failure(e)
+                    }
                 }
             }
 
@@ -127,9 +131,11 @@ class SessionRepository(
                 "teacher" -> Role.TEACHER
                 "guardian" -> Role.GUARDIAN
                 "student" -> Role.STUDENT
+                "supervisor" -> Role.SUPERVISOR
+                "manager" -> Role.MANAGER
                 else -> {
                     try { authApi.logout() } catch (_: Exception) {}
-                    return@withContext Result.failure(IllegalStateException("هذا التطبيق مخصص للطلاب وأولياء الأمور والمعلمين — استخدم لوحة التحكم على الويب"))
+                    return@withContext Result.failure(IllegalStateException("هذا التطبيق مخصص للطلاب وأولياء الأمور والمعلمين والإداريين — استخدم لوحة التحكم على الويب"))
                 }
             }
             val user = SessionUser(
@@ -146,16 +152,18 @@ class SessionRepository(
 
             store.saveLogin(response.token, user)
 
-            // Profile check
-            try {
-                val profile = meApi.profile()
-                store.saveProfile(profile)
-            } catch (e: Exception) {
-                if (e is retrofit2.HttpException && e.code() == 403) {
-                    store.clear()
-                    db.clearAllTables()
-                    _state.value = SessionState.SignedOut
-                    return@withContext Result.failure(e)
+            // Profile check (skipped for staff roles: /me/profile returns 403)
+            if (role != Role.SUPERVISOR && role != Role.MANAGER) {
+                try {
+                    val profile = meApi.profile()
+                    store.saveProfile(profile)
+                } catch (e: Exception) {
+                    if (e is retrofit2.HttpException && e.code() == 403) {
+                        store.clear()
+                        db.clearAllTables()
+                        _state.value = SessionState.SignedOut
+                        return@withContext Result.failure(e)
+                    }
                 }
             }
 

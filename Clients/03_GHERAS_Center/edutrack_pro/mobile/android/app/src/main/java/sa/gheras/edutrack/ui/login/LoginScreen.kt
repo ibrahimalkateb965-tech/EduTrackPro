@@ -226,7 +226,7 @@ fun LoginScreen(
                     val roles = listOf(
                         Triple(Role.STUDENT, "طالب", "🎓"),
                         Triple(Role.GUARDIAN, "ولي أمر", "👨‍👩‍👧"),
-                        Triple(Role.TEACHER, "معلم", "👨‍🏫")
+                        Triple(Role.TEACHER, "معلم / كادر", "👨‍🏫")
                     )
                     roles.forEach { (role, label, emoji) ->
                         val isSelected = state.selectedRole == role
@@ -275,7 +275,7 @@ fun LoginScreen(
                         label = {
                             Text(
                                 when (state.selectedRole) {
-                                    Role.TEACHER -> "رقم الجوال أو اسم المستخدم أو الهوية"
+                                    Role.TEACHER, Role.SUPERVISOR, Role.MANAGER -> "رقم الجوال أو اسم المستخدم أو الهوية"
                                     Role.GUARDIAN -> "رقم الجوال أو رقم الهوية"
                                     Role.STUDENT -> "رقم الجوال أو الهوية أو الإقامة"
                                 }
@@ -505,7 +505,7 @@ fun LoginScreen(
                     label = {
                         Text(
                             when (state.selectedRole) {
-                                Role.TEACHER -> "رقم الجوال أو اسم المستخدم أو الهوية"
+                                Role.TEACHER, Role.SUPERVISOR, Role.MANAGER -> "رقم الجوال أو اسم المستخدم أو الهوية"
                                 Role.GUARDIAN -> "رقم الجوال أو رقم الهوية"
                                 Role.STUDENT -> "رقم الجوال أو الهوية أو الإقامة"
                             }

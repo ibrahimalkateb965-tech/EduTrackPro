@@ -82,9 +82,29 @@ class SessionRepositoryTest {
     }
 
     @Test
-    fun testRoleGate_rejectsManager() = runTest {
+    fun testRoleGate_manager_mapsToManager() = runTest {
         fakeAuth.loginUserRole = "manager"
         val result = repo.login("manager1", "password123")
+        assertTrue(result.isSuccess)
+        val user = result.getOrThrow()
+        assertEquals(Role.MANAGER, user.role)
+        assertTrue(repo.state.value is SessionState.Active)
+    }
+
+    @Test
+    fun testRoleGate_supervisor_mapsToSupervisor() = runTest {
+        fakeAuth.loginUserRole = "supervisor"
+        val result = repo.login("supervisor1", "password123")
+        assertTrue(result.isSuccess)
+        val user = result.getOrThrow()
+        assertEquals(Role.SUPERVISOR, user.role)
+        assertTrue(repo.state.value is SessionState.Active)
+    }
+
+    @Test
+    fun testRoleGate_unknownRole_fails() = runTest {
+        fakeAuth.loginUserRole = "unknown_role_xyz"
+        val result = repo.login("user1", "password123")
         assertTrue(result.isFailure)
         assertEquals(SessionState.SignedOut, repo.state.value)
     }

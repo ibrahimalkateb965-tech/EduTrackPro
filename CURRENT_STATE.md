@@ -893,6 +893,27 @@ Request: explore `github.com/morluto/rea`, register it in Claude Code, and adopt
 - **(b)** Verify REA after restart (`/mcp` shows `rea` connected), then a static JS/ASAR smoke run.
 - **(c)** Supply `jadx-headless-mcp 0.7.1`, set `REA_JADX_MCP_JAR`, then run an authorized REA audit of the EduTrack `app-debug.apk` (leaked secrets, API hosts, R8 residue).
 
+---
+
+## 24. Session 2026-10-21 — Milestone M1 (استلام الأبناء - Child Pickup & Gate Handover) Certified [APPROVED]
+
+Milestone M1 has been formally audited, verified, and certified with the **`[APPROVED]`** seal by Master Orchestrator **Claude Code CLI (Opus Max)** under Hook 31 (Fleet Teamwork) & Re-Audit #5.
+
+| Step / Gate | Executor | Result | Verification & Evidence |
+| :--- | :--- | :---: | :--- |
+| **Server Backend (S-B0..S-B7)** | OpenCode CLI (`GLM 5.3 Flash`) | ✅ **[APPROVED]** | Pytest 4-file suite **96/96** pass with `PGTZ='<+03>-03'`. P1 (`test_no_raw_national_id_in_any_response`) and P2 (`test_terminal_status_readable_by_guardian`) green. Migration 016 verified idempotent. Single-prefix route `/api/v1/pickup/...` verified. |
+| **Android Client (A-B1..A-B13g)** | OpenCode CLI + agcli | ✅ **[APPROVED]** | Gradle `testDebugUnitTest --rerun-tasks`: **178/178 passed (0 failures)** across 2 consecutive runs. Reviewer patch R6 applied. Masked DTOs, room transaction stability, and single-prefix Retrofit endpoints verified. |
+| **Defect Q1 (Double Prefix)** | Multi-CLI Fleet | ✅ **CLOSED** | Stripped `api/v1/` from `PickupApi.kt`; removed redundant router mount from `main.py`. Red check passed: re-introducing double prefix fails test. |
+| **Defect Q2 (Private Captures)** | Multi-CLI Fleet | ✅ **CLOSED** | Purged all temporary captures containing external dialogs. Only 4 clean app screenshots retained. |
+| **Live Run Gate (K4 / [C-96])** | agcli on real hardware | ✅ **[APPROVED]** | Full lifecycle run on connected Samsung Galaxy S25 Ultra (`RFGYB0QPVTA`) against local FastAPI / pgserver. Verified via raw server logs (`127.0.0.1:8000`), Postgres `dismissals` row (`fd7c6cd1-14d4-4713-856d-5a441d588687`), and 4 device screenshots. Polling loop cessation confirmed upon terminal `completed` status. |
+| **Milestone M2 Status** | Claude Code CLI | 🔓 **UNLOCKED** | Gate K4 satisfied. Milestone M2 is officially unlocked and ready for implementation. |
+
+### Standing Items & Next Actions:
+- Commit all M1 code and test additions to Git.
+- Execute `/strategic-clear` and `/clear` before commencing Milestone M2 to preserve peak attention fidelity (30k–300k sweet spot).
+- Non-blocking item Y2 (`TeacherChildPrepScreen` auto-`startPrep` refinement) scheduled for the first batch of Milestone M2.
+
+
 
 
 

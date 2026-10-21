@@ -26,6 +26,7 @@ import sa.gheras.edutrack.data.remote.dto.InstallmentDto
 import sa.gheras.edutrack.data.remote.dto.LessonLogBody
 import sa.gheras.edutrack.data.remote.dto.LessonLogDto
 import sa.gheras.edutrack.data.remote.dto.NotificationDto
+import sa.gheras.edutrack.data.remote.dto.PickupDelegatesResponse
 import sa.gheras.edutrack.data.remote.dto.ProfileDto
 import sa.gheras.edutrack.data.remote.dto.ReceiptDto
 import sa.gheras.edutrack.data.remote.dto.RoomDto
@@ -151,6 +152,9 @@ interface MeApi {
         @Query("offset") offset: Int = 0,
         @Query("student_id") studentId: String? = null
     ): Envelope<ReceiptDto>
+
+    @GET("me/pickup-delegates")
+    suspend fun listPickupDelegates(): PickupDelegatesResponse
 
     @POST("attendance/students")
     suspend fun postAttendanceBatch(@Body items: List<AttendanceItemBody>): Response<Unit>

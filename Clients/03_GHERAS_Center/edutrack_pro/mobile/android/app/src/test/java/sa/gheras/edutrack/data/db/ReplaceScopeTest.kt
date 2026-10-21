@@ -7,6 +7,7 @@ import app.cash.turbine.test
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -19,6 +20,7 @@ import sa.gheras.edutrack.data.entity.InstallmentEntity
 import sa.gheras.edutrack.data.entity.LessonLogEntity
 import sa.gheras.edutrack.data.entity.NotificationEntity
 import sa.gheras.edutrack.data.entity.PendingWriteEntity
+import sa.gheras.edutrack.data.entity.PickupDelegateEntity
 import sa.gheras.edutrack.data.entity.ReceiptEntity
 import sa.gheras.edutrack.data.entity.RoomEntity
 import sa.gheras.edutrack.data.entity.ScheduleEntity
@@ -243,10 +245,24 @@ class ReplaceScopeTest {
             updatedAt = now
         )
 
+        val delegate = PickupDelegateEntity(
+            id = "del_1",
+            studentId = "student_1",
+            name = "Uncle Khalid",
+            nationalIdMasked = "10******32",
+            phone = "0555555555",
+            relation = "Uncle",
+            isApproved = true,
+            deletedAt = null,
+            createdAt = now,
+            updatedAt = now
+        )
+
         return ScopePayload(
             rooms = listOf(room),
             schedules = listOf(schedule),
             students = listOf(student),
+            pickupDelegates = listOf(delegate),
             installments = listOf(installment),
             receipts = listOf(receipt),
             attendance = listOf(attendance),
@@ -421,5 +437,26 @@ class ReplaceScopeTest {
         assertEquals("Ahmad", db.studentDao().getById("student_1")?.name)
         assertEquals("Child rows must survive rollback too", 1, countRows("receipts"))
         assertEquals("Outbox must be untouched", 1, countRows("pending_writes"))
+    }
+
+    @Test
+    fun testReplaceAllClearsAndUpsertsPickupDelegates() = runTest {
+        // 1. Insert scope containing one delegate
+        db.replaceAll(createInitialPayload())
+        assertEquals(1, countRows("pickup_delegates"))
+        assertEquals("Uncle Khalid", db.pickupDao().getDelegateById("del_1")?.name)
+
+        // 2. Replace with an empty snapshot — pickup_delegates must be cleared
+        // (a payload with only rooms would leave a dangling FK if pickup_delegates were kept)
+        db.replaceAll(ScopePayload(rooms = listOf(RoomEntity(
+            id = "room_1",
+            branchId = "branch_1",
+            name = "Room A",
+            groupName = "Group 1",
+            createdAt = now,
+            updatedAt = now
+        ))))
+        assertEquals(0, countRows("pickup_delegates"))
+        assertNull(db.pickupDao().getDelegateById("del_1"))
     }
 }

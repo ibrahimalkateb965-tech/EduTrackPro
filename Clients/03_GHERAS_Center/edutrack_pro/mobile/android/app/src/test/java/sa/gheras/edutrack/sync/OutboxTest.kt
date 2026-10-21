@@ -9,12 +9,14 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import sa.gheras.edutrack.data.db.GherasDatabase
 import sa.gheras.edutrack.data.entity.EvaluationEntity
+import sa.gheras.edutrack.data.entity.PickupDelegateEntity
 import sa.gheras.edutrack.data.entity.PendingWriteEntity
 import sa.gheras.edutrack.data.entity.RoomEntity
 import sa.gheras.edutrack.data.entity.StudentEntity
@@ -245,5 +247,116 @@ class OutboxTest {
         // Table should be empty again
         assertEquals(0, countRows("evaluations"))
         assertNull(db.evaluationDao().getById("local:student_1:2026-09-21:القرآن"))
+    }
+
+    @Test
+    fun testEnqueue_createPickupDelegate_appliesOptimisticProjection() = runTest {
+        seedStudent("student_1")
+
+        val payload = "{\"student_id\":\"student_1\",\"name\":\"Mohammed\",\"national_id\":\"1234567890\",\"phone\":\"0551234567\",\"relation\":\"uncle\",\"client_request_id\":\"cr_1\"}"
+        outbox.enqueue(
+            kind = PendingWriteEntity.KIND_CREATE_PICKUP_DELEGATE,
+            naturalKey = "create_delegate:student_1:cr_1",
+            payloadJson = payload
+        )
+
+        // 1. Pending write row inserted
+        assertEquals(1, countRows("pending_writes"))
+        val pending = db.pendingWriteDao().getByNaturalKey("create_delegate:student_1:cr_1")
+        assertNotNull(pending)
+        assertEquals(PendingWriteEntity.KIND_CREATE_PICKUP_DELEGATE, pending?.kind)
+
+        // 2. Optimistic projection present locally in pickup_delegates table
+        db.pickupDao().observeDelegatesByStudent("student_1").test {
+            val delegates = awaitItem()
+            assertEquals(1, delegates.size)
+
+            val created = delegates.first()
+            assertTrue("Delegate id must be locally generated", created.id.startsWith("local:"))
+            assertEquals("Mohammed", created.name)
+            assertEquals("0551234567", created.phone)
+            assertEquals("uncle", created.relation)
+            assertEquals("Student id must match the payload", "student_1", created.studentId)
+            assertTrue(created.isApproved)
+            assertEquals("12******90", created.nationalIdMasked)
+            assertEquals("cr_1", created.clientRequestId)
+            assertNotNull(created.createdAt)
+            assertNotNull(created.updatedAt)
+            assertNull(created.deletedAt)
+
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun testRevertOptimisticProjection_createPickupDelegate_softDeletesDelegate() = runTest {
+        seedStudent("student_1")
+
+        // Payload carries a locally reserved delegate id so revert can target the projected row
+        val payload = "{\"id\":\"local:delegate_1\",\"student_id\":\"student_1\",\"name\":\"Mohammed\",\"national_id\":\"1234567890\",\"phone\":\"0551234567\",\"relation\":\"uncle\"}"
+        outbox.enqueue(
+            kind = PendingWriteEntity.KIND_CREATE_PICKUP_DELEGATE,
+            naturalKey = "create_delegate:student_1:cr_2",
+            payloadJson = payload
+        )
+        assertEquals(1, countRows("pickup_delegates"))
+        assertNotNull(db.pickupDao().getDelegateById("local:delegate_1"))
+
+        val pending = db.pendingWriteDao().getByNaturalKey("create_delegate:student_1:cr_2")
+        assertNotNull(pending)
+
+        // Simulate permanent failure: revert must soft-delete the projected delegate
+        OutboxWorker.revertOptimisticProjection(pending!!, db)
+
+        // getDelegateById filters deleted_at IS NULL, so the soft-deleted row is invisible
+        assertNull(db.pickupDao().getDelegateById("local:delegate_1"))
+        // Row still exists on disk (soft delete, not a hard removal)
+        assertEquals(1, countRows("pickup_delegates"))
+    }
+
+    @Test
+    fun testEnqueue_deletePickupDelegate_appliesOptimisticSoftDelete() = runTest {
+        seedStudent("student_1")
+
+        val now = Instant.now()
+        db.pickupDao().upsert(
+            PickupDelegateEntity(
+                id = "delegate_1",
+                studentId = "student_1",
+                name = "Mohammed",
+                phone = "0551234567",
+                relation = "uncle",
+                isApproved = true,
+                clientRequestId = null,
+                nationalIdMasked = null,
+                createdAt = now,
+                updatedAt = now,
+                deletedAt = null
+            )
+        )
+        assertNotNull(db.pickupDao().getDelegateById("delegate_1"))
+
+        val payload = "{\"delegate_id\":\"delegate_1\",\"student_id\":\"student_1\"}"
+        outbox.enqueue(
+            kind = PendingWriteEntity.KIND_DELETE_PICKUP_DELEGATE,
+            naturalKey = "delete_delegate:delegate_1",
+            payloadJson = payload
+        )
+
+        // 1. Pending write row inserted
+        assertEquals(1, countRows("pending_writes"))
+        val pending = db.pendingWriteDao().getByNaturalKey("delete_delegate:delegate_1")
+        assertNotNull(pending)
+        assertEquals(PendingWriteEntity.KIND_DELETE_PICKUP_DELEGATE, pending?.kind)
+
+        // 2. Optimistic soft delete: live query no longer sees the delegate
+        assertNull(db.pickupDao().getDelegateById("delegate_1"))
+        // Soft delete keeps the row on disk so the projection stays revertable
+        assertEquals(1, countRows("pickup_delegates"))
+        val softDeleted = db.query("SELECT deleted_at FROM pickup_delegates WHERE id = 'delegate_1'", null).use { cursor ->
+            cursor.moveToFirst()
+            cursor.getString(0)
+        }
+        assertNotNull("Soft delete must stamp deleted_at", softDeleted)
     }
 }

@@ -14,6 +14,7 @@ import sa.gheras.edutrack.data.repo.mappers.AcademicMappers
 import sa.gheras.edutrack.data.repo.mappers.AssignmentMappers
 import sa.gheras.edutrack.data.repo.mappers.FeesMappers
 import sa.gheras.edutrack.data.repo.mappers.NotificationMappers
+import sa.gheras.edutrack.data.repo.mappers.PickupMappers
 import sa.gheras.edutrack.data.repo.mappers.ScheduleMappers
 import sa.gheras.edutrack.data.repo.mappers.StudentMappers
 import java.time.Instant
@@ -51,6 +52,14 @@ class PullSync(
                 _status.value = SyncStatus.Idle
                 return@withContext false
             }
+
+            // Staff roles use the web dashboard; /me/* mobile pull-sync is not applicable
+            if (user.role == Role.SUPERVISOR || user.role == Role.MANAGER) {
+                _status.value = SyncStatus.Idle
+                _lastSyncAt.value = Instant.now()
+                return@withContext true
+            }
+
             val isTeacher = user.role == Role.TEACHER
 
             // 1. Profile
@@ -116,12 +125,19 @@ class PullSync(
                 rcptDtoList.map { FeesMappers.receiptToEntity(it) }
             } else emptyList()
 
+            // 12. Pickup delegates (guardian only)
+            val delegateEntities = if (user.role == Role.GUARDIAN) {
+                val delegatesResponse = meApi.listPickupDelegates()
+                delegatesResponse.delegates.map { PickupMappers.delegateToEntity(it) }
+            } else emptyList()
+
             val payload = ScopePayload(
                 rooms = allRooms,
                 schedules = scheduleEntities,
                 students = studentEntities,
                 installments = instEntities,
                 receipts = rcptEntities,
+                pickupDelegates = delegateEntities,
                 attendance = attEntities,
                 evaluations = evalEntities,
                 skillProgress = skillEntities,

@@ -59,7 +59,7 @@ This document is the canonical entry point for all AI agents, coding assistants,
 ### Pillar 2: AI Solutions & Autonomous Agentic Systems
 - **Root Directories**: `.agents/`, `tools/`, `scripts/`
 - **Capabilities**:
-  - Autonomous multi-agent pipelines (Fleet Orchestrator, Sub-agents under `.agents/Sub_Agent/`).
+  - Autonomous multi-agent pipelines (Fleet Orchestrator, Sub-agents under `.agents/agents/` with legacy fallback to `.agents/Sub_Agent/`).
   - Production-grade **FastMCP** server construction and tool exposure.
   - **n8n** automation workflows, webhook processors, and LLM router architectures.
   - Visualization & System Architecture: **Autovem Flowchart Studio** (`tools/flowchart_studio/`) for 4K architectural diagramming with WCAG AA compliance.
@@ -111,7 +111,7 @@ Autovemtech operates an autonomous multi-CLI fleet governed by [fleet_config.jso
                    ▼                                  ▼
 ┌──────────────────────────────────────┐  ┌─────────────────────────────────────────────────────────────┐
 │     CODEX CLI / CHATGPT DESKTOP      │  │                 OPENCODE CLI (PAID GO EXECUTOR)             │
-│           (GPT-5.6 Soul)             │  │ ┌─────────────────────────────────────────────────────────┐ │
+│           (GPT-6.1 Soul)             │  │ ┌─────────────────────────────────────────────────────────┐ │
 │ Algorithmic Logic • Complex Refactor │  │ │ Worker A: GLM 5.3 Flash (opencode-go/glm-5.3-flash)     │ │
 │ Deep Optimizations • Data Parsers    │  │ │ Fast Terminal, Builds, Scaffolding, DB & Backend Logic  │ │
 └──────────────────────────────────────┘  │ └─────────────────────────────────────────────────────────┘ │
@@ -143,11 +143,11 @@ Autovemtech operates an autonomous multi-CLI fleet governed by [fleet_config.jso
 
 | Agent Entity | Tool / Harness | Model / Invocation | Core Operational Role |
 | :--- | :--- | :--- | :--- |
-| **Claude Code CLI** | `claude` | Opus Max / Sonnet 5 | Master Orchestrator, Staff Architect, **Sole Testing Authority**, Quality Gatekeeper. |
-| **Codex CLI / Desktop** | `codex` / ChatGPT Desktop | GPT-5.6 Soul / gpt-6-astra | Algorithmic logic, complex math engines, heavy refactoring, data pipelines. |
-| **OpenCode CLI (Worker A)** | `opencode` (Flash) | `-m opencode-go/glm-5.3-flash` | **Primary Paid Fast Executor**: Shell commands, CLI build tasks, database migrations, DAOs, repositories, backend endpoints (NO TESTING; **MAX 1 instance of GLM concurrently**). |
+| **Claude Code CLI** | `claude` | Opus Max / Sonnet 5 (Frontier Coding Tier) | Master Orchestrator, Staff Architect, **Sole Testing Authority**, Quality Gatekeeper. |
+| **Codex CLI / Desktop** | `codex` / ChatGPT Desktop | GPT-6.1 Soul / gpt-6.1-soul | Algorithmic logic, complex math engines, heavy refactoring, data pipelines. |
+| **OpenCode CLI (Worker A)** | `opencode` (Flash) | `-m opencode-go/glm-5.3-flash` (or newest code tier) | **Primary Paid Fast Executor**: Shell commands, CLI build tasks, database migrations, DAOs, repositories, backend endpoints (NO TESTING; **MAX 1 instance of GLM concurrently**). |
 | **Cline CLI (Worker B)** | `cline` (Flash) | `glm-5.3-flash (medium)` | **Parallel UI & Scaffolding**: Runs concurrently with Worker A. Rapid terminal tasks, defaults to Act mode with Auto-approve. ($0.00) |
-| **Antigravity CLI (`agcli`)** | `agcli` | Gemini 3.8 Flash High | **Autonomous Terminal Executor**: Headless generation of UI components, Jetpack Compose, Web views, and domain logic. |
+| **Antigravity CLI (`agcli`)** | `agcli` | Gemini 3.8 Flash High (or newest Gemini code tier) | **Autonomous Terminal Executor**: Headless generation of UI components, Jetpack Compose, Web views, and domain logic. |
 | **Antigravity IDE** | Editor Workbench | Gemini 3.8 Flash High | **Interactive Human-AI Cockpit**: High-level strategy, consultation, visual inspection, monitoring real-time outputs, and manually refining/optimizing commands with the user *before* routing them to the CLI fleet. **Never target Antigravity IDE with automated CLI delegate prompts.** |
 
 ### Dual-Harness Concurrency Invariants
@@ -169,6 +169,13 @@ Autovemtech operates an autonomous multi-CLI fleet governed by [fleet_config.jso
 > 1. **Antigravity IDE** leads field execution, DOM inspection, complex browser tasks via `browser_subagent`, and local workspace file modifications.
 > 2. **Claude Code CLI** is queried headlessly in the background via `claude -p "..."` for high-level architectural arbitration, edge-case auditing, and exclusive testing/verification gates.
 > 3. Zero manual copy-pasting; saves >80% tokens on Opus Max and guarantees robust browser session stability.
+
+### Two-Stage Phased Dispatch & Anti-Hollow Build Standard ([C-103])
+> [!IMPORTANT]
+> **Anti-Hollow Build Mandate**: When launching autonomous/turbo background workers for full-stack systems requiring external credentials or services (Discord bots, Sentry DSN, GitHub PAT, Temporal Cloud, Payment Gateways):
+> - **Stage 1 (Autonomous Background Scaffolding):** Limit scope strictly to architecture blueprints, code scaffolds, workflow logic, `.env.example`, and an explicit step-by-step human provisioning checklist (`SETUP_CHECKLIST.md`).
+> - **Mandatory Hard Stop Gate:** The agent MUST halt immediately after completing scaffolding and present the human checklist. Never mock credentials or falsely declare completion.
+> - **Stage 2 (Interactive Handshake & Shadow Run):** Live integration testing, webhook binding, and dry-run verification begin ONLY after the user provisions real credentials in `.env`, strictly adhering to Shadow Mode.
 
 ### Token Conservation & Context Window Sweet Spot Governance (Hook 27 & Hook 25)
 Governed by [.agents/CONTEXT_GOVERNANCE.md](file:///f:/AI%20PROJECTS/Autovemtech/.agents/CONTEXT_GOVERNANCE.md):

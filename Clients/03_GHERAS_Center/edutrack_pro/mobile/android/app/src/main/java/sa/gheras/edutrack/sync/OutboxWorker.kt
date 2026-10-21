@@ -10,11 +10,14 @@ import sa.gheras.edutrack.data.entity.PendingWriteEntity
 import sa.gheras.edutrack.data.remote.ErrorMapper
 import sa.gheras.edutrack.data.remote.dto.AttendanceItemBody
 import sa.gheras.edutrack.data.remote.dto.CreateAssignmentBody
+import sa.gheras.edutrack.data.remote.dto.CreateDelegateRequest
 import sa.gheras.edutrack.data.remote.dto.DailyEvalItemBody
 import sa.gheras.edutrack.data.remote.dto.LessonLogBody
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.RequestBody.Companion.asRequestBody
 import sa.gheras.edutrack.data.entity.EvaluationEntity
+import sa.gheras.edutrack.data.entity.PickupDelegateEntity
+import sa.gheras.edutrack.di.AppContainer
 import sa.gheras.edutrack.data.repo.mappers.AssignmentMappers
 import sa.gheras.edutrack.data.repo.mappers.DateParsers
 import java.io.File
@@ -41,7 +44,7 @@ class OutboxWorker(
         var hadWork = false
         for (item in pendingList) {
             try {
-                flushItem(item, meApi, db)
+                flushItem(item, meApi, db, container)
                 // 2xx success: remove row from pending_writes
                 db.pendingWriteDao().deleteById(item.id)
                 hadWork = true
@@ -88,7 +91,8 @@ class OutboxWorker(
     private suspend fun flushItem(
         item: PendingWriteEntity,
         meApi: sa.gheras.edutrack.data.remote.MeApi,
-        db: sa.gheras.edutrack.data.db.GherasDatabase
+        db: sa.gheras.edutrack.data.db.GherasDatabase,
+        container: AppContainer
     ) {
         val json = JSONObject(item.payloadJson)
 
@@ -241,6 +245,21 @@ class OutboxWorker(
                     db.assignmentStudentDao().upsertAll(serverLinks)
                 }
             }
+            PendingWriteEntity.KIND_CREATE_PICKUP_DELEGATE -> {
+                val body = CreateDelegateRequest(
+                    studentId = json.getString("student_id"),
+                    name = json.getString("name"),
+                    nationalId = json.getString("national_id"),
+                    phone = json.getString("phone"),
+                    relation = json.getString("relation"),
+                    clientRequestId = json.optString("client_request_id").takeIf { it.isNotBlank() }
+                )
+                container.pickupApi.createDelegate(body)
+            }
+            PendingWriteEntity.KIND_DELETE_PICKUP_DELEGATE -> {
+                val delegateId = json.getString("delegate_id")
+                container.pickupApi.deleteDelegate(delegateId)
+            }
         }
     }
 
@@ -307,6 +326,20 @@ class OutboxWorker(
                 }
                 if (idsList.isNotEmpty()) {
                     db.notificationDao().restore(idsList)
+                }
+            }
+            PendingWriteEntity.KIND_CREATE_PICKUP_DELEGATE -> {
+                val delegateId = json.optString("id")
+                val existing = if (delegateId.isNotBlank()) db.pickupDao().getDelegateById(delegateId) else null
+                if (existing != null) {
+                    db.pickupDao().upsert(existing.copy(deletedAt = Instant.now()))
+                }
+            }
+            PendingWriteEntity.KIND_DELETE_PICKUP_DELEGATE -> {
+                val delegateId = json.getString("delegate_id")
+                val existing = db.pickupDao().getDelegateByIdIncludingDeleted(delegateId)
+                if (existing != null) {
+                    db.pickupDao().upsert(existing.copy(deletedAt = null))
                 }
             }
         }

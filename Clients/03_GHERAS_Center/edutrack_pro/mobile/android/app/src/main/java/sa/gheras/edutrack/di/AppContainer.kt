@@ -15,7 +15,9 @@ import sa.gheras.edutrack.data.local.session.SessionStore
 import sa.gheras.edutrack.data.remote.AuthApi
 import sa.gheras.edutrack.data.remote.AuthInterceptor
 import sa.gheras.edutrack.data.remote.MeApi
+import sa.gheras.edutrack.data.remote.PickupApi
 import sa.gheras.edutrack.data.repo.OutboxRepository
+import sa.gheras.edutrack.data.repo.PickupRepository
 import sa.gheras.edutrack.data.repo.SessionRepository
 import sa.gheras.edutrack.sync.Outbox
 import sa.gheras.edutrack.sync.PullSync
@@ -29,7 +31,12 @@ class AppContainer(private val context: Context) {
             GherasDatabase::class.java,
             GherasDatabase.DATABASE_NAME
         )
-            .addMigrations(GherasDatabase.MIGRATION_1_2, GherasDatabase.MIGRATION_2_3, GherasDatabase.MIGRATION_3_4)
+            .addMigrations(
+                GherasDatabase.MIGRATION_1_2,
+                GherasDatabase.MIGRATION_2_3,
+                GherasDatabase.MIGRATION_3_4,
+                GherasDatabase.MIGRATION_4_5
+            )
             .fallbackToDestructiveMigrationOnDowngrade()
             .build()
     }
@@ -75,6 +82,10 @@ class AppContainer(private val context: Context) {
 
     val meApi: MeApi by lazy {
         retrofit.create(MeApi::class.java)
+    }
+
+    val pickupApi: PickupApi by lazy {
+        retrofit.create(PickupApi::class.java)
     }
 
     val outbox: Outbox by lazy {
@@ -138,5 +149,13 @@ class AppContainer(private val context: Context) {
 
     val notificationsRepository: sa.gheras.edutrack.data.repo.NotificationsRepository by lazy {
         sa.gheras.edutrack.data.repo.NotificationsRepository(database.notificationDao(), outbox)
+    }
+
+    val pickupRepository: PickupRepository by lazy {
+        PickupRepository(
+            pickupDao = database.pickupDao(),
+            pickupApi = pickupApi,
+            outbox = outbox
+        )
     }
 }

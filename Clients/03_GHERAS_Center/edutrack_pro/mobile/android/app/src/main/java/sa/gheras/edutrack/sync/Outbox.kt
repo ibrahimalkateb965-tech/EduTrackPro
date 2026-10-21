@@ -14,6 +14,7 @@ import sa.gheras.edutrack.data.entity.AssignmentStudentEntity
 import sa.gheras.edutrack.data.entity.EvaluationEntity
 import sa.gheras.edutrack.data.entity.LessonLogEntity
 import sa.gheras.edutrack.data.entity.PendingWriteEntity
+import sa.gheras.edutrack.data.entity.PickupDelegateEntity
 import sa.gheras.edutrack.data.entity.StudentAttendanceEntity
 import sa.gheras.edutrack.data.repo.mappers.DateParsers
 import java.time.Instant
@@ -233,6 +234,39 @@ class Outbox(
                         )
                     }
                     db.assignmentStudentDao().upsertAll(links)
+                }
+            }
+            PendingWriteEntity.KIND_CREATE_PICKUP_DELEGATE -> {
+                val studentId = json.getString("student_id")
+                val name = json.getString("name")
+                val phone = json.getString("phone")
+                val relation = json.getString("relation")
+                val nationalId = json.optString("national_id")
+                val delegateId = json.optString("id").ifBlank { "local:${UUID.randomUUID()}" }
+                val maskedId = if (nationalId.length > 4) {
+                    nationalId.take(2) + "*".repeat(nationalId.length - 4) + nationalId.takeLast(2)
+                } else nationalId
+
+                val entity = PickupDelegateEntity(
+                    id = delegateId,
+                    studentId = studentId,
+                    name = name,
+                    phone = phone,
+                    relation = relation,
+                    isApproved = true,
+                    clientRequestId = json.optString("client_request_id").takeIf { it.isNotBlank() },
+                    nationalIdMasked = maskedId.takeIf { it.isNotBlank() },
+                    createdAt = now,
+                    updatedAt = now,
+                    deletedAt = null
+                )
+                db.pickupDao().upsert(entity)
+            }
+            PendingWriteEntity.KIND_DELETE_PICKUP_DELEGATE -> {
+                val delegateId = json.getString("delegate_id")
+                val existing = db.pickupDao().getDelegateById(delegateId)
+                if (existing != null) {
+                    db.pickupDao().upsert(existing.copy(deletedAt = now, updatedAt = now))
                 }
             }
         }
