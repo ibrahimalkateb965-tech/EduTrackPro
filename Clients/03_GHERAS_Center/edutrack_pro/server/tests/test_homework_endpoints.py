@@ -50,8 +50,8 @@ def setup_data(db, client):
         "INSERT INTO guardians (name, phone) VALUES ('ولي أمر التجربة', '0509998811') RETURNING id"
     ).fetchone()["id"]
     db.execute("UPDATE users SET guardian_id = %s WHERE id = %s", (g_entity_id, g1_id))
-    db.execute("INSERT INTO student_guardians (student_id, guardian_id, relation) VALUES (%s, %s, 'أب')", (s1_id, g_entity_id))
-    db.execute("INSERT INTO student_guardians (student_id, guardian_id, relation) VALUES (%s, %s, 'أب')", (s2_id, g_entity_id))
+    db.execute("INSERT INTO student_guardians (student_id, guardian_id) VALUES (%s, %s)", (s1_id, g_entity_id))
+    db.execute("INSERT INTO student_guardians (student_id, guardian_id) VALUES (%s, %s)", (s2_id, g_entity_id))
 
     db.commit()
 

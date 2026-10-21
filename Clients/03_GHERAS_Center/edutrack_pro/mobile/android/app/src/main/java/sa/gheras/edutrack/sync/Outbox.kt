@@ -16,6 +16,8 @@ import sa.gheras.edutrack.data.entity.LessonLogEntity
 import sa.gheras.edutrack.data.entity.PendingWriteEntity
 import sa.gheras.edutrack.data.entity.PickupDelegateEntity
 import sa.gheras.edutrack.data.entity.StudentAttendanceEntity
+import sa.gheras.edutrack.data.entity.SubmissionEntity
+import sa.gheras.edutrack.data.entity.SubmissionFileEntity
 import sa.gheras.edutrack.data.repo.mappers.DateParsers
 import java.time.Instant
 import java.time.LocalDate

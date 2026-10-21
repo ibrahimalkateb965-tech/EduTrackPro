@@ -116,29 +116,28 @@ def create_assignment(conn, scope: Scope, body: dict) -> dict:
         row = conn.execute("""
             INSERT INTO assignments (
                 id, branch_id, title, subject, instructions, due_date,
-                teacher_user_id, room_id, is_draft, updated_at
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, now())
+                teacher_user_id, is_draft, updated_at
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, now())
             ON CONFLICT (id) DO UPDATE SET
                 title = EXCLUDED.title,
                 subject = EXCLUDED.subject,
                 instructions = EXCLUDED.instructions,
                 due_date = EXCLUDED.due_date,
-                room_id = EXCLUDED.room_id,
                 is_draft = EXCLUDED.is_draft,
                 updated_at = now()
             WHERE assignments.teacher_user_id = EXCLUDED.teacher_user_id
             RETURNING *
-        """, (assignment_id, branch_id, title, subject, instructions, due_date, scope.user_id, room_id, is_draft)).fetchone()
+        """, (assignment_id, branch_id, title, subject, instructions, due_date, scope.user_id, is_draft)).fetchone()
         if not row:
             raise ApiError(404, "not_found", "الواجب غير موجود أو لا تملكه المعلمة")
     else:
         row = conn.execute("""
             INSERT INTO assignments (
                 branch_id, title, subject, instructions, due_date,
-                teacher_user_id, room_id, is_draft
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                teacher_user_id, is_draft
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s)
             RETURNING *
-        """, (branch_id, title, subject, instructions, due_date, scope.user_id, room_id, is_draft)).fetchone()
+        """, (branch_id, title, subject, instructions, due_date, scope.user_id, is_draft)).fetchone()
 
     ass_id = row["id"]
 

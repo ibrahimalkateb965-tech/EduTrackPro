@@ -207,4 +207,4 @@ fun TeacherChildPrepScreen(
     }
 }
 
-fun canMarkReady(status: PickupStatus?): Boolean = status == PickupStatus.IN_PREP
+fun canMarkReady(status: String?): Boolean = status == PickupStatus.IN_PREP

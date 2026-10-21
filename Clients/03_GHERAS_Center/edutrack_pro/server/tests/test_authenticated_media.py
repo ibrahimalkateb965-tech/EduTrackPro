@@ -25,6 +25,12 @@ from tests.conftest import login, make_user
 API = "/api/v1"
 
 
+@pytest.fixture(autouse=True)
+def setup_upload_dir(tmp_path, monkeypatch):
+    monkeypatch.setenv("UPLOAD_DIR", str(tmp_path))
+    return tmp_path
+
+
 @pytest.fixture()
 def media_env(db, client):
     branch_id = uuid.UUID("00000000-0000-0000-0000-000000000001")
@@ -48,12 +54,12 @@ def media_env(db, client):
     # Guardian 1 -> Student 1
     ge1_id = db.execute("INSERT INTO guardians (name, phone) VALUES ('ولي 1', '0501110001') RETURNING id").fetchone()["id"]
     db.execute("UPDATE users SET guardian_id = %s WHERE id = %s", (ge1_id, g1_id))
-    db.execute("INSERT INTO student_guardians (student_id, guardian_id, relation) VALUES (%s, %s, 'أب')", (s1_id, ge1_id))
+    db.execute("INSERT INTO student_guardians (student_id, guardian_id) VALUES (%s, %s)", (s1_id, ge1_id))
 
     # Guardian 2 -> Student 2
     ge2_id = db.execute("INSERT INTO guardians (name, phone) VALUES ('ولي 2', '0501110002') RETURNING id").fetchone()["id"]
     db.execute("UPDATE users SET guardian_id = %s WHERE id = %s", (ge2_id, g2_id))
-    db.execute("INSERT INTO student_guardians (student_id, guardian_id, relation) VALUES (%s, %s, 'أب')", (s2_id, ge2_id))
+    db.execute("INSERT INTO student_guardians (student_id, guardian_id) VALUES (%s, %s)", (s2_id, ge2_id))
 
     db.commit()
 
@@ -151,9 +157,9 @@ def test_4_source_acl_enforcement(db, client, media_env):
 
     # 2. Source 1: assignment_files
     ass_id = db.execute("""
-        INSERT INTO assignments (teacher_user_id, room_id, title, is_draft)
-        VALUES (%s, %s, 'واجب القراءة', false) RETURNING id
-    """, (env["t1_id"], env["room_id"])).fetchone()["id"]
+        INSERT INTO assignments (teacher_user_id, title, is_draft)
+        VALUES (%s, 'واجب القراءة', false) RETURNING id
+    """, (env["t1_id"],)).fetchone()["id"]
     db.execute("INSERT INTO assignment_students (assignment_id, student_id) VALUES (%s, %s)", (ass_id, env["s1_id"]))
 
     ass_key = f"ass_file_{uuid.uuid4().hex[:8]}.pdf"
@@ -173,8 +179,8 @@ def test_4_source_acl_enforcement(db, client, media_env):
 
     # 3. Source 3: teacher_feedback_key (voice note)
     sub_id = db.execute("""
-        INSERT INTO submissions (assignment_id, student_id, attempt_number, status)
-        VALUES (%s, %s, 1, 'graded') RETURNING id
+        INSERT INTO submissions (assignment_id, student_id, attempt_number, status, grade_level)
+        VALUES (%s, %s, 1, 'graded', 'excellent') RETURNING id
     """, (ass_id, env["s1_id"])).fetchone()["id"]
 
     fb_key = f"feedback_{uuid.uuid4().hex[:8]}.mp3"

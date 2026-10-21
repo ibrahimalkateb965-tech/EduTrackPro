@@ -46,13 +46,13 @@ def repo_env(db):
     ).fetchone()["id"]
     db.execute("UPDATE users SET guardian_id = %s WHERE id = %s", (g_entity_id, guardian_id))
     db.execute(
-        "INSERT INTO student_guardians (student_id, guardian_id, relation) VALUES (%s, %s, 'أب')",
+        "INSERT INTO student_guardians (student_id, guardian_id) VALUES (%s, %s)",
         (student_id, g_entity_id)
     )
 
     # Scopes
-    teacher_scope = Scope(user_id=teacher_id, role="teacher", branch_id=branch_id, room_ids={room_id}, student_ids={student_id})
-    guardian_scope = Scope(user_id=guardian_id, role="guardian", branch_id=branch_id, room_ids={room_id}, student_ids={student_id})
+    teacher_scope = Scope(user_id=teacher_id, role="teacher", room_ids=frozenset({room_id}), student_ids=frozenset({student_id}))
+    guardian_scope = Scope(user_id=guardian_id, role="guardian", room_ids=frozenset({room_id}), student_ids=frozenset({student_id}))
 
     # Stage an upload for guardian
     stage_key = f"submissions/test_{uuid.uuid4().hex[:8]}.jpg"

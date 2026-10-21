@@ -38,7 +38,7 @@ def retired_env(db, client):
 
     ge_id = db.execute("INSERT INTO guardians (name, phone) VALUES ('ولي متقاعد', '0507776655') RETURNING id").fetchone()["id"]
     db.execute("UPDATE users SET guardian_id = %s WHERE id = %s", (ge_id, g_id))
-    db.execute("INSERT INTO student_guardians (student_id, guardian_id, relation) VALUES (%s, %s, 'أب')", (s_id, ge_id))
+    db.execute("INSERT INTO student_guardians (student_id, guardian_id) VALUES (%s, %s)", (s_id, ge_id))
 
     db.commit()
 

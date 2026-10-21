@@ -48,15 +48,15 @@ class ChildHomeworkViewModel(
 
     private val _selectedTab = MutableStateFlow(HomeworkTab.ALL)
     private val _errorMessage = MutableStateFlow<String?>(null)
+    private val _tabAndError = combine(_selectedTab, _errorMessage) { tab, err -> tab to err }
 
     val uiState: StateFlow<ChildHomeworkUiState> = combine(
         assignmentStudentDao.observeByStudent(studentId),
         assignmentsRepository.observeAll(),
         assignmentsRepository.observeLatestByStudent(studentId),
         assignmentsRepository.observeAllSubmissionFiles(),
-        _selectedTab,
-        _errorMessage
-    ) { studentLinks, allAssignments, latestSubmissions, allFiles, selectedTab, error ->
+        _tabAndError
+    ) { studentLinks, allAssignments, latestSubmissions, allFiles, (selectedTab, error) ->
         val student = studentsRepository.getById(studentId)
         val assignMap = allAssignments.associateBy { it.id }
         val subMap = latestSubmissions.associateBy { it.assignmentId }

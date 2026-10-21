@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import sa.gheras.edutrack.data.dao.RoomDao
@@ -52,8 +53,8 @@ class TeacherHomeworkViewModel(
     private fun loadInitialData() {
         viewModelScope.launch {
             try {
-                val rooms = roomDao.getAll()
-                val students = studentsRepository.getAll()
+                val rooms = roomDao.observeAll().first()
+                val students = studentsRepository.observeAll().first()
                 _uiState.update {
                     it.copy(
                         rooms = rooms,

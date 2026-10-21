@@ -31,6 +31,28 @@ object Num {
     fun formatDecimal(value: Double): String = decimalFormat.format(value)
 
     /**
+     * Formats integers/counts with thousands separator using 0-9 numerals.
+     */
+    fun format(value: Int): String = integerFormat.format(value)
+    fun format(value: Long): String = integerFormat.format(value)
+
+    /**
+     * Formats date cleanly using 0-9 Western Arabic numerals (Rule 50).
+     */
+    fun formatDate(date: java.time.LocalDate?): String {
+        return date?.toString() ?: "غير محدد"
+    }
+
+    /**
+     * Formats instant in Riyadh timezone (Asia/Riyadh) using 0-9 numerals.
+     */
+    fun formatInstant(instant: java.time.Instant?): String {
+        if (instant == null) return "غير محدد"
+        val formatter = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm", Locale.US)
+        return instant.atZone(java.time.ZoneId.of("Asia/Riyadh")).format(formatter)
+    }
+
+    /**
      * Enforces Western Arabic numerals (0-9) by replacing any Eastern Arabic numerals (٠-٩).
      */
     fun enforceWesternNumerals(text: String): String {

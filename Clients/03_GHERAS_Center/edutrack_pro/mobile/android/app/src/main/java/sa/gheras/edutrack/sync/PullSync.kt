@@ -93,7 +93,7 @@ class PullSync(
             val evalDtoList = meApi.listEvaluations(limit = 500).items
             val evalEntities = evalDtoList.map { AcademicMappers.evaluationToEntity(it) }
 
-            // 7. Assignments & Submissions
+            // 7. Assignments & Submissions (Multi-attempt M2 pull with limit = 500 - M-5)
             val asgnDtoList = meApi.listAssignments(limit = 500).items
             val asgnEntities = asgnDtoList.map { AssignmentMappers.assignmentToEntity(it) }
             val asgnStudentEntities = asgnDtoList.flatMap { AssignmentMappers.assignmentStudentsToEntities(it) }

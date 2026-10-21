@@ -88,10 +88,10 @@ class GuardianHomeViewModel(
                 .sortedWith(compareByDescending<EvaluationEntity> { it.date }.thenByDescending { it.updatedAt })
                 .distinctBy { it.subject }
                 .take(4)
-            val pendingHomework = assignments.count { it.dueDate == null || !it.dueDate.isBefore(today) }
+            val pendingHomework = assignments.count { it.dueDate == null || it.dueDate.isAfter(today) || it.dueDate.isEqual(today) }
             val nextInstallment = installments
                 .filter { it.status != "paid" }
-                .minByOrNull { it.dueDate }
+                .minByOrNull { it.dueDate ?: LocalDate.MAX }
 
             ChildDashboardSummary(
                 selectedChild = activeChild,

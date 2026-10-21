@@ -13,35 +13,36 @@ from __future__ import annotations
 
 import re
 import uuid
+from pathlib import Path
+
 import psycopg
 import pytest
 from psycopg.rows import dict_row
 
 API = "/api/v1"
-MIGRATION_PATH = "db/postgres/017_homework_revisions.sql"
+MIGRATION_PATH = Path(__file__).resolve().parents[2] / "db" / "postgres" / "017_homework_revisions.sql"
 
 
-def test_anchored_regex_url_rewriting_logic():
-    """Verify that regex_replace correctly converts legacy upload URLs without doubling prefixes (R4-1)."""
-    pattern = r"(https?://[^/\"\s]+)?/api/v1/static/uploads/"
-    replacement = r"/api/v1/me/files/"
+def test_anchored_regex_url_rewriting_logic(db):
+    """Verify that PostgreSQL regexp_replace in 017:164 correctly converts legacy upload URLs without doubling prefixes (R4-1)."""
+    # Execute actual SQL regexp_replace against Postgres
+    res = db.execute("""
+        SELECT 
+            regexp_replace('Check attachment at https://gheras.autovem.tech/api/v1/static/uploads/sheet1.pdf', '(https?://[^/"\\s]+)?/api/v1/static/uploads/', '/api/v1/me/files/', 'g') as case1,
+            regexp_replace('Review file /api/v1/static/uploads/audio_lesson.mp3 for details', '(https?://[^/"\\s]+)?/api/v1/static/uploads/', '/api/v1/me/files/', 'g') as case2,
+            regexp_replace('<img src="/api/v1/static/uploads/diagram.png" />', '(https?://[^/"\\s]+)?/api/v1/static/uploads/', '/api/v1/me/files/', 'g') as case3
+    """).fetchone()
 
     # Case 1: Absolute URL with domain
-    input_text = 'Check attachment at https://gheras.autovem.tech/api/v1/static/uploads/sheet1.pdf'
-    output = re.sub(pattern, replacement, input_text)
-    assert output == 'Check attachment at /api/v1/me/files/sheet1.pdf'
-    assert '/api/v1/api/v1/' not in output
+    assert res["case1"] == 'Check attachment at /api/v1/me/files/sheet1.pdf'
+    assert '/api/v1/api/v1/' not in res["case1"]
 
     # Case 2: Relative URL
-    input_text_rel = 'Review file /api/v1/static/uploads/audio_lesson.mp3 for details'
-    output_rel = re.sub(pattern, replacement, input_text_rel)
-    assert output_rel == 'Review file /api/v1/me/files/audio_lesson.mp3 for details'
-    assert '/api/v1/api/v1/' not in output_rel
+    assert res["case2"] == 'Review file /api/v1/me/files/audio_lesson.mp3 for details'
+    assert '/api/v1/api/v1/' not in res["case2"]
 
     # Case 3: URL inside HTML tags or markdown
-    input_md = '<img src="/api/v1/static/uploads/diagram.png" />'
-    output_md = re.sub(pattern, replacement, input_md)
-    assert output_md == '<img src="/api/v1/me/files/diagram.png" />'
+    assert res["case3"] == '<img src="/api/v1/me/files/diagram.png" />'
 
 
 def test_migration_017_idempotent(db):
@@ -107,8 +108,8 @@ def test_grade_level_backfill(db):
         (room_id,)
     ).fetchone()["id"]
     assignment_id = db.execute(
-        "INSERT INTO assignments (teacher_user_id, room_id, title, due_date) VALUES (%s, %s, 'Math Mig', '2026-10-30') RETURNING id",
-        (teacher_id, room_id)
+        "INSERT INTO assignments (teacher_user_id, title, due_date) VALUES (%s, 'Math Mig', '2026-10-30') RETURNING id",
+        (teacher_id,)
     ).fetchone()["id"]
 
     # Insert legacy submissions with numeric grades

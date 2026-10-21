@@ -241,6 +241,10 @@ class AssignmentsRepository(
                     branchId = branchId,
                     submissionId = localId,
                     storageKey = key,
+                    width = null,
+                    height = null,
+                    bytes = null,
+                    sha256 = null,
                     createdAt = now,
                     updatedAt = now
                 )
