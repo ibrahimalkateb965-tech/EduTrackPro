@@ -53,7 +53,7 @@ interface AssignmentDao {
           AND assignments.is_draft = 0
           AND assignments.deleted_at IS NULL
           AND assignment_students.deleted_at IS NULL
-        ORDER BY assignments.due_date DESC NULLS LAST, assignments.created_at DESC
+        ORDER BY assignments.due_date DESC, assignments.created_at DESC
         """
     )
     fun observeByStudent(studentId: String): Flow<List<AssignmentEntity>>
@@ -66,7 +66,7 @@ interface AssignmentDao {
           AND assignments.is_draft = 0
           AND assignments.deleted_at IS NULL
           AND assignment_students.deleted_at IS NULL
-        ORDER BY assignments.due_date DESC NULLS LAST, assignments.created_at DESC
+        ORDER BY assignments.due_date DESC, assignments.created_at DESC
         """
     )
     fun observePublishedByStudent(studentId: String): Flow<List<AssignmentEntity>>

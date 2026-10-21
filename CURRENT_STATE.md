@@ -985,3 +985,13 @@ All 6 blocking defects (K1–K6) identified in Claude Code CLI's audit report ha
 - **K11 (M1 R6 Kotlinx Serialization Converter)**: Switched Retrofit converter in `PickupApiEndpointTest.kt` to `retrofit2.converter.kotlinx.serialization.asConverterFactory` and added `student_id` to test mock payloads.
 - **K2 Nit**: Updated `test_homework_migration.py` anchored regex test to verify actual 017 migration execution and `assignment_files` population on realistic rows.
 - **Verification**: Python compilation (code 0) and test collection (18 tests in 0.08s) 100% verified. Ready for Claude Code CLI (Opus Max) Round 3 audit and verification.
+
+### 2026-10-21: M2 Gate Re-Audit Round 3 Rework (S2-R3 + A2-R3) Completed
+- **K12 (psycopg 3 transaction)**: Replaced unsupported `conn.savepoint(...)` with `conn.transaction()` in `assignment_repo.py:343`.
+- **K13 (Notification target_type CHECK)**: Aligned `target_type` in `assignment_repo.py` to `'assignment'`, and updated `017_homework_revisions.sql` to allow `'submission'` alongside `'assignment'`.
+- **K14 (Android SQLite < 3.30 Compatibility)**: Dropped `NULLS LAST` from `ORDER BY due_date DESC` in `AssignmentDao.kt:56,69` to prevent crash on Android 8–11 (minSdk 26).
+- **K15 (Teacher Scope Active Students Filter)**: Added `AND status = 'active'` to room student expansion query in `assignment_repo.py:160` so dismissed/archived students don't trigger 403.
+- **K16 (Migration 017 Idempotency on Files)**: Added `WHERE NOT EXISTS` guard and `uq_assignment_files_assignment_storage_key` index in `017_homework_revisions.sql` Step 9.
+- **K10 (TeacherHomeworkViewModelTest RoomEntity)**: Provided full named arguments with `createdAt` and `updatedAt` for `RoomEntity` constructor in `TeacherHomeworkViewModelTest.kt:66`.
+- **K2 Nit (Migration Test Password Hash)**: Provided required `password_hash` in `users` insert in `test_homework_migration.py:29`.
+- **Verification**: Python files compiled cleanly with 0 errors. Ready for Claude Code CLI Round 4 certification run.

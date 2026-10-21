@@ -164,7 +164,7 @@ UPDATE assignments
 SET instructions = regexp_replace(instructions, '(https?://[^/"\s]+)?/api/v1/static/uploads/', '/api/v1/me/files/', 'g')
 WHERE instructions LIKE '%/static/uploads/%';
 
--- إدراج ملفات المعلمة السابقة في assignment_files لتجاوز فحص الـ ACL
+-- إدراج ملفات المعلمة السابقة في assignment_files لتجاوز فحص الـ ACL (K16 guard)
 INSERT INTO assignment_files (branch_id, assignment_id, uploaded_by_user_id, storage_key, media_type, file_name, bytes, created_at)
 SELECT a.branch_id, a.id, a.teacher_user_id,
        m[1] AS storage_key,
@@ -177,7 +177,17 @@ SELECT a.branch_id, a.id, a.teacher_user_id,
        a.created_at
 FROM assignments a,
      LATERAL regexp_matches(a.instructions, '/api/v1/me/files/([^"''\s\)]+)', 'g') AS m
-ON CONFLICT DO NOTHING;
+WHERE NOT EXISTS (
+    SELECT 1 FROM assignment_files af
+    WHERE af.assignment_id = a.id AND af.storage_key = m[1]
+);
+
+-- فهرس فريد لملفات الواجبات لمنع تكرار الروابط عند إعادة تطبيق الترحيل (K16)
+DELETE FROM assignment_files a USING assignment_files b
+WHERE a.id > b.id AND a.assignment_id = b.assignment_id AND a.storage_key = b.storage_key;
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_assignment_files_assignment_storage_key
+ON assignment_files (assignment_id, storage_key);
 
 -- 10. ترقية قيود المواد الدراسية المعتمدة لمركز غراس القرآني والمدرسي (K7)
 ALTER TABLE assignments DROP CONSTRAINT IF EXISTS chk_assignments_subject;
@@ -190,6 +200,11 @@ WHERE a.id > b.id AND a.assignment_id = b.assignment_id AND a.student_id = b.stu
 
 CREATE UNIQUE INDEX IF NOT EXISTS uq_assignment_students 
 ON assignment_students (assignment_id, student_id);
+
+-- 12. ترقية قيود نوع الهدف في الإشعارات لدعم الواجبات والتسليمات (K13)
+ALTER TABLE notifications DROP CONSTRAINT IF EXISTS chk_notifications_target_type;
+ALTER TABLE notifications ADD CONSTRAINT chk_notifications_target_type
+    CHECK (target_type IS NULL OR target_type IN ('assignment', 'submission', 'attendance', 'evaluation', 'announcement'));
 
 GRANT SELECT, INSERT, UPDATE ON assignments TO gheras_app;
 GRANT SELECT, INSERT, UPDATE, DELETE ON assignment_students TO gheras_app;

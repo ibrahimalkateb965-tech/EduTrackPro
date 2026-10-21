@@ -26,7 +26,7 @@ MIGRATION_PATH = Path(__file__).resolve().parents[2] / "db" / "postgres" / "017_
 def test_anchored_regex_url_rewriting_logic(db):
     """Verify that PostgreSQL regexp_replace in 017:164 correctly converts legacy upload URLs without doubling prefixes (R4-1)."""
     # 1. Seed a legacy assignment with static upload URLs in instructions
-    teacher_id = db.execute("INSERT INTO users (username, role) VALUES ('legacy_teacher', 'teacher') RETURNING id").fetchone()["id"]
+    teacher_id = db.execute("INSERT INTO users (username, role, password_hash) VALUES ('legacy_teacher', 'teacher', 'hash_123') RETURNING id").fetchone()["id"]
     ass_id = db.execute("""
         INSERT INTO assignments (teacher_user_id, title, due_date, instructions)
         VALUES (%s, 'Legacy HW', '2026-10-30', 'Check attachment at https://gheras.autovem.tech/api/v1/static/uploads/sheet1.pdf and also /api/v1/static/uploads/audio.mp3')

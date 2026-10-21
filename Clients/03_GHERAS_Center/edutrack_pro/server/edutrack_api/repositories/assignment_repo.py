@@ -157,7 +157,7 @@ def create_assignment(conn, scope: Scope, body: dict) -> dict:
     target_students = body.get("student_ids")
     if not target_students and room_id:
         st_rows = conn.execute(
-            "SELECT id FROM students WHERE room_id = %s AND deleted_at IS NULL",
+            "SELECT id FROM students WHERE room_id = %s AND deleted_at IS NULL AND status = 'active'",
             (room_id,)
         ).fetchall()
         target_students = [r["id"] for r in st_rows]
@@ -340,7 +340,7 @@ def submit_assignment_cas(
     is_late = bool(is_late_row["is_late"])
 
     # 8. Savepoint CAS insert
-    with conn.savepoint("submit_attempt_savepoint"):
+    with conn.transaction():
         try:
             sub = conn.execute("""
                 INSERT INTO submissions (
@@ -374,7 +374,7 @@ def submit_assignment_cas(
             branch_id, user_id, kind, title, body, target_type, target_id,
             priority, sender_user_id, action_url, sent_at
         ) VALUES (
-            %s, %s, 'assignment', %s, %s, 'submission', %s,
+            %s, %s, 'assignment', %s, %s, 'assignment', %s,
             'normal', %s, %s, now()
         )
     """, (
@@ -509,7 +509,7 @@ def review_submission_cas(
                 branch_id, user_id, kind, title, body, target_type, target_id,
                 priority, sender_user_id, action_url, sent_at
             ) VALUES (
-                %s, %s, 'assignment', %s, %s, 'submission', %s,
+                %s, %s, 'assignment', %s, %s, 'assignment', %s,
                 'normal', %s, %s, now()
             )
         """, (
