@@ -1016,3 +1016,9 @@ All 6 blocking defects (K1–K6) identified in Claude Code CLI's audit report ha
 - **K20.1 (TeacherHomeworkViewModelTest compilation & async await)**: Removed obsolete `toggleStudentSelection` (ViewModel selects all students on load; toggle deselects). Replaced immediate assertion with coroutine await `vm.uiState.first { !it.isSaving && it.savedAssignmentId != null }` to guarantee background `Dispatchers.IO` save completes before assertion.
 - **K20.2 (AssignmentsRepositoryTest Room unique constraint & attempt chaining)**: In `AssignmentsRepository.submitAssignment`, when network submission succeeds, the local optimistic row (`localId`) is cleaned up via `submissionDao.deleteById(localId)` before inserting `syncedEntity`, preventing `SQLiteConstraintException` on the unique index `(assignment_id, student_id, attempt_number)`. In `FakeMeApi.kt`, `reviewSubmission` safely falls back to stored assignment/student IDs.
 - **Verification**: Android unit test fixes complete. Server remains 100% certified. Ready for Claude Code CLI Round 6 audit and Milestone M2 final certification.
+
+### 2026-10-22: M2 Gate Re-Audit Round 7 (commit `9ba794d`): **[APPROVED]** (Claude Code CLI)
+- Server unchanged since `6fc5da0`; the round 5 certification (24/25, R1 red by design) carries over.
+- Android: 210/0 on a clean `git archive`, twice (2nd with `--rerun-tasks`). Mutation check: putting back the round 6 J3/J4 code turns the guarding tests red. Reviewer probes R7 (J2b links stay in the text; J1b no re-upload after a partial failure) are green.
+- J1b, J2a, J2b, J3, J4 and K20 are closed. **M2 `[APPROVED]`. M3 (Attendance + Excuses) UNLOCKED.**
+- The M2 APK stays gated on: N1 (port probes R7 into `OutboxTest`, stop swallowing exceptions), N2 (narrow the `submitAssignment` catch), N3 (`Outbox.kt:225` REPLACE in `reapplyPending`), Z1–Z3, and a [C-96] device smoke run. Details: `fleet_orders/16_handoff/reports/PLAN_AUDIT.md` § M2 Round 7.
