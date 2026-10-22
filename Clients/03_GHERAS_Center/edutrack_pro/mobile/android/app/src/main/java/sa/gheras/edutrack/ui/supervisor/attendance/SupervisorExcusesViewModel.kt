@@ -43,9 +43,12 @@ class SupervisorExcusesViewModel(
         refresh()
     }
 
-    fun refresh() {
+    fun refresh(preserveError: Boolean = false) {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
+            _uiState.value = _uiState.value.copy(
+                isLoading = true,
+                errorMessage = if (preserveError) _uiState.value.errorMessage else null
+            )
             try {
                 val filter = _uiState.value.selectedFilter
                 val items = attendanceRepository.listStaffExcuses(
@@ -113,7 +116,7 @@ class SupervisorExcusesViewModel(
                     isProcessingAction = false,
                     errorMessage = err
                 )
-                refresh()
+                refresh(preserveError = true)
             }
         }
     }

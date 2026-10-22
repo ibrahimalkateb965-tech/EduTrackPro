@@ -131,7 +131,8 @@ class ChildAttendanceViewModelTest {
 
         // 1. Validation error on short reason
         vm.submitExcuse(today, "مرض") {}
-        assertEquals("سبب العذر يجب ألا يقل عن 5 أحرف", vm.uiState.value.excuseError)
+        val stateWithErr = vm.uiState.first { it.excuseError != null }
+        assertEquals("سبب العذر يجب ألا يقل عن 5 أحرف", stateWithErr.excuseError)
 
         // 2. Successful submission
         val submitted = CompletableDeferred<Unit>()
