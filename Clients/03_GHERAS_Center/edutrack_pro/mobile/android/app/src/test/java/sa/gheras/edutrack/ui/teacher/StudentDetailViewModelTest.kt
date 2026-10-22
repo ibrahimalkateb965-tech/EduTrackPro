@@ -50,7 +50,7 @@ class StudentDetailViewModelTest {
             .build()
         val outbox = Outbox(context, db)
         studentsRepo = StudentsRepository(db.studentDao())
-        attendanceRepo = AttendanceRepository(db.studentAttendanceDao(), outbox)
+        attendanceRepo = AttendanceRepository(attendanceDao = db.studentAttendanceDao(), outbox = outbox)
         evaluationsRepo = EvaluationsRepository(db.evaluationDao(), outbox)
     }
 

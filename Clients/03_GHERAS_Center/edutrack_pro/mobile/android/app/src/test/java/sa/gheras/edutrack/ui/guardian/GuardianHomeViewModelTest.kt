@@ -73,7 +73,7 @@ class GuardianHomeViewModelTest {
 
     private fun newVm() = GuardianHomeViewModel(
         studentsRepository = StudentsRepository(db.studentDao()),
-        attendanceRepository = AttendanceRepository(db.studentAttendanceDao(), outbox),
+        attendanceRepository = AttendanceRepository(attendanceDao = db.studentAttendanceDao(), outbox = outbox),
         evaluationsRepository = EvaluationsRepository(db.evaluationDao(), outbox),
         assignmentsRepository = AssignmentsRepository(db.assignmentDao(), db.submissionDao()),
         feesRepository = FeesRepository(db.installmentDao(), db.receiptDao()),

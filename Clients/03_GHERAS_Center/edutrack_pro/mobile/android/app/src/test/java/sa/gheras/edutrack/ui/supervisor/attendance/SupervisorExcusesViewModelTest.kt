@@ -26,6 +26,8 @@ import sa.gheras.edutrack.data.remote.dto.StaffExcusesResponse
 import sa.gheras.edutrack.data.remote.fakes.FakeMeApi
 import sa.gheras.edutrack.data.repo.AttendanceRepository
 import sa.gheras.edutrack.sync.Outbox
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.ResponseBody.Companion.toResponseBody
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
@@ -54,7 +56,7 @@ class SupervisorExcusesViewModelTest {
 
         override suspend fun reviewExcuse(id: String, body: ReviewExcuseRequest): AttendanceExcuseDto {
             if (shouldThrowConflict) {
-                val errorBody = okhttp3.ResponseBody.create(okhttp3.MediaType.parse("application/json"), "{\"detail\":\"Conflict\"}")
+                val errorBody = "{\"detail\":\"Conflict\"}".toResponseBody("application/json".toMediaType())
                 throw retrofit2.HttpException(retrofit2.Response.error<Any>(409, errorBody))
             }
             lastReviewAction = body.action
