@@ -87,7 +87,7 @@ class AttendanceRepositoryTest {
         // Verify outbox pending write
         val pending = db.pendingWriteDao().listPending()
         assertEquals(1, pending.size)
-        assertEquals(PendingWriteEntity.KIND_ATTENDANCE_RECORD, pending[0].kind)
+        assertEquals(PendingWriteEntity.KIND_ATTENDANCE, pending[0].kind)
         assertEquals("att:$testStudentId:$today", pending[0].naturalKey)
 
         // Verify optimistic projection in student_attendance

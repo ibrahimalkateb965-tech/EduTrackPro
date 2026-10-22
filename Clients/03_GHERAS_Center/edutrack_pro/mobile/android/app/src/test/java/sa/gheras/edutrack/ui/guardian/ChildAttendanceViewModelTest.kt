@@ -6,10 +6,13 @@ import androidx.test.core.app.ApplicationProvider
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -119,9 +122,12 @@ class ChildAttendanceViewModelTest {
     }
 
     @Test
-    fun `submitExcuse validates minimum 5 characters and enqueues to outbox`() = runBlocking {
+    fun `submitExcuse validates minimum 5 characters and enqueues to outbox`() = runTest {
         db.studentDao().upsertAll(listOf(student("s1", "ريان محمد")))
         val vm = createVm()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            vm.uiState.collect()
+        }
 
         // 1. Validation error on short reason
         vm.submitExcuse(today, "مرض") {}
