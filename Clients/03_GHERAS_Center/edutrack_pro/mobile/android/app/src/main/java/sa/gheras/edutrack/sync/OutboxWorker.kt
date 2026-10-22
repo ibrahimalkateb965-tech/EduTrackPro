@@ -88,12 +88,13 @@ class OutboxWorker(
         return Result.success()
     }
 
-    private suspend fun flushItem(
-        item: PendingWriteEntity,
-        meApi: sa.gheras.edutrack.data.remote.MeApi,
-        db: sa.gheras.edutrack.data.db.GherasDatabase,
-        container: AppContainer
-    ) {
+    companion object {
+        internal suspend fun flushItem(
+            item: PendingWriteEntity,
+            meApi: sa.gheras.edutrack.data.remote.MeApi,
+            db: sa.gheras.edutrack.data.db.GherasDatabase,
+            container: AppContainer? = null
+        ) {
         val json = JSONObject(item.payloadJson)
 
         when (item.kind) {
@@ -243,6 +244,27 @@ class OutboxWorker(
                                 att
                             }
                         } else {
+                            // Already uploaded URL from a previous attempt or existing file
+                            val storageKey = if (att.uri.contains("/me/files/")) {
+                                att.uri.substringAfter("/me/files/")
+                            } else {
+                                att.uri.substringAfterLast("/")
+                            }
+                            if (filesList.none { it.storageKey == storageKey }) {
+                                filesList.add(
+                                    sa.gheras.edutrack.data.remote.dto.AssignmentFileDto(
+                                        storageKey = storageKey,
+                                        mediaType = when (att.type) {
+                                            sa.gheras.edutrack.ui.teacher.media.AssignmentMediaType.PDF -> "document"
+                                            sa.gheras.edutrack.ui.teacher.media.AssignmentMediaType.AUDIO -> "audio"
+                                            sa.gheras.edutrack.ui.teacher.media.AssignmentMediaType.VIDEO -> "video"
+                                            else -> "image"
+                                        },
+                                        fileName = storageKey.substringAfterLast("/"),
+                                        bytes = 0L
+                                    )
+                                )
+                            }
                             att
                         }
                     }
@@ -253,8 +275,30 @@ class OutboxWorker(
                         if (existing != null) {
                             db.assignmentDao().upsert(existing.copy(instructions = instructions))
                         }
-                        // Update outbox pending item payload to prevent re-uploading on retry
+                        // Update outbox pending item payload to prevent re-uploading on retry AND preserve file list (J1 fix)
                         json.put("instructions", instructions)
+                        val filesArr = org.json.JSONArray()
+                        for (f in filesList) {
+                            filesArr.put(org.json.JSONObject().apply {
+                                put("storage_key", f.storageKey)
+                                put("media_type", f.mediaType)
+                                put("file_name", f.fileName)
+                                put("bytes", f.bytes)
+                            })
+                        }
+                        json.put("files", filesArr)
+                        db.pendingWriteDao().upsert(item.copy(payloadJson = json.toString()))
+                    } else if (filesList.isNotEmpty() && (json.optJSONArray("files") == null || json.optJSONArray("files")!!.length() != filesList.size)) {
+                        val filesArr = org.json.JSONArray()
+                        for (f in filesList) {
+                            filesArr.put(org.json.JSONObject().apply {
+                                put("storage_key", f.storageKey)
+                                put("media_type", f.mediaType)
+                                put("file_name", f.fileName)
+                                put("bytes", f.bytes)
+                            })
+                        }
+                        json.put("files", filesArr)
                         db.pendingWriteDao().upsert(item.copy(payloadJson = json.toString()))
                     }
                 }
@@ -292,11 +336,13 @@ class OutboxWorker(
                     relation = json.getString("relation"),
                     clientRequestId = json.optString("client_request_id").takeIf { it.isNotBlank() }
                 )
-                container.pickupApi.createDelegate(body)
+                val api = container?.pickupApi ?: throw IllegalStateException("AppContainer required for pickup delegate")
+                api.createDelegate(body)
             }
             PendingWriteEntity.KIND_DELETE_PICKUP_DELEGATE -> {
                 val delegateId = json.getString("delegate_id")
-                container.pickupApi.deleteDelegate(delegateId)
+                val api = container?.pickupApi ?: throw IllegalStateException("AppContainer required for pickup delegate")
+                api.deleteDelegate(delegateId)
             }
             PendingWriteEntity.KIND_SUBMISSION_CREATE -> {
                 val assignmentId = json.getString("assignment_id")
@@ -348,8 +394,7 @@ class OutboxWorker(
         }
     }
 
-    companion object {
-        internal suspend fun revertOptimisticProjection(
+    internal suspend fun revertOptimisticProjection(
             item: PendingWriteEntity,
             db: sa.gheras.edutrack.data.db.GherasDatabase
         ) {

@@ -128,13 +128,14 @@ class TeacherHomeworkViewModelTest {
         vm.updateTitle("حفظ سورة الكهف")
         vm.updateSubject("القرآن الكريم")
         vm.updateDueDate(LocalDate.of(2026, 11, 1))
-        vm.toggleStudentSelection("s1")
 
         var doneAssignmentId: String? = null
         vm.saveAsDraft { id -> doneAssignmentId = id }
 
-        assertNotNull(doneAssignmentId)
-        val saved = assignmentsRepo.getById(doneAssignmentId!!)
+        val finalState = vm.uiState.first { !it.isSaving && it.savedAssignmentId != null }
+        val targetId = finalState.savedAssignmentId ?: doneAssignmentId
+        assertNotNull(targetId)
+        val saved = assignmentsRepo.getById(targetId!!)
         assertNotNull(saved)
         assertTrue(saved!!.isDraft)
         assertEquals("حفظ سورة الكهف", saved.title)
@@ -147,13 +148,14 @@ class TeacherHomeworkViewModelTest {
 
         vm.updateTitle("تلاوة سورة يس")
         vm.updateDueDate(null) // Optional null dueDate
-        vm.toggleStudentSelection("s1")
 
         var publishedId: String? = null
         vm.publishNow { id -> publishedId = id }
 
-        assertNotNull(publishedId)
-        val saved = assignmentsRepo.getById(publishedId!!)
+        val finalState = vm.uiState.first { !it.isSaving && it.savedAssignmentId != null }
+        val targetId = finalState.savedAssignmentId ?: publishedId
+        assertNotNull(targetId)
+        val saved = assignmentsRepo.getById(targetId!!)
         assertNotNull(saved)
         assertFalse(saved!!.isDraft)
         assertNull(saved.dueDate)

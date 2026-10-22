@@ -15,11 +15,17 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import sa.gheras.edutrack.data.db.GherasDatabase
+import sa.gheras.edutrack.data.entity.AssignmentEntity
 import sa.gheras.edutrack.data.entity.EvaluationEntity
 import sa.gheras.edutrack.data.entity.PickupDelegateEntity
 import sa.gheras.edutrack.data.entity.PendingWriteEntity
 import sa.gheras.edutrack.data.entity.RoomEntity
 import sa.gheras.edutrack.data.entity.StudentEntity
+import sa.gheras.edutrack.data.remote.fakes.FakeMeApi
+import sa.gheras.edutrack.ui.teacher.media.AssignmentAttachment
+import sa.gheras.edutrack.ui.teacher.media.AssignmentMediaParser
+import sa.gheras.edutrack.ui.teacher.media.AssignmentMediaType
+import java.io.File
 import java.time.Instant
 import java.time.LocalDate
 
@@ -358,5 +364,87 @@ class OutboxTest {
             cursor.getString(0)
         }
         assertNotNull("Soft delete must stamp deleted_at", softDeleted)
+    }
+
+    @Test
+    fun testAssignmentUploadRetry_preservesFilesList() = runTest {
+        seedStudent("student_1")
+        val fakeMeApi = FakeMeApi()
+
+        // 1. Create a local temp file to attach
+        val tempFile = File.createTempFile("test_hw_sheet", ".jpg")
+        tempFile.writeText("fake image bytes")
+        tempFile.deleteOnExit()
+
+        val rawInstructions = AssignmentMediaParser.serialize(
+            "حل المسائل في الصفحة",
+            listOf(AssignmentAttachment(uri = tempFile.absolutePath, type = AssignmentMediaType.IMAGE))
+        )
+
+        val assignId = "assign_retry_test_1"
+        val now = Instant.now()
+        db.assignmentDao().upsert(
+            AssignmentEntity(
+                id = assignId,
+                branchId = null,
+                title = "واجب الرياضيات",
+                subject = "رياضيات",
+                kind = "homework",
+                dueDate = LocalDate.now().plusDays(2),
+                teacherUserId = "teacher_1",
+                instructions = rawInstructions,
+                pageRef = "ص 10",
+                isDraft = false,
+                createdAt = now,
+                updatedAt = now,
+                deletedAt = null
+            )
+        )
+
+        val initialPayload = org.json.JSONObject().apply {
+            put("assignment_id", assignId)
+            put("title", "واجب الرياضيات")
+            put("subject", "رياضيات")
+            put("instructions", rawInstructions)
+            put("due_date", LocalDate.now().plusDays(2).toString())
+            put("student_ids", org.json.JSONArray().apply { put("student_1") })
+            put("files", org.json.JSONArray())
+        }.toString()
+
+        outbox.enqueue(
+            kind = PendingWriteEntity.KIND_ASSIGNMENT_CREATE,
+            naturalKey = "assign_create:$assignId",
+            payloadJson = initialPayload
+        )
+
+        val pendingItem = db.pendingWriteDao().getByNaturalKey("assign_create:$assignId")
+        assertNotNull(pendingItem)
+
+        // Simulate upload succeeds, but createAssignment fails (e.g. network timeout)
+        fakeMeApi.shouldFailCreateAssignmentModern = true
+
+        try {
+            OutboxWorker.flushItem(pendingItem!!, fakeMeApi, db)
+        } catch (_: Exception) {}
+
+        // Assert that pending write row was updated with both instructions AND files array!
+        val afterFailItem = db.pendingWriteDao().getByNaturalKey("assign_create:$assignId")
+        assertNotNull(afterFailItem)
+        val afterFailJson = org.json.JSONObject(afterFailItem!!.payloadJson)
+        val savedFiles = afterFailJson.optJSONArray("files")
+        assertNotNull("Files array must be persisted in outbox on upload success (J1 fix)", savedFiles)
+        assertEquals(1, savedFiles!!.length())
+        val savedFileObj = savedFiles.getJSONObject(0)
+        assertEquals("uploads/" + tempFile.name, savedFileObj.getString("storage_key"))
+
+        // Now network recovers: retry the flushItem
+        fakeMeApi.shouldFailCreateAssignmentModern = false
+        OutboxWorker.flushItem(afterFailItem, fakeMeApi, db)
+
+        // Verify that createAssignmentModern was called with the files list preserved!
+        val lastBody = fakeMeApi.lastCreateAssignmentBody
+        assertNotNull(lastBody)
+        assertEquals(1, lastBody!!.files.size)
+        assertEquals("uploads/" + tempFile.name, lastBody.files[0].storageKey)
     }
 }

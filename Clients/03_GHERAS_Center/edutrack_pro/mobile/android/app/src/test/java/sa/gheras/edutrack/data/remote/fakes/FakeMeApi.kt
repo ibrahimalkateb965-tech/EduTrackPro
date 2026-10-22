@@ -118,9 +118,16 @@ class FakeMeApi : MeApi {
         )
     }
 
+    var lastCreateAssignmentBody: CreateAssignmentRequest? = null
+    var shouldFailCreateAssignmentModern: Boolean = false
+
     override suspend fun createAssignmentModern(body: CreateAssignmentRequest): AssignmentDto {
+        lastCreateAssignmentBody = body
+        if (shouldFailCreateAssignmentModern) {
+            throw java.io.IOException("Network offline simulation")
+        }
         return AssignmentDto(
-            id = "assign_modern_1",
+            id = body.id ?: "assign_modern_1",
             title = body.title,
             subject = body.subject,
             kind = body.kind,
@@ -174,10 +181,12 @@ class FakeMeApi : MeApi {
 
     override suspend fun reviewSubmission(id: String, body: ReviewSubmissionRequest): SubmissionDto {
         val existing = submissionsStore[id]
+        val fallbackAssignmentId = submissionsStore.values.firstOrNull()?.assignmentId ?: "asgn_1"
+        val fallbackStudentId = submissionsStore.values.firstOrNull()?.studentId ?: "student_1"
         val updated = SubmissionDto(
             id = id,
-            assignmentId = existing?.assignmentId ?: "asgn_1",
-            studentId = existing?.studentId ?: "student_1",
+            assignmentId = existing?.assignmentId ?: fallbackAssignmentId,
+            studentId = existing?.studentId ?: fallbackStudentId,
             attemptNumber = existing?.attemptNumber ?: 1,
             parentSubmissionId = existing?.parentSubmissionId,
             isLate = existing?.isLate ?: true,
