@@ -4,6 +4,12 @@ import okhttp3.MultipartBody
 import okhttp3.RequestBody
 import retrofit2.Response
 import sa.gheras.edutrack.data.remote.MeApi
+import sa.gheras.edutrack.data.remote.dto.ApproveRoomAttendanceResponse
+import sa.gheras.edutrack.data.remote.dto.AttendanceExcuseDto
+import sa.gheras.edutrack.data.remote.dto.CreateExcuseRequest
+import sa.gheras.edutrack.data.remote.dto.PatchExcuseRequest
+import sa.gheras.edutrack.data.remote.dto.ReviewExcuseRequest
+import sa.gheras.edutrack.data.remote.dto.StaffExcusesResponse
 import sa.gheras.edutrack.data.remote.dto.UploadResponseDto
 import sa.gheras.edutrack.data.remote.dto.GradeSubmissionBody
 import sa.gheras.edutrack.data.remote.dto.AttendanceDto
@@ -243,5 +249,52 @@ class FakeMeApi : MeApi {
             bytes = 1024L
         )
     }
+
+    override suspend fun listExcuses(limit: Int, offset: Int, studentId: String?, status: String?): Envelope<AttendanceExcuseDto> = Envelope()
+
+    override suspend fun createExcuse(body: CreateExcuseRequest): AttendanceExcuseDto = AttendanceExcuseDto(
+        id = "exc_fake",
+        studentId = body.studentId,
+        excuseDate = body.excuseDate,
+        reasonText = body.reasonText,
+        attachmentStorageKey = body.attachmentStorageKey,
+        clientRequestId = body.clientRequestId
+    )
+
+    override suspend fun listExcusesStaff(status: String?, roomId: String?, dateFrom: String?, dateTo: String?, studentId: String?): StaffExcusesResponse = StaffExcusesResponse(emptyList())
+
+    override suspend fun getExcuseDetail(id: String): AttendanceExcuseDto = AttendanceExcuseDto(
+        id = id,
+        studentId = "stud_1",
+        excuseDate = "2026-10-22",
+        reasonText = "سبب تجريبي"
+    )
+
+    override suspend fun patchExcuse(id: String, body: PatchExcuseRequest): AttendanceExcuseDto = AttendanceExcuseDto(
+        id = id,
+        studentId = "stud_1",
+        excuseDate = "2026-10-22",
+        reasonText = body.reasonText ?: "معدل",
+        attachmentStorageKey = body.attachmentStorageKey
+    )
+
+    override suspend fun reviewExcuse(id: String, body: ReviewExcuseRequest): AttendanceExcuseDto = AttendanceExcuseDto(
+        id = id,
+        studentId = "stud_1",
+        excuseDate = "2026-10-22",
+        reasonText = "مقبول",
+        status = if (body.action == "approve") "approved" else if (body.action == "reject") "rejected" else "needs_info",
+        supervisorNotes = body.supervisorNotes
+    )
+
+    override suspend fun saveAttendanceDraft(items: List<AttendanceItemBody>): Response<Unit> = Response.success(Unit)
+
+    override suspend fun approveRoomAttendance(roomId: String, date: String): ApproveRoomAttendanceResponse = ApproveRoomAttendanceResponse(
+        approved = true,
+        roomId = roomId,
+        date = date,
+        totalStudents = 10,
+        notificationsSent = 1
+    )
 }
 

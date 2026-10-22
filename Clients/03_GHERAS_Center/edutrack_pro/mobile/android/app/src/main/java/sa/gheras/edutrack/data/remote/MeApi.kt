@@ -8,11 +8,15 @@ import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.Header
 import retrofit2.http.Multipart
+import retrofit2.http.PATCH
 import retrofit2.http.POST
+import retrofit2.http.PUT
 import retrofit2.http.Part
 import retrofit2.http.Path
 import retrofit2.http.Query
+import sa.gheras.edutrack.data.remote.dto.ApproveRoomAttendanceResponse
 import sa.gheras.edutrack.data.remote.dto.AttendanceDto
+import sa.gheras.edutrack.data.remote.dto.AttendanceExcuseDto
 import sa.gheras.edutrack.data.remote.dto.AttendanceItemBody
 import sa.gheras.edutrack.data.remote.dto.AssignmentDto
 import sa.gheras.edutrack.data.remote.dto.BroadcastBody
@@ -20,6 +24,7 @@ import sa.gheras.edutrack.data.remote.dto.BroadcastResultDto
 import sa.gheras.edutrack.data.remote.dto.ClearReadBody
 import sa.gheras.edutrack.data.remote.dto.CreateAssignmentBody
 import sa.gheras.edutrack.data.remote.dto.CreateAssignmentRequest
+import sa.gheras.edutrack.data.remote.dto.CreateExcuseRequest
 import sa.gheras.edutrack.data.remote.dto.DailyEvalItemBody
 import sa.gheras.edutrack.data.remote.dto.Envelope
 import sa.gheras.edutrack.data.remote.dto.EvaluationDto
@@ -27,16 +32,19 @@ import sa.gheras.edutrack.data.remote.dto.InstallmentDto
 import sa.gheras.edutrack.data.remote.dto.LessonLogBody
 import sa.gheras.edutrack.data.remote.dto.LessonLogDto
 import sa.gheras.edutrack.data.remote.dto.NotificationDto
+import sa.gheras.edutrack.data.remote.dto.PatchExcuseRequest
 import sa.gheras.edutrack.data.remote.dto.PickupDelegatesResponse
 import sa.gheras.edutrack.data.remote.dto.ProfileDto
 import sa.gheras.edutrack.data.remote.dto.ReceiptDto
 import sa.gheras.edutrack.data.remote.dto.ReminderPreviewResponse
+import sa.gheras.edutrack.data.remote.dto.ReviewExcuseRequest
 import sa.gheras.edutrack.data.remote.dto.ReviewSubmissionRequest
 import sa.gheras.edutrack.data.remote.dto.RoomDto
 import sa.gheras.edutrack.data.remote.dto.ScheduleDto
 import sa.gheras.edutrack.data.remote.dto.SendReminderRequest
 import sa.gheras.edutrack.data.remote.dto.SendReminderResponse
 import sa.gheras.edutrack.data.remote.dto.SkillProgressDto
+import sa.gheras.edutrack.data.remote.dto.StaffExcusesResponse
 import sa.gheras.edutrack.data.remote.dto.StudentDto
 import sa.gheras.edutrack.data.remote.dto.SubmitAssignmentRequest
 import sa.gheras.edutrack.data.remote.dto.TeacherSubmissionsResponse
@@ -236,4 +244,50 @@ interface MeApi {
     suspend fun uploadMediaMultipart(
         @Part file: MultipartBody.Part
     ): UploadResponseDto
+
+    // --- Milestone M3 Attendance & Excuses ---
+
+    @GET("me/excuses")
+    suspend fun listExcuses(
+        @Query("limit") limit: Int = 500,
+        @Query("offset") offset: Int = 0,
+        @Query("student_id") studentId: String? = null,
+        @Query("status") status: String? = null
+    ): Envelope<AttendanceExcuseDto>
+
+    @POST("attendance/excuses")
+    suspend fun createExcuse(@Body body: CreateExcuseRequest): AttendanceExcuseDto
+
+    @GET("attendance/excuses")
+    suspend fun listExcusesStaff(
+        @Query("status") status: String? = null,
+        @Query("room_id") roomId: String? = null,
+        @Query("date_from") dateFrom: String? = null,
+        @Query("date_to") dateTo: String? = null,
+        @Query("student_id") studentId: String? = null
+    ): StaffExcusesResponse
+
+    @GET("attendance/excuses/{id}")
+    suspend fun getExcuseDetail(@Path("id") id: String): AttendanceExcuseDto
+
+    @PATCH("attendance/excuses/{id}")
+    suspend fun patchExcuse(
+        @Path("id") id: String,
+        @Body body: PatchExcuseRequest
+    ): AttendanceExcuseDto
+
+    @POST("attendance/excuses/{id}/review")
+    suspend fun reviewExcuse(
+        @Path("id") id: String,
+        @Body body: ReviewExcuseRequest
+    ): AttendanceExcuseDto
+
+    @PUT("attendance/students/draft")
+    suspend fun saveAttendanceDraft(@Body items: List<AttendanceItemBody>): Response<Unit>
+
+    @POST("attendance/rooms/{roomId}/days/{date}/approve")
+    suspend fun approveRoomAttendance(
+        @Path("roomId") roomId: String,
+        @Path("date") date: String
+    ): ApproveRoomAttendanceResponse
 }

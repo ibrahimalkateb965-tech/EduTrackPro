@@ -1,10 +1,12 @@
 package sa.gheras.edutrack.data.repo.mappers
 
+import sa.gheras.edutrack.data.entity.AttendanceExcuseEntity
 import sa.gheras.edutrack.data.entity.EvaluationEntity
 import sa.gheras.edutrack.data.entity.LessonLogEntity
 import sa.gheras.edutrack.data.entity.SkillProgressEntity
 import sa.gheras.edutrack.data.entity.StudentAttendanceEntity
 import sa.gheras.edutrack.data.remote.dto.AttendanceDto
+import sa.gheras.edutrack.data.remote.dto.AttendanceExcuseDto
 import sa.gheras.edutrack.data.remote.dto.EvaluationDto
 import sa.gheras.edutrack.data.remote.dto.LessonLogDto
 import sa.gheras.edutrack.data.remote.dto.SkillProgressDto
@@ -20,10 +22,29 @@ object AcademicMappers {
             date = DateParsers.parseLocalDate(dto.date) ?: LocalDate.now(),
             status = dto.status,
             note = dto.excuseNote,
+            isDraft = dto.isDraft,
+            excuseId = dto.excuseId,
             recordedByUserId = dto.recordedByUserId,
             createdAt = DateParsers.parseInstant(dto.createdAt),
             updatedAt = DateParsers.parseInstant(dto.updatedAt),
             deletedAt = dto.deletedAt?.let { DateParsers.parseInstant(it) }
+        )
+    }
+
+    fun excuseToEntity(dto: AttendanceExcuseDto): AttendanceExcuseEntity {
+        return AttendanceExcuseEntity(
+            id = dto.id,
+            branchId = dto.branchId,
+            studentId = dto.studentId,
+            excuseDate = DateParsers.parseLocalDate(dto.excuseDate) ?: LocalDate.now(),
+            reasonText = dto.reasonText,
+            attachmentStorageKey = dto.attachmentStorageKey,
+            status = dto.status,
+            supervisorNotes = dto.supervisorNotes,
+            reviewedAt = dto.reviewedAt?.let { DateParsers.parseInstant(it) },
+            clientRequestId = dto.clientRequestId,
+            createdAt = DateParsers.parseInstant(dto.createdAt),
+            updatedAt = DateParsers.parseInstant(dto.updatedAt)
         )
     }
 

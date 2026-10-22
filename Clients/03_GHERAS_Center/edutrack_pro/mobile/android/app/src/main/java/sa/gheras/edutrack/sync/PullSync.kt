@@ -131,6 +131,12 @@ class PullSync(
                 delegatesResponse.delegates.map { PickupMappers.delegateToEntity(it) }
             } else emptyList()
 
+            // 13. Attendance excuses (guardian only)
+            val excuseEntities = if (user.role == Role.GUARDIAN) {
+                val excuseDtoList = meApi.listExcuses(limit = 500).items
+                excuseDtoList.map { AcademicMappers.excuseToEntity(it) }
+            } else emptyList()
+
             val payload = ScopePayload(
                 rooms = allRooms,
                 schedules = scheduleEntities,
@@ -139,6 +145,7 @@ class PullSync(
                 receipts = rcptEntities,
                 pickupDelegates = delegateEntities,
                 attendance = attEntities,
+                excuses = excuseEntities,
                 evaluations = evalEntities,
                 skillProgress = skillEntities,
                 lessonLogs = lessonEntities,
