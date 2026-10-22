@@ -52,16 +52,16 @@ class StudentDetailViewModel(
         val student = studentsRepository.getById(studentId)
         val room = student?.roomId?.let { roomDao.getById(it) }
 
-        // Filter attendance to last 60 days
+        // Filter attendance to last 60 days and approved/non-draft records
         val sixtyDaysAgo = LocalDate.now().minusDays(60)
-        val recentAttendances = attendances.filter { !it.date.isBefore(sixtyDaysAgo) }
+        val recentAttendances = attendances.filter { !it.date.isBefore(sixtyDaysAgo) && !it.isDraft }
 
         val stats = AttendanceStats(
             total = recentAttendances.size,
             present = recentAttendances.count { it.status == "حاضر" },
             absent = recentAttendances.count { it.status == "غائب" },
             late = recentAttendances.count { it.status == "متأخر" },
-            excused = recentAttendances.count { it.status == "مستأذن" }
+            excused = recentAttendances.count { it.status == "مستأذن" || it.status == "غياب بعذر" }
         )
 
         StudentDetailUiState(

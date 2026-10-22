@@ -1,6 +1,7 @@
 package sa.gheras.edutrack.ui.teacher
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,6 +19,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.MedicalServices
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -30,7 +33,10 @@ import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SuggestionChip
+import androidx.compose.material3.SuggestionChipDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -42,6 +48,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import sa.gheras.edutrack.ui.common.EmptyView
@@ -96,7 +103,25 @@ fun AttendanceSheetScreen(
             TopAppBar(
                 title = {
                     Column {
-                        Text("كشف الحضور", fontWeight = FontWeight.Bold)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("كشف الحضور", fontWeight = FontWeight.Bold)
+                            if (state.isAlreadyApproved) {
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .background(PresentGreen.copy(alpha = 0.15f))
+                                        .padding(horizontal = 8.dp, vertical = 2.dp)
+                                ) {
+                                    Text(
+                                        text = "معتمد",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = PresentGreen,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
                         Text(
                             text = "${state.roomName} — ${state.date}",
                             style = MaterialTheme.typography.bodySmall,
@@ -113,24 +138,62 @@ fun AttendanceSheetScreen(
         },
         bottomBar = {
             SurfaceBottomBar {
-                Button(
-                    onClick = { viewModel.save(onSaved = onNavigateBack) },
-                    enabled = !state.isSaving && state.drafts.isNotEmpty(),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(50.dp),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    if (state.isSaving) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(20.dp),
-                            color = MaterialTheme.colorScheme.onPrimary,
-                            strokeWidth = 2.dp
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    if (!state.canApprove && state.drafts.isNotEmpty()) {
+                        Text(
+                            text = "يجب تحديد حالة جميع الطلاب لتفعيل اعتماد الكشف",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(bottom = 8.dp)
                         )
-                    } else {
-                        Icon(Icons.Default.Save, contentDescription = null)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("حفظ الحضور", fontWeight = FontWeight.Bold)
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        // 1. Save Draft Button
+                        OutlinedButton(
+                            onClick = { viewModel.saveDraft(onSaved = onNavigateBack) },
+                            enabled = !state.isSaving && !state.isApproving && state.canSaveDraft,
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(50.dp),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            if (state.isSaving) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(18.dp),
+                                    strokeWidth = 2.dp
+                                )
+                            } else {
+                                Icon(Icons.Default.Save, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("حفظ كمسودة", fontWeight = FontWeight.SemiBold)
+                            }
+                        }
+
+                        // 2. Approve Room Day Button
+                        Button(
+                            onClick = { viewModel.approve(onApproved = onNavigateBack) },
+                            enabled = !state.isSaving && !state.isApproving && state.canApprove,
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(50.dp),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            if (state.isApproving) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(18.dp),
+                                    color = MaterialTheme.colorScheme.onPrimary,
+                                    strokeWidth = 2.dp
+                                )
+                            } else {
+                                Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("اعتماد الكشف", fontWeight = FontWeight.Bold)
+                            }
+                        }
                     }
                 }
             }
@@ -175,11 +238,30 @@ fun StudentAttendanceRow(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
-            Text(
-                text = draft.student.name,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = draft.student.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+
+                if (draft.isExcusedApproved || draft.status == "غياب بعذر") {
+                    SuggestionChip(
+                        onClick = {},
+                        label = { Text("غياب بعذر معتمد", style = MaterialTheme.typography.labelSmall) },
+                        icon = { Icon(Icons.Default.MedicalServices, contentDescription = null, modifier = Modifier.size(14.dp)) },
+                        colors = SuggestionChipDefaults.suggestionChipColors(
+                            containerColor = PresentGreen.copy(alpha = 0.15f),
+                            labelColor = PresentGreen,
+                            iconContentColor = PresentGreen
+                        )
+                    )
+                }
+            }
 
             Spacer(modifier = Modifier.height(8.dp))
 

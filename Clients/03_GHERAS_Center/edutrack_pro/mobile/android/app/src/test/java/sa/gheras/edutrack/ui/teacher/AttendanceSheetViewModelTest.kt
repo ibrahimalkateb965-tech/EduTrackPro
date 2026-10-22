@@ -15,6 +15,7 @@ import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -51,7 +52,7 @@ class AttendanceSheetViewModelTest {
             .build()
         outbox = Outbox(context, db)
         studentsRepo = StudentsRepository(db.studentDao())
-        attendanceRepo = AttendanceRepository(db.studentAttendanceDao(), outbox)
+        attendanceRepo = AttendanceRepository(db.studentAttendanceDao(), db.attendanceExcuseDao(), null, outbox)
     }
 
     @After
@@ -99,7 +100,7 @@ class AttendanceSheetViewModelTest {
         }
 
     @Test
-    fun `initializes with room students and default present status`() = runBlocking {
+    fun `initializes with room students and null status without default present`() = runBlocking {
         seedData()
 
         val vm = createVm()
@@ -108,8 +109,10 @@ class AttendanceSheetViewModelTest {
         assertEquals("قاعة الفاروق", state.roomName)
         assertEquals(testDate, state.date)
         assertEquals(2, state.drafts.size)
-        assertEquals("حاضر", state.drafts[0].status)
-        assertEquals("حاضر", state.drafts[1].status)
+        // P1 / G3: Must NOT default to "حاضر"
+        assertNull(state.drafts[0].status)
+        assertNull(state.drafts[1].status)
+        assertFalse("Cannot approve until all marked", state.canApprove)
         assertFalse(state.isDirty)
         assertFalse(state.isSaving)
     }
@@ -142,42 +145,24 @@ class AttendanceSheetViewModelTest {
         assertEquals("عذر مرضي", s1Draft.note)
 
         val s2Draft = state.drafts.first { it.student.id == "s2" }
-        assertEquals("حاضر", s2Draft.status)
+        assertNull(s2Draft.status)
     }
 
     @Test
-    fun `updateStatus modifies draft and sets dirty flag`() = runBlocking {
+    fun `marking all students enables canApprove`() = runBlocking {
         seedData()
         val vm = createVm()
         loadedState(vm)
 
-        vm.updateStatus("s1", "متأخر")
-        val state = vm.uiState.value
+        vm.updateStatus("s1", "حاضر")
+        assertFalse(vm.uiState.value.canApprove)
 
-        assertTrue(state.isDirty)
-        val s1Draft = state.drafts.first { it.student.id == "s1" }
-        assertEquals("متأخر", s1Draft.status)
-
-        val s2Draft = state.drafts.first { it.student.id == "s2" }
-        assertEquals("حاضر", s2Draft.status)
+        vm.updateStatus("s2", "متأخر")
+        assertTrue("All students marked so canApprove must be true", vm.uiState.value.canApprove)
     }
 
     @Test
-    fun `updateNote modifies draft note and sets dirty flag`() = runBlocking {
-        seedData()
-        val vm = createVm()
-        loadedState(vm)
-
-        vm.updateNote("s2", "استئذن مبكراً")
-        val state = vm.uiState.value
-
-        assertTrue(state.isDirty)
-        val s2Draft = state.drafts.first { it.student.id == "s2" }
-        assertEquals("استئذن مبكراً", s2Draft.note)
-    }
-
-    @Test
-    fun `save writes batch to outbox and resets dirty flag`() = runBlocking {
+    fun `saveDraft writes batch to outbox and resets dirty flag`() = runBlocking {
         seedData()
         val vm = createVm()
         loadedState(vm)
@@ -185,16 +170,36 @@ class AttendanceSheetViewModelTest {
         vm.updateNote("s1", "سفر عائلي")
 
         val savedDeferred = CompletableDeferred<Unit>()
-        vm.save { savedDeferred.complete(Unit) }
+        vm.saveDraft { savedDeferred.complete(Unit) }
         savedDeferred.await()
 
         val finalState = vm.uiState.first { !it.isSaving && !it.isDirty }
         assertFalse(finalState.isDirty)
         assertFalse(finalState.isSaving)
 
-        // Verify records were enqueued in Outbox
+        // Verify records were enqueued in Outbox with KIND_ATTENDANCE_RECORD
         val pendingWrites = db.pendingWriteDao().observePending().first()
-        assertEquals(2, pendingWrites.size)
-        assertTrue(pendingWrites.all { it.kind == PendingWriteEntity.KIND_ATTENDANCE })
+        assertEquals(1, pendingWrites.size)
+        assertEquals(PendingWriteEntity.KIND_ATTENDANCE_RECORD, pendingWrites[0].kind)
+    }
+
+    @Test
+    fun `approve enqueues draft batch and approval pending write`() = runBlocking {
+        seedData()
+        val vm = createVm()
+        loadedState(vm)
+        vm.updateStatus("s1", "حاضر")
+        vm.updateStatus("s2", "حاضر")
+
+        val approvedDeferred = CompletableDeferred<Unit>()
+        vm.approve { approvedDeferred.complete(Unit) }
+        approvedDeferred.await()
+
+        val pendingWrites = db.pendingWriteDao().observePending().first()
+        // 2 attendance records + 1 approval record = 3
+        assertEquals(3, pendingWrites.size)
+        val approvalWrite = pendingWrites.firstOrNull { it.kind == PendingWriteEntity.KIND_ATTENDANCE_APPROVE }
+        assertNotNull("Must enqueue approval pending write", approvalWrite)
+        assertEquals("att_approve:r1:$testDate", approvalWrite?.naturalKey)
     }
 }
