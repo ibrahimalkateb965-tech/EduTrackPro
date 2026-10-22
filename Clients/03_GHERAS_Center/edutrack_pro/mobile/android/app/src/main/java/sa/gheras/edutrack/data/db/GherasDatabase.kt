@@ -6,6 +6,7 @@ import androidx.room.TypeConverters
 import androidx.room.withTransaction
 import sa.gheras.edutrack.data.dao.AssignmentDao
 import sa.gheras.edutrack.data.dao.AssignmentStudentDao
+import sa.gheras.edutrack.data.dao.AttendanceExcuseDao
 import sa.gheras.edutrack.data.dao.EvaluationDao
 import sa.gheras.edutrack.data.dao.InstallmentDao
 import sa.gheras.edutrack.data.dao.LessonLogDao
@@ -23,6 +24,7 @@ import sa.gheras.edutrack.data.dao.SubmissionFileDao
 import sa.gheras.edutrack.data.dao.SyncStateDao
 import sa.gheras.edutrack.data.entity.AssignmentEntity
 import sa.gheras.edutrack.data.entity.AssignmentStudentEntity
+import sa.gheras.edutrack.data.entity.AttendanceExcuseEntity
 import sa.gheras.edutrack.data.entity.EvaluationEntity
 import sa.gheras.edutrack.data.entity.InstallmentEntity
 import sa.gheras.edutrack.data.entity.LessonLogEntity
@@ -46,6 +48,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
     entities = [
         AssignmentEntity::class,
         AssignmentStudentEntity::class,
+        AttendanceExcuseEntity::class,
         EvaluationEntity::class,
         InstallmentEntity::class,
         LessonLogEntity::class,
@@ -62,7 +65,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         SubmissionFileEntity::class,
         SyncStateEntity::class
     ],
-    version = 6,
+    version = 7,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -70,6 +73,7 @@ abstract class GherasDatabase : RoomDatabase() {
 
     abstract fun assignmentDao(): AssignmentDao
     abstract fun assignmentStudentDao(): AssignmentStudentDao
+    abstract fun attendanceExcuseDao(): AttendanceExcuseDao
     abstract fun evaluationDao(): EvaluationDao
     abstract fun installmentDao(): InstallmentDao
     abstract fun lessonLogDao(): LessonLogDao
@@ -110,6 +114,7 @@ abstract class GherasDatabase : RoomDatabase() {
         submissionDao().clear()
         assignmentStudentDao().clear()
         assignmentDao().clear()
+        attendanceExcuseDao().clear()
         studentAttendanceDao().clear()
         evaluationDao().clear()
         skillProgressDao().clear()
@@ -247,6 +252,36 @@ abstract class GherasDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE `submissions` ADD COLUMN `teacher_feedback_key` TEXT")
                 db.execSQL("ALTER TABLE `submissions` ADD COLUMN `is_late` INTEGER NOT NULL DEFAULT 0")
                 db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_submissions_assignment_id_student_id_attempt_number` ON `submissions` (`assignment_id`, `student_id`, `attempt_number`)")
+            }
+        }
+
+        val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // 1. Add columns to student_attendance
+                db.execSQL("ALTER TABLE `student_attendance` ADD COLUMN `is_draft` INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE `student_attendance` ADD COLUMN `excuse_id` TEXT")
+
+                // 2. Create attendance_excuses table
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `attendance_excuses` (
+                        `id` TEXT NOT NULL,
+                        `branch_id` TEXT,
+                        `student_id` TEXT NOT NULL,
+                        `excuse_date` TEXT NOT NULL,
+                        `reason_text` TEXT NOT NULL,
+                        `attachment_storage_key` TEXT,
+                        `status` TEXT NOT NULL DEFAULT 'pending',
+                        `supervisor_notes` TEXT,
+                        `reviewed_at` TEXT,
+                        `client_request_id` TEXT,
+                        `created_at` TEXT NOT NULL,
+                        `updated_at` TEXT NOT NULL,
+                        PRIMARY KEY(`id`),
+                        FOREIGN KEY(`student_id`) REFERENCES `students`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT
+                    )
+                """.trimIndent())
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_attendance_excuses_student_id` ON `attendance_excuses` (`student_id`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_attendance_excuses_excuse_date` ON `attendance_excuses` (`excuse_date`)")
             }
         }
     }
