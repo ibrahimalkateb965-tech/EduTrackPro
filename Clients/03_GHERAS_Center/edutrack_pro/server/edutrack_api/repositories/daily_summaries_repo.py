@@ -266,6 +266,7 @@ def get_guardian_daily_summaries(
             ds.class_summary,
             ds.homework_summary,
             ds.attachments,
+            ds.is_published,
             ds.published_at,
             dsn.private_note AS student_private_note
         FROM daily_summaries ds

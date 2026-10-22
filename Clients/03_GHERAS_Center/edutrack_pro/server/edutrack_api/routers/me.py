@@ -338,6 +338,17 @@ def list_receipts(limit: int = 100, offset: int = 0, student_id: UUID | None = N
     return _envelope(rows, total, limit, offset)
 
 
+@router.get("/pickup-delegates")
+def list_pickup_delegates(scope: Scope = _SCOPE, conn=_CONN) -> dict:
+    from edutrack_api.repositories import pickup_repo
+    _only(scope, "guardian")
+    if not scope.student_ids:
+        return {"delegates": []}
+    rows = pickup_repo.list_delegates_by_student_ids(conn, [str(sid) for sid in scope.student_ids])
+    return {"delegates": [row_to_json(r) for r in rows]}
+
+
+
 @router.post("/lesson-logs")
 def post_lesson_log(body: LessonLogIn, scope: Scope = _SCOPE, conn=_CONN) -> dict:
     _only(scope, "teacher")
