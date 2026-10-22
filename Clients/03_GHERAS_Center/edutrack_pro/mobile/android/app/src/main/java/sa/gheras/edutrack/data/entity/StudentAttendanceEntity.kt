@@ -31,6 +31,8 @@ data class StudentAttendanceEntity(
     val date: LocalDate,
     val status: String,
     val note: String?,
+    @ColumnInfo(name = "is_draft", defaultValue = "0") val isDraft: Boolean = false,
+    @ColumnInfo(name = "excuse_id") val excuseId: String? = null,
     @ColumnInfo(name = "recorded_by_user_id") val recordedByUserId: String?,
     @ColumnInfo(name = "created_at", defaultValue = "(strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))") val createdAt: Instant,
     @ColumnInfo(name = "updated_at", defaultValue = "(strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))") val updatedAt: Instant,
