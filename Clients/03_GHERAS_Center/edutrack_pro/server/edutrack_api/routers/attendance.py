@@ -145,8 +145,8 @@ def _save(
             row = conn.execute(sql, params).fetchone()
             saved.append(row_to_json(row))
 
-            # Emit attendance notification to guardians on absence (only if non-draft and not excused)
-            if not is_draft and status == "غائب":
+            # Emit attendance notification to guardians on absence (only if resulting row is non-draft and status is 'غائب')
+            if not row["is_draft"] and status == "غائب":
                 _send_absence_notifications(conn, item[key], item["date"], actor["id"])
         else:
             params = {

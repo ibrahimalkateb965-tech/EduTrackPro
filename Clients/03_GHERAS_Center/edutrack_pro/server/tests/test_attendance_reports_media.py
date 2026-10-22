@@ -49,7 +49,8 @@ def _create_dummy_file(storage_key: str, content: bytes = b"dummy medical note")
     return dest
 
 
-def test_media_acl_source_5_excuse_attachment(client, manager, db):
+def test_media_acl_source_5_excuse_attachment(client, manager, db, monkeypatch, tmp_path):
+    monkeypatch.setenv("UPLOAD_DIR", str(tmp_path))
     """Source 5 ACL: supervisor, manager, guardian, and room teacher can view; stranger gets 404 (P8)."""
     room1 = _room(client, manager, "قاعة النرجس")
     room2 = _room(client, manager, "قاعة القرنفل")
@@ -247,20 +248,20 @@ def test_print_reports_attendance_symbols_and_draft_isolation(client, manager, d
     # 1. /print/attendance-report
     res_print = client.get(f"/api/v1/print/attendance-report?from={DATE_STR}&to={DATE_STR}", headers=manager)
     assert res_print.status_code == 200
-    body = res_print.json()["data"]
+    body = res_print.json()
 
-    s1_row = next(r for r in body["output"] if r["student_name"] == "طالب أ")
+    s1_row = next(r for r in body["rows"] if r["student_name"] == "طالب أ")
     assert s1_row["cells"][0]["symbol"] == "ع"  # 'غياب بعذر' rendered as 'ع'
 
-    s2_row = next(r for r in body["output"] if r["student_name"] == "طالب ب")
+    s2_row = next(r for r in body["rows"] if r["student_name"] == "طالب ب")
     assert s2_row["cells"][0]["symbol"] == ""  # Draft ignored, empty cell!
     assert s2_row["absent_count"] == 0
 
     # 2. /print/student-report for s1
     res_st_print = client.get(f"/api/v1/print/student-report?student_id={s1}", headers=manager)
     assert res_st_print.status_code == 200
-    st_print_data = res_st_print.json()["data"]
-    assert st_print_data["attendance_counts"]["excused"] == 1
+    st_print_data = res_st_print.json()
+    assert st_print_data["excused_count"] == 1
 
     # 3. /print/admin-report and /print/statistics
     res_admin = client.get(f"/api/v1/print/admin-report?from={DATE_STR}&to={DATE_STR}", headers=manager)

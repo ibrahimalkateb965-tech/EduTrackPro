@@ -203,13 +203,13 @@ def test_list_excuses_staff_permissions_and_filtering(client, manager, db):
 
     # Supervisor without attendance permission
     sup_no_att_id = make_user(db, "sup_no_exc", "supervisor")
-    db.execute("UPDATE users SET permissions = '{\"attendance\": false}'::jsonb WHERE id = %s", (sup_no_att_id,))
+    db.execute("INSERT INTO user_permissions (user_id, attendance) VALUES (%s, false)", (sup_no_att_id,))
     db.commit()
     sup_no_att_hdr = login(client, "sup_no_exc")
 
     # Supervisor with attendance permission
     sup_att_id = make_user(db, "sup_with_exc", "supervisor")
-    db.execute("UPDATE users SET permissions = '{\"attendance\": true}'::jsonb WHERE id = %s", (sup_att_id,))
+    db.execute("INSERT INTO user_permissions (user_id, attendance) VALUES (%s, true)", (sup_att_id,))
     db.commit()
     sup_att_hdr = login(client, "sup_with_exc")
 
@@ -393,6 +393,14 @@ def test_patch_excuse_needs_info_lifecycle(client, manager, db):
     )
     assert res_stranger.status_code == 403
 
+    # 4b. X2 check: Staff (manager / supervisor) cannot patch -> 403 Forbidden (guardians only)
+    res_mgr_patch = client.patch(
+        f"/api/v1/attendance/excuses/{e_id}",
+        json={"reason_text": "تعديل غير مصرح من المدير"},
+        headers=manager,
+    )
+    assert res_mgr_patch.status_code == 403
+
     # 5. Owner guardian patches with updated reason and new attachment -> 200
     staged_key = _seed_staged_upload(db, g_uid)
     res_patch = client.patch(
@@ -409,3 +417,35 @@ def test_patch_excuse_needs_info_lifecycle(client, manager, db):
     assert patched_body["reason_text"] == "تم إرفاق التقرير الطبي المعتمد كاملاً"
     assert patched_body["attachment_storage_key"] == staged_key
     assert patched_body["supervisor_notes"] == "يرجى إرفاق التقرير الطبي من المستشفى"  # Preserved!
+
+
+def test_create_excuse_supervisor_permissions_check(client, manager, db):
+    """Supervisor must have permissions.attendance to submit excuses via POST (X2)."""
+    room = _room(client, manager, "قاعة الفجر")
+    st = _student(client, manager, "طالب الفجر", room)
+
+    # Supervisor without attendance permission -> 403
+    sup_no_id = make_user(db, "sup_no_create_exc", "supervisor")
+    db.execute("INSERT INTO user_permissions (user_id, attendance) VALUES (%s, false)", (sup_no_id,))
+    db.commit()
+    sup_no_hdr = login(client, "sup_no_create_exc")
+
+    res_no = client.post(
+        "/api/v1/attendance/excuses",
+        json={"student_id": st, "excuse_date": DATE_STR, "reason_text": "عذر من مشرفة بلا صلاحية"},
+        headers=sup_no_hdr,
+    )
+    assert res_no.status_code == 403
+
+    # Supervisor with attendance permission -> 201
+    sup_ok_id = make_user(db, "sup_ok_create_exc", "supervisor")
+    db.execute("INSERT INTO user_permissions (user_id, attendance) VALUES (%s, true)", (sup_ok_id,))
+    db.commit()
+    sup_ok_hdr = login(client, "sup_ok_create_exc")
+
+    res_ok = client.post(
+        "/api/v1/attendance/excuses",
+        json={"student_id": st, "excuse_date": DATE_STR, "reason_text": "عذر من مشرفة ذات صلاحية"},
+        headers=sup_ok_hdr,
+    )
+    assert res_ok.status_code == 201

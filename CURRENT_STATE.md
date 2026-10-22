@@ -1,5 +1,7 @@
 # CURRENT_STATE.md — Autovemtech Fleet Master Handoff
 
+> **2026-10-22 M3 server gate: S3-R1 rework ready for re-audit.** R10 patch committed with test fixes. X1 (200 on replay), X2 (PATCH/POST role guards), and X3 (absence notification on post-approval edit) closed. Documentation appended to `PLAN_AUDIT.md` and `GATE_STATUS.md`. Ready for Claude Code CLI S3-R1 re-audit and X4 baseline comparison. A3-B1/B2 authorized; A3-B3 onwards locked. pgserver is at `/tmp/m3gate` (uri.txt).
+
 > **Target Client**: `Clients/03_GHERAS_Center` (EduTrack Pro — Smart Educational Center)  
 > **Master Orchestrator**: `Claude Code CLI` (Opus Max / Sonnet 5)  
 > **Handoff Source**: `Antigravity IDE` (Interactive Cockpit & Visual Inspector)  
@@ -1037,3 +1039,10 @@ All 6 blocking defects (K1–K6) identified in Claude Code CLI's audit report ha
 - **S3-B4b (commit `6c168bb`):** Implemented `GET /me/excuses` (G1) and `me_repo.list_excuses` with `attachment_url` (/api/v1/me/files/{key}) and scope isolation, added `is_draft = FALSE` for guardians/students in `me_repo.list_attendance` (P4), with tests in `test_me_excuses.py`.
 - **S3-B5 (commit `44b73e0`):** Updated web dashboard (`attendance.js`) with room filter, 'غياب بعذر' status badge/option support, class attendance approval button (`POST attendance/rooms/{room_id}/days/{date}/approve`), and safe 'غائب' submission mapping.
 - **Server Track Complete:** Batches S3-B1 through S3-B5 are complete and committed on `main` (`44b73e0`). Handing over to Claude Code CLI (Opus Max) for exclusive test execution, Devil's Advocate audit, and official server gate sign-off before commencing Android track (A3-B1 .. A3-B7).
+
+### 2026-10-22: M3 Server Track Re-Audit Rework (S3-R1) Completed
+- **R10 reviewer patch committed**: Fixed test fixtures (`user_permissions` table insertion, valid student status `dismissed`, print response structure, temp upload dir).
+- **X1 (200 on excuse replay)**: Fixed in `server/edutrack_api/routers/excuses.py` using `response.status_code = status.HTTP_200_OK` on both fast lookup and UniqueViolation replay branches.
+- **X2 (role guards)**: Restricted `PATCH /attendance/excuses/{id}` strictly to `guardian` role (`_GUARDIAN`); required `permissions.attendance` for supervisors on `POST /attendance/excuses`; added comprehensive 403 test assertions.
+- **X3 (absence notification on post-approval draft edit)**: In `server/edutrack_api/routers/attendance.py`, updated absence notification condition to `if not row["is_draft"] and status == "غائب"`, correctly detecting edits to already-approved rows and notifying the guardian (with `action_url` dedupe); added test assertion in `test_attendance_draft_approval.py`.
+- **Docs updated**: Appended audit text to `PLAN_AUDIT.md` and gate row to `GATE_STATUS.md`. Ready for Claude Code CLI S3-R1 re-audit and X4 baseline comparison.

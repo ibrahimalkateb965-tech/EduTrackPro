@@ -6,7 +6,7 @@ from datetime import date as dt_date
 from uuid import UUID
 
 import psycopg
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response, status
 from pydantic import BaseModel
 
 from edutrack_api.audit import write_audit
@@ -20,6 +20,7 @@ router = APIRouter(prefix="/attendance/excuses")
 
 _USER = Depends(require_roles("guardian", "manager", "supervisor"))
 _STAFF = Depends(require_roles("manager", "supervisor"))
+_GUARDIAN = Depends(require_roles("guardian"))
 MAIN_BRANCH = UUID("00000000-0000-0000-0000-000000000001")
 
 
@@ -44,6 +45,7 @@ class ExcuseReviewIn(BaseModel):
 @router.post("", status_code=201)
 def create_excuse(
     body: ExcuseCreateIn,
+    response: Response,
     user: dict = _USER,
     conn=Depends(get_conn),
 ) -> dict:
@@ -52,7 +54,9 @@ def create_excuse(
     if len(reason) < 5:
         raise ApiError(422, "validation_error", "سبب العذر يجب ألا يقل عن 5 أحرف")
 
-    # Scope verification for guardians
+    # Scope and permission verification
+    if user["role"] == "supervisor" and not user.get("permissions", {}).get("attendance", False):
+        raise ApiError(403, "forbidden", "ليس لديك صلاحية تقديم الأعذار")
     if user["role"] == "guardian":
         scope = resolve_scope(conn, user)
         scope.assert_students([body.student_id])
@@ -69,6 +73,7 @@ def create_excuse(
             (user["id"], body.client_request_id),
         ).fetchone()
         if existing:
+            response.status_code = status.HTTP_200_OK
             return row_to_json(existing)
 
     # 2. Check active excuse for this student and day (P10)
@@ -135,6 +140,7 @@ def create_excuse(
                 (user["id"], body.client_request_id),
             ).fetchone()
             if replay:
+                response.status_code = status.HTTP_200_OK
                 return row_to_json(replay)
         raise ApiError(409, "conflict", "يوجد عذر مسجل مسبقاً لهذا اليوم")
 
@@ -239,7 +245,7 @@ def get_excuse_detail(
 def patch_excuse(
     id: UUID,
     body: ExcusePatchIn,
-    user: dict = _USER,
+    user: dict = _GUARDIAN,
     conn=Depends(get_conn),
 ) -> dict:
     """Guardian updates/completes an excuse in 'needs_info' status (P7)."""

@@ -163,7 +163,7 @@ def test_draft_attendance_foreign_or_inactive_student_rejected(client, manager, 
     assert res.json()["error"]["code"] == "validation_error"
 
     # 2. Inactive student in draft -> 422
-    db.execute("UPDATE students SET status = 'suspended' WHERE id = %s", (st1,))
+    db.execute("UPDATE students SET status = 'dismissed' WHERE id = %s", (st1,))
     db.commit()
     res_inactive = client.put(
         "/api/v1/attendance/students/draft",
@@ -243,6 +243,26 @@ def test_draft_over_approved_row_remains_approved(client, manager, db):
     assert row_updated["is_draft"] is False  # Must NOT revert to draft!
     assert row_updated["status"] == "متأخر"
     assert row_updated["note"] == "تعديل مسودة"
+
+    # 4. X3 / n4 rule: Post-approval edit to 'غائب' via draft route MUST notify guardian
+    _guardian(db, client, "parent_maryam", [st_id])
+    res_draft_absent = client.put(
+        "/api/v1/attendance/students/draft",
+        json={
+            "room_id": room_id,
+            "date": DATE_STR,
+            "items": [{"student_id": st_id, "status": "غائب"}],
+        },
+        headers=teacher_hdr,
+    )
+    assert res_draft_absent.status_code == 200
+
+    notif = db.execute(
+        "SELECT id, kind, title FROM notifications WHERE target_id = %s AND kind = 'attendance'",
+        (st_id,),
+    ).fetchone()
+    assert notif is not None, "Notification must be sent when editing an approved day to absent (X3/n4)"
+    assert notif["title"] == "تسجيل غياب"
 
 
 def test_approved_excuse_automatic_conversion_direct_and_draft(client, manager, db):
@@ -364,7 +384,7 @@ def test_approve_room_attendance_role_and_room_scope(client, manager, db):
     # Supervisor without attendance permission
     sup_no_att_id = make_user(db, "sup_no_att", "supervisor")
     db.execute(
-        "UPDATE users SET permissions = '{\"attendance\": false}'::jsonb WHERE id = %s",
+        "INSERT INTO user_permissions (user_id, attendance) VALUES (%s, false)",
         (sup_no_att_id,),
     )
     db.commit()
@@ -373,7 +393,7 @@ def test_approve_room_attendance_role_and_room_scope(client, manager, db):
     # Supervisor with attendance permission
     sup_att_id = make_user(db, "sup_att", "supervisor")
     db.execute(
-        "UPDATE users SET permissions = '{\"attendance\": true}'::jsonb WHERE id = %s",
+        "INSERT INTO user_permissions (user_id, attendance) VALUES (%s, true)",
         (sup_att_id,),
     )
     db.commit()
