@@ -1,6 +1,6 @@
 # CURRENT_STATE.md — Autovemtech Fleet Master Handoff
 
-> **2026-10-22 M3 server gate: S3-R1 rework ready for re-audit.** R10 patch committed with test fixes. X1 (200 on replay), X2 (PATCH/POST role guards), and X3 (absence notification on post-approval edit) closed. Documentation appended to `PLAN_AUDIT.md` and `GATE_STATUS.md`. Ready for Claude Code CLI S3-R1 re-audit and X4 baseline comparison. A3-B1/B2 authorized; A3-B3 onwards locked. pgserver is at `/tmp/m3gate` (uri.txt).
+> **2026-10-22 M3 Server Track [APPROVED] (re-audit round 2, HEAD `1e3638b`).** X1–X3 closed: 5 M3 files 34/34, and reverting the fixes turns the 4 guarding tests red. X4 closed: full suite `b817cb7` 244/34 vs `1e3638b` 270/34, with an identical failing set, so there are zero M3 regressions. **A3-B3..A3-B7 UNLOCKED** (A3-B1/B2 already authorized). Open before any APK: **W2** `services/pickup.py:116` calls nonexistent `settings.get_pickup_cutoff` (since `43f0ce1`), so pickup create returns 500 and 22 `test_pickup` tests are red (ticket S-B8). **W1** `test_homework_migration` re-runs 017, which narrows `chk_notifications_target_type` (drops `pickup`/`excuse`) on the shared test DB; re-apply 018 before reruns. Also still open: N1, N2, nit N3a. Details: `16_handoff/reports/PLAN_AUDIT.md` § M3 Server Track Re-Audit Round 2. pgserver: `/tmp/m3gate` (018 re-applied).
 
 > **Target Client**: `Clients/03_GHERAS_Center` (EduTrack Pro — Smart Educational Center)  
 > **Master Orchestrator**: `Claude Code CLI` (Opus Max / Sonnet 5)  
