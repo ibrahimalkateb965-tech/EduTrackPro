@@ -64,7 +64,6 @@ import androidx.compose.ui.unit.dp
 import sa.gheras.edutrack.data.remote.dto.AttendanceExcuseDto
 import sa.gheras.edutrack.ui.common.EmptyView
 import sa.gheras.edutrack.ui.common.LoadingView
-import sa.gheras.edutrack.ui.common.Num
 import sa.gheras.edutrack.ui.theme.AbsentRed
 import sa.gheras.edutrack.ui.theme.ExcusedBlue
 import sa.gheras.edutrack.ui.theme.PresentGreen
@@ -248,7 +247,7 @@ fun SupervisorExcuseCard(
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.SemiBold
                 )
-                Num(text = excuse.excuseDate, style = MaterialTheme.typography.bodyMedium)
+                Text(text = excuse.excuseDate, style = MaterialTheme.typography.bodyMedium)
             }
 
             Spacer(modifier = Modifier.height(4.dp))

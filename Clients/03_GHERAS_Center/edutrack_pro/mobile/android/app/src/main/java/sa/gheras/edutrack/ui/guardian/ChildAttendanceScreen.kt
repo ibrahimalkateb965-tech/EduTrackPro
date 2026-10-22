@@ -1,5 +1,8 @@
 package sa.gheras.edutrack.ui.guardian
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -17,6 +20,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Attachment
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.FactCheck
 import androidx.compose.material.icons.filled.MedicalServices
 import androidx.compose.material3.AlertDialog
@@ -145,8 +150,8 @@ fun ChildAttendanceScreen(
                 viewModel.clearError()
                 showSubmitDialog = false
             },
-            onSubmit = { date, reason ->
-                viewModel.submitExcuse(date, reason) {
+            onSubmit = { date, reason, localPath ->
+                viewModel.submitExcuse(date, reason, localPath) {
                     showSubmitDialog = false
                 }
             }
@@ -162,8 +167,8 @@ fun ChildAttendanceScreen(
                 viewModel.clearError()
                 excuseToPatch = null
             },
-            onPatch = { reason ->
-                viewModel.patchExcuse(excuse.id, reason) {
+            onPatch = { reason, localPath ->
+                viewModel.patchExcuse(excuse.id, reason, localPath) {
                     excuseToPatch = null
                 }
             }
@@ -388,10 +393,17 @@ fun SubmitExcuseDialog(
     isSubmitting: Boolean,
     errorMessage: String?,
     onDismiss: () -> Unit,
-    onSubmit: (LocalDate, String) -> Unit
+    onSubmit: (LocalDate, String, String?) -> Unit
 ) {
     var reasonText by remember { mutableStateOf("") }
     var selectedDate by remember { mutableStateOf(LocalDate.now()) }
+    var attachedPath by remember { mutableStateOf<String?>(null) }
+
+    val filePicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let { attachedPath = it.toString() }
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -412,6 +424,40 @@ fun SubmitExcuseDialog(
                     minLines = 3,
                     isError = errorMessage != null
                 )
+                Spacer(modifier = Modifier.height(8.dp))
+                if (attachedPath != null) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                            Icon(Icons.Default.Attachment, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = attachedPath!!.substringAfterLast("/"),
+                                style = MaterialTheme.typography.bodySmall,
+                                maxLines = 1
+                            )
+                        }
+                        IconButton(onClick = { attachedPath = null }, modifier = Modifier.size(24.dp)) {
+                            Icon(Icons.Default.Close, contentDescription = "حذف المرفق", modifier = Modifier.size(16.dp))
+                        }
+                    }
+                } else {
+                    OutlinedButton(
+                        onClick = { filePicker.launch("*/*") },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Icon(Icons.Default.Attachment, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("إرفاق تقرير طبي أو مستند (اختياري)", style = MaterialTheme.typography.labelSmall)
+                    }
+                }
                 if (errorMessage != null) {
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
@@ -424,7 +470,7 @@ fun SubmitExcuseDialog(
         },
         confirmButton = {
             Button(
-                onClick = { onSubmit(selectedDate, reasonText) },
+                onClick = { onSubmit(selectedDate, reasonText, attachedPath) },
                 enabled = !isSubmitting && reasonText.trim().length >= 5
             ) {
                 if (isSubmitting) {
@@ -448,9 +494,16 @@ fun PatchExcuseDialog(
     isSubmitting: Boolean,
     errorMessage: String?,
     onDismiss: () -> Unit,
-    onPatch: (String) -> Unit
+    onPatch: (String, String?) -> Unit
 ) {
     var reasonText by remember { mutableStateOf(excuse.reasonText) }
+    var attachedPath by remember { mutableStateOf(excuse.attachmentStorageKey) }
+
+    val filePicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let { attachedPath = it.toString() }
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -478,6 +531,40 @@ fun PatchExcuseDialog(
                     modifier = Modifier.fillMaxWidth(),
                     minLines = 3
                 )
+                Spacer(modifier = Modifier.height(8.dp))
+                if (attachedPath != null) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                            Icon(Icons.Default.Attachment, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = attachedPath!!.substringAfterLast("/"),
+                                style = MaterialTheme.typography.bodySmall,
+                                maxLines = 1
+                            )
+                        }
+                        IconButton(onClick = { attachedPath = null }, modifier = Modifier.size(24.dp)) {
+                            Icon(Icons.Default.Close, contentDescription = "حذف المرفق", modifier = Modifier.size(16.dp))
+                        }
+                    }
+                } else {
+                    OutlinedButton(
+                        onClick = { filePicker.launch("*/*") },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Icon(Icons.Default.Attachment, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("إرفاق تقرير طبي أو مستند (اختياري)", style = MaterialTheme.typography.labelSmall)
+                    }
+                }
                 if (errorMessage != null) {
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
@@ -490,7 +577,7 @@ fun PatchExcuseDialog(
         },
         confirmButton = {
             Button(
-                onClick = { onPatch(reasonText) },
+                onClick = { onPatch(reasonText, attachedPath) },
                 enabled = !isSubmitting && reasonText.trim().isNotBlank()
             ) {
                 if (isSubmitting) {
