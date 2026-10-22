@@ -5,12 +5,14 @@ const STATUSES = ['حاضر', 'غائب', 'متأخر', 'مستأذن'];
 const SUBJECTS = ['القرآن', 'التجويد', 'الحديث', 'اللغة الإنجليزية', 'الرياضيات', 'عام'];
 
 let students = [];
+let rooms = [];
 let entries = new Map();
 let evalEntries = new Map();
 let selectedDate = fmtDate(new Date());
 let selectedSubject = 'القرآن';
 let groupFilter = '';
 let genderFilter = '';
+let roomFilter = '';
 let activeTab = 'attendance';
 let tbody = null;
 let printLink = null;
@@ -55,8 +57,13 @@ function setEvalEntry(studentId, key, value) {
 
 function attendanceRow(student, api) {
   const entry = entries.get(student.id) || { status: 'حاضر', note: '' };
+  const isExcusedAbsence = entry.status === 'غياب بعذر';
+
   const status = el('select', { 'aria-label': `حالة ${student.name || ''}` });
   STATUSES.forEach(value => status.append(el('option', { value }, value)));
+  if (isExcusedAbsence) {
+    status.append(el('option', { value: 'غياب بعذر' }, 'غياب بعذر (معتمد)'));
+  }
   status.value = entry.status || 'حاضر';
 
   const commBtn = el('button', {
@@ -82,6 +89,11 @@ function attendanceRow(student, api) {
       commBtn.style.background = '#e53935';
       commBtn.style.color = '#fff';
       commBtn.textContent = '⚠️ إشعار غياب';
+    } else if (status.value === 'غياب بعذر') {
+      commBtn.classList.add('button-outline');
+      commBtn.style.background = '#e3f2fd';
+      commBtn.style.color = '#1565c0';
+      commBtn.textContent = '📋 عذر معتمد';
     } else {
       commBtn.classList.add('button-outline');
       commBtn.style.background = '';
@@ -98,9 +110,15 @@ function attendanceRow(student, api) {
 
   const note = el('input', { type: 'text', value: entry.note || '', placeholder: 'ملاحظة اختيارية', 'aria-label': `ملاحظة ${student.name || ''}` });
   note.addEventListener('input', () => setEntry(student.id, 'note', note.value));
+
+  const roomDisplay = student.room_name || (rooms.find(r => String(r.id) === String(student.room_id))?.name) || '';
+  const groupDisplay = student.group_name
+    ? (student.group_name + (roomDisplay ? ` - ${roomDisplay}` : '') + (student.gender ? ` (${student.gender})` : ''))
+    : (roomDisplay || '—');
+
   return el('tr', {},
     el('td', {}, student.name || '—'),
-    el('td', {}, student.group_name ? (student.group_name + (student.gender ? ` (${student.gender})` : '')) : '—'),
+    el('td', {}, groupDisplay),
     el('td', {}, status),
     el('td', {}, note),
     el('td', {}, commBtn)
@@ -137,7 +155,11 @@ function evaluationRow(student) {
 }
 
 function paint() {
-  const list = students.filter(student => (!groupFilter || student.group_name === groupFilter) && (!genderFilter || student.gender === genderFilter));
+  const list = students.filter(student =>
+    (!groupFilter || student.group_name === groupFilter) &&
+    (!genderFilter || student.gender === genderFilter) &&
+    (!roomFilter || String(student.room_id) === String(roomFilter))
+  );
   if (activeTab === 'evaluation') {
     const rows = list.map(student => evaluationRow(student));
     const emptyText = students.length ? 'لا يوجد طلاب في هذه المجموعة' : 'لا يوجد طلاب نشطون بعد';
@@ -181,14 +203,41 @@ async function loadEntries(api) {
 
 async function saveAttendance(api, button) {
   button.disabled = true;
-  const targetList = students.filter(student => (!groupFilter || student.group_name === groupFilter) && (!genderFilter || student.gender === genderFilter));
+  const targetList = students.filter(student =>
+    (!groupFilter || student.group_name === groupFilter) &&
+    (!genderFilter || student.gender === genderFilter) &&
+    (!roomFilter || String(student.room_id) === String(roomFilter))
+  );
   const rows = targetList.map(student => {
     const entry = entries.get(student.id) || {};
-    return { student_id: student.id, date: selectedDate, status: entry.status || 'حاضر', note: entry.note || null };
+    const rawStatus = entry.status || 'حاضر';
+    // 'غياب بعذر' is rejected with 422 if sent in client payload (m2);
+    // sending 'غائب' allows the server to auto-convert to 'غياب بعذر' if an approved excuse exists.
+    const st = rawStatus === 'غياب بعذر' ? 'غائب' : rawStatus;
+    return { student_id: student.id, date: selectedDate, status: st, note: entry.note || null };
   });
   try {
     await api.post('attendance/students', rows);
     toast('تم حفظ حضور الطلاب بنجاح');
+    await loadEntries(api);
+    paint();
+  } catch (error) {
+    toast(error.message, true);
+  }
+  button.disabled = false;
+}
+
+async function approveRoomAttendance(api, button, roomId) {
+  if (!roomId) {
+    toast('يرجى اختيار فصل أولاً لاعتماده', true);
+    return;
+  }
+  button.disabled = true;
+  try {
+    const res = await api.post(`attendance/rooms/${roomId}/days/${selectedDate}/approve`, {});
+    toast(`تم اعتماد حضور الفصل بنجاح (المعتمد: ${res?.approved_count ?? '—'})`);
+    await loadEntries(api);
+    paint();
   } catch (error) {
     toast(error.message, true);
   }
@@ -219,12 +268,14 @@ async function saveEvaluations(api, button) {
 export async function render(container, api) {
   currentApi = api;
   students = [];
+  rooms = [];
   entries = new Map();
   evalEntries = new Map();
   selectedDate = fmtDate(new Date());
   selectedSubject = 'القرآن';
   groupFilter = '';
   genderFilter = '';
+  roomFilter = '';
   container.replaceChildren();
 
   // Parse initial tab from URL hash params
@@ -271,6 +322,16 @@ export async function render(container, api) {
       paint();
     });
 
+    const roomSelect = el('select', { 'aria-label': 'تصفية بالفصل' });
+    roomSelect.append(el('option', { value: '' }, 'كل الفصول / القاعات'));
+    rooms.forEach(room => roomSelect.append(el('option', { value: String(room.id) }, room.name)));
+    roomSelect.value = roomFilter;
+    roomSelect.addEventListener('change', () => {
+      roomFilter = roomSelect.value;
+      updateViewMode();
+      paint();
+    });
+
     const groupSelect = el('select', { 'aria-label': 'تصفية بالمجموعة' });
     groupSelect.append(el('option', { value: '' }, 'كل المجموعات'));
     GROUPS.forEach(group => groupSelect.append(el('option', { value: group }, group)));
@@ -299,7 +360,7 @@ export async function render(container, api) {
       const saveBtn = el('button', { class: 'button', type: 'button' }, '💾 حفظ التقييم اليومي');
       saveBtn.onclick = () => saveEvaluations(api, saveBtn);
 
-      toolbarContainer.append(dateInput, groupSelect, genderSelect, subjectSelect, saveBtn);
+      toolbarContainer.append(dateInput, roomSelect, groupSelect, genderSelect, subjectSelect, saveBtn);
 
       theadContainer.replaceChildren(
         el('tr', {},
@@ -314,7 +375,21 @@ export async function render(container, api) {
       saveButton.addEventListener('click', () => saveAttendance(api, saveButton));
       printLink = el('a', { class: 'button button-outline', href: reportHref(), target: '_blank', rel: 'noopener' }, '📄 تقرير الحضور');
 
-      toolbarContainer.append(dateInput, groupSelect, genderSelect, saveButton, printLink);
+      const toolbarItems = [dateInput, roomSelect, groupSelect, genderSelect, saveButton];
+
+      if (roomFilter) {
+        const approveButton = el('button', {
+          class: 'button',
+          type: 'button',
+          style: 'background:#2e7d32; border-color:#2e7d32; color:#fff;',
+          title: 'اعتماد نهائي لكشف حضور الفصل'
+        }, '✓ اعتماد الفصل');
+        approveButton.addEventListener('click', () => approveRoomAttendance(api, approveButton, roomFilter));
+        toolbarItems.push(approveButton);
+      }
+
+      toolbarItems.push(printLink);
+      toolbarContainer.append(...toolbarItems);
 
       theadContainer.replaceChildren(
         el('tr', {},
@@ -338,10 +413,16 @@ export async function render(container, api) {
   );
 
   try {
-    students = toList(await api.fetchAll('students')).filter(student => (student.status || 'active') === 'active');
+    const [stData, rmData] = await Promise.all([
+      api.fetchAll('students'),
+      api.fetchAll('rooms').catch(() => [])
+    ]);
+    students = toList(stData).filter(student => (student.status || 'active') === 'active');
+    rooms = toList(rmData).filter(room => !room.deleted_at);
   } catch (error) {
     toast(error.message, true);
   }
+  updateViewMode();
   await loadEntries(api);
   paint(api);
 }
