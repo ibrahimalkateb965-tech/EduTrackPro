@@ -17,9 +17,13 @@ import sa.gheras.edutrack.data.db.GherasDatabase
 import sa.gheras.edutrack.data.entity.PendingWriteEntity
 import sa.gheras.edutrack.data.entity.RoomEntity
 import sa.gheras.edutrack.data.entity.StudentEntity
+import sa.gheras.edutrack.data.remote.dto.AttendanceExcuseDto
+import sa.gheras.edutrack.data.remote.dto.CreateExcuseRequest
 import sa.gheras.edutrack.data.remote.fakes.FakeMeApi
 import sa.gheras.edutrack.sync.Outbox
 import sa.gheras.edutrack.sync.OutboxWorker
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.ResponseBody.Companion.toResponseBody
 import java.time.Instant
 import java.time.LocalDate
 
@@ -226,16 +230,17 @@ class AttendanceRepositoryTest {
         assertEquals(1, pendingList.size)
         val item = pendingList[0]
 
-        // Create 409 HttpException
-        val errorBody = okhttp3.ResponseBody.create(okhttp3.MediaType.parse("application/json"), "{\"detail\":\"Conflict\"}")
-        val http409 = retrofit2.HttpException(retrofit2.Response.error<Any>(409, errorBody))
+        // Create api that throws 409 Conflict on createExcuse
+        val apiWith409 = object : FakeMeApi() {
+            override suspend fun createExcuse(req: CreateExcuseRequest): AttendanceExcuseDto {
+                val errorBody = "{\"detail\":\"Conflict\"}".toResponseBody("application/json".toMediaType())
+                throw retrofit2.HttpException(retrofit2.Response.error<Any>(409, errorBody))
+            }
+        }
 
-        // Simulate worker terminal handling on 409
-        val code = http409.code()
-        assertTrue(code == 403 || code == 404 || code == 409 || code == 422)
-        val error = sa.gheras.edutrack.data.remote.ErrorMapper.map(http409)
-        db.pendingWriteDao().markFailed(item.id, error.userMessage)
-        OutboxWorker.revertOptimisticProjection(item, db)
+        // Run worker processing directly via processPendingItem
+        val result = OutboxWorker.processPendingItem(item, apiWith409, db)
+        assertEquals(OutboxWorker.ProcessResult.TERMINAL_FAILURE, result)
 
         // Verify write marked failed (attempts = -1) so queue is not wedged
         val failed = db.pendingWriteDao().getById(item.id)

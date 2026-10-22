@@ -32,6 +32,8 @@ class OutboxWorker(
     params: WorkerParameters
 ) : CoroutineWorker(context, params) {
 
+    enum class ProcessResult { SUCCESS, RETRY, TERMINAL_FAILURE }
+
     override suspend fun doWork(): Result {
         val app = applicationContext as? GherasApp ?: return Result.failure()
         val container = app.container
@@ -44,36 +46,11 @@ class OutboxWorker(
 
         var hadWork = false
         for (item in pendingList) {
-            try {
-                flushItem(item, meApi, db, container)
-                // 2xx success: remove row from pending_writes
-                db.pendingWriteDao().deleteById(item.id)
-                hadWork = true
-            } catch (e: HttpException) {
-                val code = e.code()
-                if (code == 401) {
-                    sessionRepo.onUnauthorized()
-                    return Result.retry()
-                } else if (code == 403 || code == 404 || code == 409 || code == 422) {
-                    // Terminal failure: mark attempts = -1 and revert optimistic projection
-                    val error = ErrorMapper.map(e)
-                    db.pendingWriteDao().markFailed(item.id, error.userMessage)
-                    revertOptimisticProjection(item, db)
-                    hadWork = true
-                } else {
-                    // 5xx server error
-                    db.pendingWriteDao().recordAttempt(item.id, e.message())
-                    return Result.retry()
-                }
-            } catch (e: IOException) {
-                // Network failure: retry later
-                db.pendingWriteDao().recordAttempt(item.id, e.message)
+            val result = processPendingItem(item, meApi, db, container, sessionRepo)
+            if (result == ProcessResult.RETRY) {
                 return Result.retry()
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                db.pendingWriteDao().markFailed(item.id, e.message ?: "unknown error")
-                revertOptimisticProjection(item, db)
+            }
+            if (result == ProcessResult.SUCCESS || result == ProcessResult.TERMINAL_FAILURE) {
                 hadWork = true
             }
         }
@@ -90,6 +67,47 @@ class OutboxWorker(
     }
 
     companion object {
+        internal suspend fun processPendingItem(
+            item: PendingWriteEntity,
+            meApi: sa.gheras.edutrack.data.remote.MeApi,
+            db: sa.gheras.edutrack.data.db.GherasDatabase,
+            container: AppContainer? = null,
+            sessionRepo: sa.gheras.edutrack.data.repo.SessionRepository? = null
+        ): ProcessResult {
+            try {
+                flushItem(item, meApi, db, container)
+                // 2xx success: remove row from pending_writes
+                db.pendingWriteDao().deleteById(item.id)
+                return ProcessResult.SUCCESS
+            } catch (e: HttpException) {
+                val code = e.code()
+                if (code == 401) {
+                    sessionRepo?.onUnauthorized()
+                    return ProcessResult.RETRY
+                } else if (code == 403 || code == 404 || code == 409 || code == 422) {
+                    // Terminal failure: mark attempts = -1 and revert optimistic projection
+                    val error = ErrorMapper.map(e)
+                    db.pendingWriteDao().markFailed(item.id, error.userMessage)
+                    revertOptimisticProjection(item, db)
+                    return ProcessResult.TERMINAL_FAILURE
+                } else {
+                    // 5xx server error
+                    db.pendingWriteDao().recordAttempt(item.id, e.message())
+                    return ProcessResult.RETRY
+                }
+            } catch (e: IOException) {
+                // Network failure: retry later
+                db.pendingWriteDao().recordAttempt(item.id, e.message)
+                return ProcessResult.RETRY
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                db.pendingWriteDao().markFailed(item.id, e.message ?: "unknown error")
+                revertOptimisticProjection(item, db)
+                return ProcessResult.TERMINAL_FAILURE
+            }
+        }
+
         internal suspend fun flushItem(
             item: PendingWriteEntity,
             meApi: sa.gheras.edutrack.data.remote.MeApi,
