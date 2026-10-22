@@ -48,7 +48,7 @@ import sa.gheras.edutrack.data.remote.dto.SkillProgressDto
 import sa.gheras.edutrack.data.remote.dto.StudentDto
 import sa.gheras.edutrack.data.remote.dto.SubmissionDto
 
-class FakeMeApi : MeApi {
+open class FakeMeApi : MeApi {
     override suspend fun profile(): ProfileDto {
         return ProfileDto(
             user = ProfileUserDto("user_1", "teacher1", "teacher", "Teacher One"),

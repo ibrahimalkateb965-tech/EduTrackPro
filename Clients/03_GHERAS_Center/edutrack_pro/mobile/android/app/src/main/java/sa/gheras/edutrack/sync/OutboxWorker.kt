@@ -176,8 +176,9 @@ class OutboxWorker(
                             else -> "application/octet-stream".toMediaTypeOrNull()
                         }
                         val uploadRes = meApi.uploadMedia(file.name, file.asRequestBody(mediaType))
-                        storageKey = uploadRes.storageKey ?: uploadRes.url.substringAfterLast("/")
-                        json.put("attachment_storage_key", storageKey)
+                        val fetchedKey = uploadRes.storageKey ?: throw IllegalStateException("Server did not return storage_key for uploaded attachment")
+                        storageKey = fetchedKey
+                        json.put("attachment_storage_key", fetchedKey)
                         db.pendingWriteDao().upsert(item.copy(payloadJson = json.toString()))
                     }
                 }
@@ -221,8 +222,9 @@ class OutboxWorker(
                             else -> "application/octet-stream".toMediaTypeOrNull()
                         }
                         val uploadRes = meApi.uploadMedia(file.name, file.asRequestBody(mediaType))
-                        storageKey = uploadRes.storageKey ?: uploadRes.url.substringAfterLast("/")
-                        json.put("attachment_storage_key", storageKey)
+                        val fetchedKey = uploadRes.storageKey ?: throw IllegalStateException("Server did not return storage_key for uploaded attachment")
+                        storageKey = fetchedKey
+                        json.put("attachment_storage_key", fetchedKey)
                         db.pendingWriteDao().upsert(item.copy(payloadJson = json.toString()))
                     }
                 }

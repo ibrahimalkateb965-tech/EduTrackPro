@@ -3,6 +3,7 @@ package sa.gheras.edutrack.ui.guardian
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -53,6 +54,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import sa.gheras.edutrack.data.entity.AttendanceExcuseEntity
@@ -61,6 +63,7 @@ import sa.gheras.edutrack.ui.common.LoadingView
 import sa.gheras.edutrack.ui.common.Num
 import sa.gheras.edutrack.ui.theme.PresentGreen
 import sa.gheras.edutrack.ui.theme.WarningAmber
+import java.io.File
 import java.time.LocalDate
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -395,14 +398,48 @@ fun SubmitExcuseDialog(
     onDismiss: () -> Unit,
     onSubmit: (LocalDate, String, String?) -> Unit
 ) {
+    val context = LocalContext.current
     var reasonText by remember { mutableStateOf("") }
     var selectedDate by remember { mutableStateOf(LocalDate.now()) }
     var attachedPath by remember { mutableStateOf<String?>(null) }
+    var pickerError by remember { mutableStateOf<String?>(null) }
 
     val filePicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
-        uri?.let { attachedPath = it.toString() }
+        if (uri != null) {
+            try {
+                val cr = context.contentResolver
+                val mime = cr.getType(uri) ?: ""
+                val uriStr = uri.toString().lowercase()
+                val isImageOrPdf = mime.startsWith("image/") || mime == "application/pdf" ||
+                        uriStr.endsWith(".pdf") || uriStr.endsWith(".jpg") || uriStr.endsWith(".png") || uriStr.endsWith(".jpeg")
+                if (!isImageOrPdf) {
+                    pickerError = "يرجى اختيار صورة (JPG, PNG) أو ملف PDF فقط"
+                    return@rememberLauncherForActivityResult
+                }
+                val ext = when {
+                    mime == "application/pdf" || uriStr.endsWith(".pdf") -> "pdf"
+                    mime == "image/png" || uriStr.endsWith(".png") -> "png"
+                    else -> "jpg"
+                }
+                val destFile = File(context.cacheDir, "excuse_${System.currentTimeMillis()}.$ext")
+                cr.openInputStream(uri)?.use { input ->
+                    destFile.outputStream().use { output ->
+                        input.copyTo(output)
+                    }
+                }
+                if (destFile.length() > 25 * 1024 * 1024) {
+                    destFile.delete()
+                    pickerError = "حجم الملف يتجاوز الحد الأقصى 25 ميجابايت"
+                    return@rememberLauncherForActivityResult
+                }
+                attachedPath = destFile.absolutePath
+                pickerError = null
+            } catch (_: Exception) {
+                pickerError = "تعذر قراءة أو حفظ الملف المرفق"
+            }
+        }
     }
 
     AlertDialog(
@@ -458,6 +495,14 @@ fun SubmitExcuseDialog(
                         Text("إرفاق تقرير طبي أو مستند (اختياري)", style = MaterialTheme.typography.labelSmall)
                     }
                 }
+                if (pickerError != null) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = pickerError!!,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
                 if (errorMessage != null) {
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
@@ -496,13 +541,47 @@ fun PatchExcuseDialog(
     onDismiss: () -> Unit,
     onPatch: (String, String?) -> Unit
 ) {
+    val context = LocalContext.current
     var reasonText by remember { mutableStateOf(excuse.reasonText) }
     var attachedPath by remember { mutableStateOf(excuse.attachmentStorageKey) }
+    var pickerError by remember { mutableStateOf<String?>(null) }
 
     val filePicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
-        uri?.let { attachedPath = it.toString() }
+        if (uri != null) {
+            try {
+                val cr = context.contentResolver
+                val mime = cr.getType(uri) ?: ""
+                val uriStr = uri.toString().lowercase()
+                val isImageOrPdf = mime.startsWith("image/") || mime == "application/pdf" ||
+                        uriStr.endsWith(".pdf") || uriStr.endsWith(".jpg") || uriStr.endsWith(".png") || uriStr.endsWith(".jpeg")
+                if (!isImageOrPdf) {
+                    pickerError = "يرجى اختيار صورة (JPG, PNG) أو ملف PDF فقط"
+                    return@rememberLauncherForActivityResult
+                }
+                val ext = when {
+                    mime == "application/pdf" || uriStr.endsWith(".pdf") -> "pdf"
+                    mime == "image/png" || uriStr.endsWith(".png") -> "png"
+                    else -> "jpg"
+                }
+                val destFile = File(context.cacheDir, "excuse_${System.currentTimeMillis()}.$ext")
+                cr.openInputStream(uri)?.use { input ->
+                    destFile.outputStream().use { output ->
+                        input.copyTo(output)
+                    }
+                }
+                if (destFile.length() > 25 * 1024 * 1024) {
+                    destFile.delete()
+                    pickerError = "حجم الملف يتجاوز الحد الأقصى 25 ميجابايت"
+                    return@rememberLauncherForActivityResult
+                }
+                attachedPath = destFile.absolutePath
+                pickerError = null
+            } catch (_: Exception) {
+                pickerError = "تعذر قراءة أو حفظ الملف المرفق"
+            }
+        }
     }
 
     AlertDialog(
@@ -564,6 +643,14 @@ fun PatchExcuseDialog(
                         Spacer(modifier = Modifier.width(6.dp))
                         Text("إرفاق تقرير طبي أو مستند (اختياري)", style = MaterialTheme.typography.labelSmall)
                     }
+                }
+                if (pickerError != null) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = pickerError!!,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
                 }
                 if (errorMessage != null) {
                     Spacer(modifier = Modifier.height(4.dp))
