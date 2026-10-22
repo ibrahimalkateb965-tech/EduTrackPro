@@ -22,9 +22,8 @@ import sa.gheras.edutrack.data.entity.PendingWriteEntity
 import sa.gheras.edutrack.data.entity.RoomEntity
 import sa.gheras.edutrack.data.entity.StudentEntity
 import sa.gheras.edutrack.data.remote.fakes.FakeMeApi
-import sa.gheras.edutrack.ui.teacher.media.AssignmentAttachment
 import sa.gheras.edutrack.ui.teacher.media.AssignmentMediaParser
-import sa.gheras.edutrack.ui.teacher.media.AssignmentMediaType
+import sa.gheras.edutrack.ui.teacher.media.MediaAttachment
 import java.io.File
 import java.time.Instant
 import java.time.LocalDate
@@ -378,7 +377,14 @@ class OutboxTest {
 
         val rawInstructions = AssignmentMediaParser.serialize(
             "حل المسائل في الصفحة",
-            listOf(AssignmentAttachment(uri = tempFile.absolutePath, type = AssignmentMediaType.IMAGE))
+            listOf(
+                MediaAttachment(
+                    id = "att_test_1",
+                    kind = "image",
+                    title = "ورقة عمل",
+                    uri = tempFile.absolutePath
+                )
+            )
         )
 
         val assignId = "assign_retry_test_1"

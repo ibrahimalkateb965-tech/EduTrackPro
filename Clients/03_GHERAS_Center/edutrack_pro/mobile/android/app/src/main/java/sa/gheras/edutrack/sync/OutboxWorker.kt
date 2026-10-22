@@ -203,12 +203,35 @@ class OutboxWorker(
                     }
                 }
 
+                val assignmentId = json.optString("assignment_id")
                 var instructions = json.optString("instructions").takeIf { it.isNotBlank() }
                 if (!instructions.isNullOrBlank()) {
                     val (cleanText, attachments) = sa.gheras.edutrack.ui.teacher.media.AssignmentMediaParser.parse(instructions)
-                    var hasUploaded = false
-                    val updatedAttachments = attachments.map { att ->
-                        if (!att.uri.startsWith("http://") && !att.uri.startsWith("https://") && !att.uri.startsWith("/api/")) {
+                    val currentAttachments = attachments.toMutableList()
+
+                    for (i in currentAttachments.indices) {
+                        val att = currentAttachments[i]
+                        if (att.uri.contains("/me/files/")) {
+                            // Already uploaded server file from a previous attempt
+                            val storageKey = att.uri.substringAfter("/me/files/")
+                            if (filesList.none { it.storageKey == storageKey }) {
+                                val mediaType = when (att.kind) {
+                                    "pdf_document" -> "document"
+                                    "voice_note" -> "audio"
+                                    "video_link" -> "video"
+                                    else -> "image"
+                                }
+                                filesList.add(
+                                    sa.gheras.edutrack.data.remote.dto.AssignmentFileDto(
+                                        storageKey = storageKey,
+                                        mediaType = mediaType,
+                                        fileName = storageKey.substringAfterLast("/"),
+                                        bytes = 0L
+                                    )
+                                )
+                            }
+                        } else if (!att.uri.startsWith("http://") && !att.uri.startsWith("https://") && !att.uri.startsWith("/api/")) {
+                            // Local file on device to upload
                             val file = File(att.uri)
                             if (file.exists() && file.isFile) {
                                 if (file.length() > 25 * 1024 * 1024) {
@@ -224,71 +247,43 @@ class OutboxWorker(
                                 }
                                 val reqBody = file.asRequestBody(mediaType)
                                 val res = meApi.uploadMedia(file.name, reqBody)
-                                hasUploaded = true
                                 val storageKey = res.storageKey ?: res.url.substringAfterLast("/")
-                                filesList.add(
-                                    sa.gheras.edutrack.data.remote.dto.AssignmentFileDto(
-                                        storageKey = storageKey,
-                                        mediaType = when (file.extension.lowercase()) {
-                                            "pdf" -> "document"
-                                            "mp3", "m4a", "aac" -> "audio"
-                                            "mp4" -> "video"
-                                            else -> "image"
-                                        },
-                                        fileName = file.name,
-                                        bytes = file.length()
-                                    )
+                                val fileDto = sa.gheras.edutrack.data.remote.dto.AssignmentFileDto(
+                                    storageKey = storageKey,
+                                    mediaType = when (file.extension.lowercase()) {
+                                        "pdf" -> "document"
+                                        "mp3", "m4a", "aac" -> "audio"
+                                        "mp4" -> "video"
+                                        else -> "image"
+                                    },
+                                    fileName = file.name,
+                                    bytes = file.length()
                                 )
-                                att.copy(uri = res.url)
-                            } else {
-                                att
+                                filesList.add(fileDto)
+                                currentAttachments[i] = att.copy(uri = res.url)
+
+                                // J1 & J1b: Immediately persist after EACH successful upload to Room and Outbox
+                                instructions = sa.gheras.edutrack.ui.teacher.media.AssignmentMediaParser.serialize(cleanText, currentAttachments)
+                                db.assignmentDao().updateInstructions(assignmentId, instructions, Instant.now())
+
+                                json.put("instructions", instructions)
+                                val filesArr = org.json.JSONArray()
+                                for (f in filesList) {
+                                    filesArr.put(org.json.JSONObject().apply {
+                                        put("storage_key", f.storageKey)
+                                        put("media_type", f.mediaType)
+                                        put("file_name", f.fileName)
+                                        put("bytes", f.bytes)
+                                    })
+                                }
+                                json.put("files", filesArr)
+                                db.pendingWriteDao().upsert(item.copy(payloadJson = json.toString()))
                             }
-                        } else {
-                            // Already uploaded URL from a previous attempt or existing file
-                            val storageKey = if (att.uri.contains("/me/files/")) {
-                                att.uri.substringAfter("/me/files/")
-                            } else {
-                                att.uri.substringAfterLast("/")
-                            }
-                            if (filesList.none { it.storageKey == storageKey }) {
-                                filesList.add(
-                                    sa.gheras.edutrack.data.remote.dto.AssignmentFileDto(
-                                        storageKey = storageKey,
-                                        mediaType = when (att.type) {
-                                            sa.gheras.edutrack.ui.teacher.media.AssignmentMediaType.PDF -> "document"
-                                            sa.gheras.edutrack.ui.teacher.media.AssignmentMediaType.AUDIO -> "audio"
-                                            sa.gheras.edutrack.ui.teacher.media.AssignmentMediaType.VIDEO -> "video"
-                                            else -> "image"
-                                        },
-                                        fileName = storageKey.substringAfterLast("/"),
-                                        bytes = 0L
-                                    )
-                                )
-                            }
-                            att
                         }
+                        // J2b: External links (youtube.com, forms.gle) are kept in instructions only and never added to filesList
                     }
-                    if (hasUploaded) {
-                        instructions = sa.gheras.edutrack.ui.teacher.media.AssignmentMediaParser.serialize(cleanText, updatedAttachments)
-                        val assignmentId = json.optString("assignment_id")
-                        val existing = db.assignmentDao().getById(assignmentId)
-                        if (existing != null) {
-                            db.assignmentDao().upsert(existing.copy(instructions = instructions))
-                        }
-                        // Update outbox pending item payload to prevent re-uploading on retry AND preserve file list (J1 fix)
-                        json.put("instructions", instructions)
-                        val filesArr = org.json.JSONArray()
-                        for (f in filesList) {
-                            filesArr.put(org.json.JSONObject().apply {
-                                put("storage_key", f.storageKey)
-                                put("media_type", f.mediaType)
-                                put("file_name", f.fileName)
-                                put("bytes", f.bytes)
-                            })
-                        }
-                        json.put("files", filesArr)
-                        db.pendingWriteDao().upsert(item.copy(payloadJson = json.toString()))
-                    } else if (filesList.isNotEmpty() && (json.optJSONArray("files") == null || json.optJSONArray("files")!!.length() != filesList.size)) {
+
+                    if (filesList.isNotEmpty() && (json.optJSONArray("files") == null || json.optJSONArray("files")!!.length() != filesList.size)) {
                         val filesArr = org.json.JSONArray()
                         for (f in filesList) {
                             filesArr.put(org.json.JSONObject().apply {
@@ -320,7 +315,12 @@ class OutboxWorker(
                     files = filesList
                 )
                 val res = meApi.createAssignmentModern(body)
-                db.assignmentDao().upsert(AssignmentMappers.assignmentToEntity(res))
+                val existing = db.assignmentDao().getById(res.id)
+                if (existing != null) {
+                    db.assignmentDao().update(AssignmentMappers.assignmentToEntity(res))
+                } else {
+                    db.assignmentDao().upsert(AssignmentMappers.assignmentToEntity(res))
+                }
                 val serverLinks = AssignmentMappers.assignmentStudentsToEntities(res)
                 if (serverLinks.isNotEmpty()) {
                     db.assignmentStudentDao().deleteByAssignment(res.id)

@@ -180,16 +180,14 @@ class FakeMeApi : MeApi {
     }
 
     override suspend fun reviewSubmission(id: String, body: ReviewSubmissionRequest): SubmissionDto {
-        val existing = submissionsStore[id]
-        val fallbackAssignmentId = submissionsStore.values.firstOrNull()?.assignmentId ?: "asgn_1"
-        val fallbackStudentId = submissionsStore.values.firstOrNull()?.studentId ?: "student_1"
+        val existing = submissionsStore[id] ?: throw IllegalArgumentException("Submission $id not found in FakeMeApi store")
         val updated = SubmissionDto(
             id = id,
-            assignmentId = existing?.assignmentId ?: fallbackAssignmentId,
-            studentId = existing?.studentId ?: fallbackStudentId,
-            attemptNumber = existing?.attemptNumber ?: 1,
-            parentSubmissionId = existing?.parentSubmissionId,
-            isLate = existing?.isLate ?: true,
+            assignmentId = existing.assignmentId,
+            studentId = existing.studentId,
+            attemptNumber = existing.attemptNumber,
+            parentSubmissionId = existing.parentSubmissionId,
+            isLate = existing.isLate,
             status = body.status,
             gradeLevel = body.gradeLevel,
             grade = body.grade,

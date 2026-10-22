@@ -36,6 +36,9 @@ interface AssignmentDao {
     @Query("UPDATE assignments SET is_draft = 0, updated_at = :updatedAt WHERE id = :id")
     suspend fun markPublished(id: String, updatedAt: Instant)
 
+    @Query("UPDATE assignments SET instructions = :instructions, updated_at = :updatedAt WHERE id = :id")
+    suspend fun updateInstructions(id: String, instructions: String?, updatedAt: Instant)
+
     @Query("SELECT * FROM assignments WHERE id = :id")
     suspend fun getById(id: String): AssignmentEntity?
 

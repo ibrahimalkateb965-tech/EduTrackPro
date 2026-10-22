@@ -280,17 +280,13 @@ class AssignmentsRepository(
                 val dto = api.submitAssignment(assignmentId, req)
                 val syncedEntity = AssignmentMappers.submissionToEntity(dto, branchId)
                 if (localId != syncedEntity.id) {
+                    submissionFileDao?.deleteBySubmission(localId)
                     submissionDao.deleteById(localId)
                 }
                 submissionDao.upsert(syncedEntity)
-                if (submissionFileDao != null) {
-                    if (localId != syncedEntity.id) {
-                        submissionFileDao.replaceScope(localId, emptyList())
-                    }
-                    if (dto.files.isNotEmpty()) {
-                        val fileEntities = AssignmentMappers.submissionFilesToEntities(dto, branchId)
-                        submissionFileDao.replaceScope(syncedEntity.id, fileEntities)
-                    }
+                if (submissionFileDao != null && dto.files.isNotEmpty()) {
+                    val fileEntities = AssignmentMappers.submissionFilesToEntities(dto, branchId)
+                    submissionFileDao.replaceScope(syncedEntity.id, fileEntities)
                 }
                 Result.success(syncedEntity)
             } catch (e: Exception) {
