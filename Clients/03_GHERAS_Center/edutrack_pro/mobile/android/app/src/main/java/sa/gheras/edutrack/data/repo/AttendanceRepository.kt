@@ -1,5 +1,6 @@
 package sa.gheras.edutrack.data.repo
 
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
@@ -21,7 +22,8 @@ class AttendanceRepository(
     private val attendanceDao: StudentAttendanceDao,
     private val excuseDao: AttendanceExcuseDao? = null,
     private val meApi: MeApi? = null,
-    private val outbox: Outbox
+    private val outbox: Outbox,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
 ) {
     fun observeByStudent(studentId: String): Flow<List<StudentAttendanceEntity>> =
         attendanceDao.observeByStudent(studentId)
@@ -176,7 +178,7 @@ class AttendanceRepository(
         dateFrom: LocalDate? = null,
         dateTo: LocalDate? = null,
         studentId: String? = null
-    ): List<AttendanceExcuseDto> = withContext(Dispatchers.IO) {
+    ): List<AttendanceExcuseDto> = withContext(ioDispatcher) {
         val api = meApi ?: return@withContext emptyList()
         val response = api.listExcusesStaff(
             status = status,
@@ -192,7 +194,7 @@ class AttendanceRepository(
         excuseId: String,
         action: String,
         notes: String? = null
-    ): AttendanceExcuseDto = withContext(Dispatchers.IO) {
+    ): AttendanceExcuseDto = withContext(ioDispatcher) {
         val api = checkNotNull(meApi) { "MeApi must not be null for supervisor review" }
         api.reviewExcuse(excuseId, ReviewExcuseRequest(action = action, supervisorNotes = notes))
     }

@@ -79,14 +79,21 @@ class SupervisorExcusesViewModelTest {
 
     @Before
     fun setUp() {
-        Dispatchers.setMain(UnconfinedTestDispatcher())
+        val testDispatcher = UnconfinedTestDispatcher()
+        Dispatchers.setMain(testDispatcher)
         val context = ApplicationProvider.getApplicationContext<Context>()
         db = Room.inMemoryDatabaseBuilder(context, GherasDatabase::class.java)
             .allowMainThreadQueries()
             .build()
         val outbox = Outbox(context, db) { "supervisor_1" }
         fakeApi = TestSupervisorMeApi()
-        attendanceRepo = AttendanceRepository(db.studentAttendanceDao(), db.attendanceExcuseDao(), fakeApi, outbox)
+        attendanceRepo = AttendanceRepository(
+            attendanceDao = db.studentAttendanceDao(),
+            excuseDao = db.attendanceExcuseDao(),
+            meApi = fakeApi,
+            outbox = outbox,
+            ioDispatcher = testDispatcher
+        )
     }
 
     @After
