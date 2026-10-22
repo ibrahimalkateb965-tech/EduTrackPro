@@ -43,7 +43,7 @@ def test_student_attendance_status_check(db):
     # Seed required parent rows
     branch_id = db.execute("SELECT id FROM branches LIMIT 1").fetchone()["id"]
     room_id = db.execute(
-        "INSERT INTO rooms (branch_id, name) VALUES (%s, 'قاعة الاختبار') RETURNING id",
+        "INSERT INTO rooms (branch_id, name, group_name) VALUES (%s, 'قاعة الاختبار', 'الصباح') RETURNING id",
         (branch_id,)
     ).fetchone()["id"]
     student_id = db.execute(
@@ -87,7 +87,7 @@ def test_student_attendance_is_draft_and_excuse_id(db):
     """Verify is_draft default and excuse_id column with SET NULL on excuse deletion."""
     branch_id = db.execute("SELECT id FROM branches LIMIT 1").fetchone()["id"]
     room_id = db.execute(
-        "INSERT INTO rooms (branch_id, name) VALUES (%s, 'قاعة المسودة') RETURNING id",
+        "INSERT INTO rooms (branch_id, name, group_name) VALUES (%s, 'قاعة المسودة', 'الصباح') RETURNING id",
         (branch_id,)
     ).fetchone()["id"]
     student_id = db.execute(
@@ -140,7 +140,10 @@ def test_student_attendance_is_draft_and_excuse_id(db):
 def test_attendance_excuses_schema_and_constraints(db):
     """Verify attendance_excuses status values, default, and unique active day index."""
     branch_id = db.execute("SELECT id FROM branches LIMIT 1").fetchone()["id"]
-    room_id = db.execute("SELECT id FROM rooms LIMIT 1").fetchone()["id"]
+    room_id = db.execute(
+        "INSERT INTO rooms (branch_id, name, group_name) VALUES (%s, 'قاعة الأعذار', 'الصباح') RETURNING id",
+        (branch_id,)
+    ).fetchone()["id"]
     student_id = db.execute(
         "INSERT INTO students (branch_id, room_id, name) VALUES (%s, %s, 'طالب الأعذار') RETURNING id",
         (branch_id, room_id)
@@ -187,7 +190,10 @@ def test_attendance_excuses_schema_and_constraints(db):
 def test_attendance_excuses_client_request_id_unique(db):
     """Verify unique constraint uq_attendance_excuses_client_request_id protects replay."""
     branch_id = db.execute("SELECT id FROM branches LIMIT 1").fetchone()["id"]
-    room_id = db.execute("SELECT id FROM rooms LIMIT 1").fetchone()["id"]
+    room_id = db.execute(
+        "INSERT INTO rooms (branch_id, name, group_name) VALUES (%s, 'قاعة الأعذار', 'الصباح') RETURNING id",
+        (branch_id,)
+    ).fetchone()["id"]
     student_id = db.execute(
         "INSERT INTO students (branch_id, room_id, name) VALUES (%s, %s, 'طالب الـ Client Req') RETURNING id",
         (branch_id, room_id)
@@ -217,7 +223,10 @@ def test_attendance_excuses_client_request_id_unique(db):
 def test_attendance_excuses_updated_at_trigger(db):
     """Verify trg_attendance_excuses_updated_at updates updated_at on record update."""
     branch_id = db.execute("SELECT id FROM branches LIMIT 1").fetchone()["id"]
-    room_id = db.execute("SELECT id FROM rooms LIMIT 1").fetchone()["id"]
+    room_id = db.execute(
+        "INSERT INTO rooms (branch_id, name, group_name) VALUES (%s, 'قاعة الأعذار', 'الصباح') RETURNING id",
+        (branch_id,)
+    ).fetchone()["id"]
     student_id = db.execute(
         "INSERT INTO students (branch_id, room_id, name) VALUES (%s, %s, 'طالب التريجر') RETURNING id",
         (branch_id, room_id)
@@ -234,6 +243,7 @@ def test_attendance_excuses_updated_at_trigger(db):
     """, (branch_id, student_id, guardian_user_id)).fetchone()
     excuse_id = row["id"]
     orig_updated_at = row["updated_at"]
+    db.commit()  # now() is frozen per transaction; the UPDATE must run in a new one
 
     # Sleep slightly so timestamps differ
     time.sleep(0.05)
@@ -262,7 +272,9 @@ def test_attendance_excuses_grants(db):
 def test_notifications_target_type_excuse(db):
     """Verify that notifications table allows target_type = 'excuse'."""
     branch_id = db.execute("SELECT id FROM branches LIMIT 1").fetchone()["id"]
-    user_id = db.execute("SELECT id FROM users LIMIT 1").fetchone()["id"]
+    user_id = db.execute(
+        "INSERT INTO users (username, role, password_hash) VALUES ('guardian_notif_018', 'guardian', 'hash_123') RETURNING id"
+    ).fetchone()["id"]
 
     db.execute("""
         INSERT INTO notifications (branch_id, user_id, kind, title, body, target_type)

@@ -1022,3 +1022,12 @@ All 6 blocking defects (K1–K6) identified in Claude Code CLI's audit report ha
 - Android: 210/0 on a clean `git archive`, twice (2nd with `--rerun-tasks`). Mutation check: putting back the round 6 J3/J4 code turns the guarding tests red. Reviewer probes R7 (J2b links stay in the text; J1b no re-upload after a partial failure) are green.
 - J1b, J2a, J2b, J3, J4 and K20 are closed. **M2 `[APPROVED]`. M3 (Attendance + Excuses) UNLOCKED.**
 - The M2 APK stays gated on: N1 (port probes R7 into `OutboxTest`, stop swallowing exceptions), N2 (narrow the `submitAssignment` catch), N3 (`Outbox.kt:225` REPLACE in `reapplyPending`), Z1–Z3, and a [C-96] device smoke run. Details: `fleet_orders/16_handoff/reports/PLAN_AUDIT.md` § M2 Round 7.
+
+### 2026-10-22: M3 Plan Audit Round 2 (`PLAN_M3.md` Rev 2.0): **CHANGES REQUESTED**, S3-B1 authorized (Claude Code CLI)
+- Closed: P1, P2, P4, P6–P11, n1–n6. Partial: P3, P5, P12.
+- New blockers G1–G4: G1 no excuse read routes (`GET /me/excuses` → PullSync, staff `GET /attendance/excuses`; `me.py` is in no batch); G2 `PendingWriteEntity.kt` KIND constants are in no batch; G3 draft upsert hides approved rows again, P5 is not on the draft path, no room-membership check, roles unstated; G4 `StudentDetailViewModel.kt:64` and `GuardianHomeScreen.kt:203` miss `غياب بعذر`. Nits m1–m7.
+- **S3-B1 dispatch AUTHORIZED** (018 + `deploy.sh` + migration test; apply m6). S3-B2 onwards stays locked until Rev 2.1 is `[APPROVED]`. Details: `fleet_orders/16_handoff/reports/PLAN_AUDIT.md` § M3 Plan Audit Round 2.
+
+## 2026-10-22 — Fleet Order 16 / M3 (Claude Code gate)
+- `PLAN_M3.md` Rev 2.1 **[APPROVED]** (G1–G4, m1–m7 closed). Conditions H1–H4 for S3-B2/S3-B4a: approve-route role/scope checks, draft rejects client `غياب بعذر`, clear `excuse_id` on status change, excuses router before crud.
+- S3-B1 (`808f0b2`, WSL) **[APPROVED]** after test-only reviewer patch R9 (submitted suite 2/8: fixture bugs). 8/8 green, mutation-checked. R9 lives in F: `server/tests/test_attendance_excuses_migration.py`; port it to the WSL clone. **S3-B2 unlocked.**
