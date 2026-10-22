@@ -197,6 +197,7 @@ class OutboxWorker(
                         val fetchedKey = uploadRes.storageKey ?: throw IllegalStateException("Server did not return storage_key for uploaded attachment")
                         storageKey = fetchedKey
                         json.put("attachment_storage_key", fetchedKey)
+                        try { file.delete() } catch (_: Exception) {}
                         db.pendingWriteDao().upsert(item.copy(payloadJson = json.toString()))
                     }
                 }
@@ -243,6 +244,7 @@ class OutboxWorker(
                         val fetchedKey = uploadRes.storageKey ?: throw IllegalStateException("Server did not return storage_key for uploaded attachment")
                         storageKey = fetchedKey
                         json.put("attachment_storage_key", fetchedKey)
+                        try { file.delete() } catch (_: Exception) {}
                         db.pendingWriteDao().upsert(item.copy(payloadJson = json.toString()))
                     }
                 }

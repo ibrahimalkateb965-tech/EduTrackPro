@@ -51,12 +51,16 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import sa.gheras.edutrack.data.entity.AttendanceExcuseEntity
 import sa.gheras.edutrack.ui.common.EmptyView
 import sa.gheras.edutrack.ui.common.LoadingView
@@ -392,6 +396,73 @@ fun AttendanceExcusesList(
 }
 
 @Composable
+private fun rememberExcuseAttachmentPicker(
+    context: android.content.Context,
+    onFileSelected: (String) -> Unit,
+    onError: (String) -> Unit
+): () -> Unit {
+    val scope = rememberCoroutineScope()
+    val launcher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch(Dispatchers.IO) {
+            try {
+                val cr = context.contentResolver
+                val mime = cr.getType(uri)?.lowercase() ?: ""
+                val uriStr = uri.toString().lowercase()
+
+                val ext = when {
+                    mime == "application/pdf" || (mime.isBlank() && uriStr.endsWith(".pdf")) -> "pdf"
+                    mime == "image/jpeg" || (mime.isBlank() && (uriStr.endsWith(".jpg") || uriStr.endsWith(".jpeg"))) -> "jpg"
+                    mime == "image/png" || (mime.isBlank() && uriStr.endsWith(".png")) -> "png"
+                    else -> {
+                        withContext(Dispatchers.Main) {
+                            onError("يرجى اختيار صورة (JPG, PNG) أو ملف PDF فقط")
+                        }
+                        return@launch
+                    }
+                }
+
+                val excusesDir = File(context.filesDir, "excuses").apply { mkdirs() }
+                val destFile = File(excusesDir, "excuse_${System.currentTimeMillis()}.$ext")
+
+                cr.openInputStream(uri)?.use { input ->
+                    destFile.outputStream().use { output ->
+                        input.copyTo(output)
+                    }
+                } ?: run {
+                    withContext(Dispatchers.Main) {
+                        onError("تعذر قراءة أو حفظ الملف المرفق")
+                    }
+                    return@launch
+                }
+
+                if (destFile.length() > 25 * 1024 * 1024) {
+                    destFile.delete()
+                    withContext(Dispatchers.Main) {
+                        onError("حجم الملف يتجاوز الحد الأقصى 25 ميجابايت")
+                    }
+                    return@launch
+                }
+
+                withContext(Dispatchers.Main) {
+                    onFileSelected(destFile.absolutePath)
+                }
+            } catch (_: Exception) {
+                withContext(Dispatchers.Main) {
+                    onError("تعذر قراءة أو حفظ الملف المرفق")
+                }
+            }
+        }
+    }
+
+    return {
+        launcher.launch(arrayOf("image/jpeg", "image/png", "application/pdf"))
+    }
+}
+
+@Composable
 fun SubmitExcuseDialog(
     isSubmitting: Boolean,
     errorMessage: String?,
@@ -404,43 +475,16 @@ fun SubmitExcuseDialog(
     var attachedPath by remember { mutableStateOf<String?>(null) }
     var pickerError by remember { mutableStateOf<String?>(null) }
 
-    val filePicker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri: Uri? ->
-        if (uri != null) {
-            try {
-                val cr = context.contentResolver
-                val mime = cr.getType(uri) ?: ""
-                val uriStr = uri.toString().lowercase()
-                val isImageOrPdf = mime.startsWith("image/") || mime == "application/pdf" ||
-                        uriStr.endsWith(".pdf") || uriStr.endsWith(".jpg") || uriStr.endsWith(".png") || uriStr.endsWith(".jpeg")
-                if (!isImageOrPdf) {
-                    pickerError = "يرجى اختيار صورة (JPG, PNG) أو ملف PDF فقط"
-                    return@rememberLauncherForActivityResult
-                }
-                val ext = when {
-                    mime == "application/pdf" || uriStr.endsWith(".pdf") -> "pdf"
-                    mime == "image/png" || uriStr.endsWith(".png") -> "png"
-                    else -> "jpg"
-                }
-                val destFile = File(context.cacheDir, "excuse_${System.currentTimeMillis()}.$ext")
-                cr.openInputStream(uri)?.use { input ->
-                    destFile.outputStream().use { output ->
-                        input.copyTo(output)
-                    }
-                }
-                if (destFile.length() > 25 * 1024 * 1024) {
-                    destFile.delete()
-                    pickerError = "حجم الملف يتجاوز الحد الأقصى 25 ميجابايت"
-                    return@rememberLauncherForActivityResult
-                }
-                attachedPath = destFile.absolutePath
-                pickerError = null
-            } catch (_: Exception) {
-                pickerError = "تعذر قراءة أو حفظ الملف المرفق"
-            }
+    val launchPicker = rememberExcuseAttachmentPicker(
+        context = context,
+        onFileSelected = { path ->
+            attachedPath = path
+            pickerError = null
+        },
+        onError = { err ->
+            pickerError = err
         }
-    }
+    )
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -486,7 +530,7 @@ fun SubmitExcuseDialog(
                     }
                 } else {
                     OutlinedButton(
-                        onClick = { filePicker.launch("*/*") },
+                        onClick = launchPicker,
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(8.dp)
                     ) {
@@ -546,43 +590,16 @@ fun PatchExcuseDialog(
     var attachedPath by remember { mutableStateOf(excuse.attachmentStorageKey) }
     var pickerError by remember { mutableStateOf<String?>(null) }
 
-    val filePicker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri: Uri? ->
-        if (uri != null) {
-            try {
-                val cr = context.contentResolver
-                val mime = cr.getType(uri) ?: ""
-                val uriStr = uri.toString().lowercase()
-                val isImageOrPdf = mime.startsWith("image/") || mime == "application/pdf" ||
-                        uriStr.endsWith(".pdf") || uriStr.endsWith(".jpg") || uriStr.endsWith(".png") || uriStr.endsWith(".jpeg")
-                if (!isImageOrPdf) {
-                    pickerError = "يرجى اختيار صورة (JPG, PNG) أو ملف PDF فقط"
-                    return@rememberLauncherForActivityResult
-                }
-                val ext = when {
-                    mime == "application/pdf" || uriStr.endsWith(".pdf") -> "pdf"
-                    mime == "image/png" || uriStr.endsWith(".png") -> "png"
-                    else -> "jpg"
-                }
-                val destFile = File(context.cacheDir, "excuse_${System.currentTimeMillis()}.$ext")
-                cr.openInputStream(uri)?.use { input ->
-                    destFile.outputStream().use { output ->
-                        input.copyTo(output)
-                    }
-                }
-                if (destFile.length() > 25 * 1024 * 1024) {
-                    destFile.delete()
-                    pickerError = "حجم الملف يتجاوز الحد الأقصى 25 ميجابايت"
-                    return@rememberLauncherForActivityResult
-                }
-                attachedPath = destFile.absolutePath
-                pickerError = null
-            } catch (_: Exception) {
-                pickerError = "تعذر قراءة أو حفظ الملف المرفق"
-            }
+    val launchPicker = rememberExcuseAttachmentPicker(
+        context = context,
+        onFileSelected = { path ->
+            attachedPath = path
+            pickerError = null
+        },
+        onError = { err ->
+            pickerError = err
         }
-    }
+    )
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -635,7 +652,7 @@ fun PatchExcuseDialog(
                     }
                 } else {
                     OutlinedButton(
-                        onClick = { filePicker.launch("*/*") },
+                        onClick = launchPicker,
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(8.dp)
                     ) {
