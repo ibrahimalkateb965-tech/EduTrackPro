@@ -151,6 +151,28 @@ def list_attendance(
     return _envelope(rows, total, limit, offset)
 
 
+@router.get("/excuses")
+def list_excuses(
+    limit: int = 100,
+    offset: int = 0,
+    student_id: UUID | None = None,
+    status: str | None = None,
+    date_from: dt.date | None = None,
+    date_to: dt.date | None = None,
+    scope: Scope = _SCOPE,
+    conn=_CONN,
+) -> dict:
+    _page(limit, offset)
+    filters = {
+        "student_id": student_id,
+        "status": status,
+        "date_from": date_from,
+        "date_to": date_to,
+    }
+    rows, total = me_repo.list_excuses(conn, scope, filters, limit, offset)
+    return _envelope(rows, total, limit, offset)
+
+
 @router.get("/evaluations")
 def list_evaluations(
     limit: int = 100,

@@ -368,10 +368,40 @@ def list_attendance(conn, scope: Scope, filters: dict, limit: int, offset: int) 
     if not scope.student_ids:
         return [], 0
     where, params = _student_where(scope, "a")
+    if scope.role in ("guardian", "student"):
+        where.append("a.is_draft = FALSE")
     _opt(where, params, filters, "student_id", "a.student_id = %(student_id)s")
     _opt(where, params, filters, "date_from", "a.date >= %(date_from)s")
     _opt(where, params, filters, "date_to", "a.date <= %(date_to)s")
     sql = _select("a.*, s.name AS student_name", "student_attendance a JOIN students s ON s.id = a.student_id", where, "a.date DESC, a.id")
+    return _run(conn, sql, params, limit, offset)
+
+
+_EXCUSE_COLS = (
+    "ae.*, s.name AS student_name, s.room_id, r.name AS room_name, "
+    "CASE "
+    "WHEN ae.attachment_storage_key IS NULL THEN NULL "
+    "WHEN starts_with(ae.attachment_storage_key, 'http') THEN ae.attachment_storage_key "
+    "WHEN starts_with(ae.attachment_storage_key, '/api/') THEN ae.attachment_storage_key "
+    "ELSE '/api/v1/me/files/' || ae.attachment_storage_key "
+    "END AS attachment_url"
+)
+_EXCUSE_FROM = (
+    "attendance_excuses ae "
+    "JOIN students s ON s.id = ae.student_id AND s.deleted_at IS NULL "
+    "LEFT JOIN rooms r ON r.id = s.room_id AND r.deleted_at IS NULL"
+)
+
+
+def list_excuses(conn, scope: Scope, filters: dict, limit: int, offset: int) -> Rows:
+    if not scope.student_ids:
+        return [], 0
+    where, params = _student_where(scope, "ae")
+    _opt(where, params, filters, "student_id", "ae.student_id = %(student_id)s")
+    _opt(where, params, filters, "status", "ae.status = %(status)s")
+    _opt(where, params, filters, "date_from", "ae.excuse_date >= %(date_from)s")
+    _opt(where, params, filters, "date_to", "ae.excuse_date <= %(date_to)s")
+    sql = _select(_EXCUSE_COLS, _EXCUSE_FROM, where, "ae.excuse_date DESC, ae.created_at DESC, ae.id")
     return _run(conn, sql, params, limit, offset)
 
 
