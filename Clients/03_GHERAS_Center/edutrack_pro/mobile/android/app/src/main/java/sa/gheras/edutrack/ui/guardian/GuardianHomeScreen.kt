@@ -195,12 +195,13 @@ fun GuardianHomeScreen(
 
                     // 1. Today's Attendance
                     item {
-                        val att = state.todayAttendance
+                        val att = state.todayAttendance?.takeIf { !it.isDraft }
                         val (attText, attColor) = when (att?.status) {
                             "حاضر" -> "حاضر اليوم" to PresentGreen
                             "غائب" -> "غائب اليوم" to MaterialTheme.colorScheme.error
                             "متأخر" -> "متأخر اليوم" to WarningAmber
                             "مستأذن" -> "مستأذن اليوم" to MaterialTheme.colorScheme.outline
+                            "غياب بعذر" -> "غياب بعذر معتمد" to PresentGreen
                             else -> "لم يُسجل بعد" to MaterialTheme.colorScheme.outline
                         }
 
