@@ -26,16 +26,20 @@ MIGRATION_PATH = Path(__file__).resolve().parents[2] / "db" / "postgres" / "018_
 
 def test_migration_018_idempotent(db):
     """Applying 018_attendance_excuses.sql directly to the test database must succeed idempotently twice."""
+    import re
+
     with open(MIGRATION_PATH, "r", encoding="utf-8") as f:
         sql = f.read()
 
-    # First application
-    db.execute(sql)
-    db.commit()
+    clean_sql = re.sub(r"^\s*(BEGIN|COMMIT)\s*;\s*$", "", sql, flags=re.I | re.M)
 
-    # Second application must succeed without error
-    db.execute(sql)
-    db.commit()
+    try:
+        # First application
+        db.execute(clean_sql)
+        # Second application must succeed without error
+        db.execute(clean_sql)
+    finally:
+        db.rollback()
 
 
 def test_student_attendance_status_check(db):

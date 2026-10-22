@@ -40,8 +40,8 @@ def _envelope(rows: list[dict], total: int, limit: int, offset: int) -> dict:
     return {"items": [row_to_json(r) for r in rows], "total": total, "limit": limit, "offset": offset}
 
 
-def _only(scope: Scope, role: str) -> None:
-    if scope.role != role:
+def _only(scope: Scope, *roles: str) -> None:
+    if scope.role not in roles:
         raise ApiError(403, "forbidden")
 
 
@@ -348,4 +348,24 @@ def post_lesson_log(body: LessonLogIn, scope: Scope = _SCOPE, conn=_CONN) -> dic
 @router.post("/uploads")
 def retired_assignments_and_uploads():
     raise ApiError(404, "not_found", "تم نقل واجهات الواجبات والرفع إلى /api/v1/assignments و /api/v1/uploads")
+
+
+@router.get("/daily-summaries")
+def list_my_daily_summaries(
+    student_id: UUID,
+    summary_date: dt.date | None = None,
+    scope: Scope = _SCOPE,
+    conn=_CONN,
+) -> list[dict]:
+    _only(scope, "guardian", "student")
+    if scope.student_ids is not None and student_id not in scope.student_ids:
+        raise ApiError(403, "forbidden", "الطالب لا ينتمي لسجل أبنائك")
+    from edutrack_api.repositories import daily_summaries_repo
+    summaries = daily_summaries_repo.get_guardian_daily_summaries(
+        conn=conn,
+        student_id=student_id,
+        summary_date=summary_date,
+    )
+    return [row_to_json(s) for s in summaries]
+
 

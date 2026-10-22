@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.FactCheck
 import androidx.compose.material.icons.filled.Grading
+import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.Badge
@@ -72,6 +73,7 @@ fun TeacherHomeScreen(
     onAttendanceClick: (roomId: String, date: String) -> Unit,
     onEvaluationClick: (roomId: String, date: String, subject: String) -> Unit,
     onLessonLogClick: (scheduleId: String, date: String) -> Unit,
+    onDailySummaryClick: (roomId: String) -> Unit = {},
     onPickupQueueClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -277,7 +279,8 @@ fun TeacherHomeScreen(
                             date = state.selectedDate.toString(),
                             onAttendanceClick = { onAttendanceClick(slotItem.schedule.roomId, state.selectedDate.toString()) },
                             onEvaluationClick = { onEvaluationClick(slotItem.schedule.roomId, state.selectedDate.toString(), slotItem.schedule.subject) },
-                            onLessonLogClick = { onLessonLogClick(slotItem.schedule.id, state.selectedDate.toString()) }
+                            onLessonLogClick = { onLessonLogClick(slotItem.schedule.id, state.selectedDate.toString()) },
+                            onDailySummaryClick = { onDailySummaryClick(slotItem.schedule.roomId) }
                         )
                     }
                 }
@@ -293,6 +296,7 @@ fun ScheduleSlotCard(
     onAttendanceClick: () -> Unit,
     onEvaluationClick: () -> Unit,
     onLessonLogClick: () -> Unit,
+    onDailySummaryClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val sched = slotItem.schedule
@@ -379,6 +383,22 @@ fun ScheduleSlotCard(
                     Spacer(modifier = Modifier.width(4.dp))
                     Text("السجل")
                 }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+            OutlinedButton(
+                onClick = onDailySummaryClick,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(10.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.MenuBook,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                    tint = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("إعداد ونشر الملخص اليومي للقاعة")
             }
         }
     }

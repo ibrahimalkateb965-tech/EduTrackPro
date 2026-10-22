@@ -1,6 +1,7 @@
 package sa.gheras.edutrack.data.repo
 
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import sa.gheras.edutrack.data.dao.StudentDao
 import sa.gheras.edutrack.data.entity.StudentEntity
 
@@ -12,6 +13,8 @@ class StudentsRepository(
     fun observeByRoom(roomId: String): Flow<List<StudentEntity>> = studentDao.observeByRoom(roomId)
 
     fun observeByIds(ids: List<String>): Flow<List<StudentEntity>> = studentDao.observeByIds(ids)
+
+    fun observeById(id: String): Flow<StudentEntity?> = studentDao.observeByIds(listOf(id)).map { it.firstOrNull() }
 
     suspend fun getById(id: String): StudentEntity? = studentDao.getById(id)
 

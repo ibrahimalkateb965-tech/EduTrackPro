@@ -14,7 +14,7 @@ from edutrack_api import __version__
 from edutrack_api.config import Settings, get_settings
 from edutrack_api.db import introspect_columns, make_pool
 from edutrack_api.errors import register_handlers
-from edutrack_api.routers import assignments, attendance, auth, crud, excuses, importer, me, media, pickup, print, reports, student_photos
+from edutrack_api.routers import assignments, attendance, auth, crud, daily_summaries, excuses, importer, me, media, pickup, print, reports, student_photos, threads
 from edutrack_api.routers import settings as settings_router
 
 
@@ -62,6 +62,8 @@ def create_app() -> FastAPI:
     api.include_router(assignments.router)
     api.include_router(media.router)
     api.include_router(excuses.router)
+    api.include_router(threads.router)
+    api.include_router(daily_summaries.router)
     api.include_router(crud.router)
 
     @api.get("/health")

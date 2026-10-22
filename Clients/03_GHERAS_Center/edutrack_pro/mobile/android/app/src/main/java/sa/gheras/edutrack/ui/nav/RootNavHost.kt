@@ -96,6 +96,14 @@ import sa.gheras.edutrack.ui.supervisor.attendance.SupervisorExcusesViewModel
 import sa.gheras.edutrack.ui.teacher.pickup.TeacherChildPrepScreen
 import sa.gheras.edutrack.ui.teacher.pickup.TeacherPickupQueueScreen
 import sa.gheras.edutrack.ui.teacher.pickup.TeacherPickupViewModel
+import sa.gheras.edutrack.ui.teacher.summary.TeacherDailySummaryScreen
+import sa.gheras.edutrack.ui.teacher.summary.TeacherDailySummaryViewModel
+import sa.gheras.edutrack.ui.guardian.threads.GuardianThreadsScreen
+import sa.gheras.edutrack.ui.guardian.threads.GuardianThreadsViewModel
+import sa.gheras.edutrack.ui.threads.ThreadDetailScreen
+import sa.gheras.edutrack.ui.threads.ThreadDetailViewModel
+import sa.gheras.edutrack.ui.guardian.summary.ChildDailySummaryScreen
+import sa.gheras.edutrack.ui.guardian.summary.ChildDailySummaryViewModel
 
 @Composable
 fun RootNavHost(
@@ -344,9 +352,29 @@ fun RootNavHost(
                         onLessonLogClick = { scheduleId, date ->
                             navController.navigate(LessonLogRoute(scheduleId, date))
                         },
+                        onDailySummaryClick = { roomId ->
+                            navController.navigate(TeacherDailySummaryRoute(roomId))
+                        },
                         onPickupQueueClick = {
                             navController.navigate(TeacherPickupQueueRoute)
                         }
+                    )
+                }
+
+                composable<TeacherDailySummaryRoute> { backStackEntry ->
+                    val route: TeacherDailySummaryRoute = backStackEntry.toRoute()
+                    val vm: TeacherDailySummaryViewModel = viewModel(
+                        factory = viewModelFactory {
+                            TeacherDailySummaryViewModel(
+                                roomId = route.roomId,
+                                dailySummariesRepository = container.dailySummariesRepository,
+                                studentsRepository = container.studentsRepository
+                            )
+                        }
+                    )
+                    TeacherDailySummaryScreen(
+                        viewModel = vm,
+                        onNavigateBack = { navController.popBackStack() }
                     )
                 }
 
@@ -630,10 +658,69 @@ fun RootNavHost(
                         onLessonsClick = { studentId -> navController.navigate(ChildLessonsRoute(studentId)) },
                         onSkillsClick = { studentId -> navController.navigate(ChildSkillsRoute(studentId)) },
                         onFeesClick = { studentId -> navController.navigate(FeesRoute(studentId)) },
+                        onDailySummaryClick = { studentId -> navController.navigate(ChildDailySummaryRoute(studentId)) },
+                        onThreadsClick = { navController.navigate(GuardianThreadsRoute) },
                         onPickupClick = { studentId ->
                             navController.navigate(PickupRequestRoute(studentId))
                         },
                         showFees = activeRole != Role.STUDENT
+                    )
+                }
+
+                composable<GuardianThreadsRoute> {
+                    val vm: GuardianThreadsViewModel = viewModel(
+                        factory = viewModelFactory {
+                            GuardianThreadsViewModel(
+                                threadsRepository = container.threadsRepository,
+                                studentsRepository = container.studentsRepository
+                            )
+                        }
+                    )
+                    GuardianThreadsScreen(
+                        viewModel = vm,
+                        onNavigateBack = { navController.popBackStack() },
+                        onNavigateToThread = { threadId ->
+                            navController.navigate(ThreadDetailRoute(threadId))
+                        }
+                    )
+                }
+
+                composable<ThreadDetailRoute> { backStackEntry ->
+                    val route: ThreadDetailRoute = backStackEntry.toRoute()
+                    val currentUserId = container.sessionStore.user?.id.orEmpty()
+                    val vm: ThreadDetailViewModel = viewModel(
+                        factory = viewModelFactory {
+                            ThreadDetailViewModel(
+                                threadId = route.threadId,
+                                currentUserId = currentUserId,
+                                threadsRepository = container.threadsRepository
+                            )
+                        }
+                    )
+                    ThreadDetailScreen(
+                        viewModel = vm,
+                        onNavigateBack = { navController.popBackStack() }
+                    )
+                }
+
+                composable<ChildDailySummaryRoute> { backStackEntry ->
+                    val route: ChildDailySummaryRoute = backStackEntry.toRoute()
+                    val vm: ChildDailySummaryViewModel = viewModel(
+                        factory = viewModelFactory {
+                            ChildDailySummaryViewModel(
+                                studentId = route.studentId,
+                                dailySummariesRepository = container.dailySummariesRepository,
+                                studentsRepository = container.studentsRepository,
+                                threadsRepository = container.threadsRepository
+                            )
+                        }
+                    )
+                    ChildDailySummaryScreen(
+                        viewModel = vm,
+                        onNavigateBack = { navController.popBackStack() },
+                        onNavigateToThread = { threadId ->
+                            navController.navigate(ThreadDetailRoute(threadId))
+                        }
                     )
                 }
 

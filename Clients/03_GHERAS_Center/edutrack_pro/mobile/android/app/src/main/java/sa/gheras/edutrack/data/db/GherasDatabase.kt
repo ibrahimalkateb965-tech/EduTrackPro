@@ -7,6 +7,7 @@ import androidx.room.withTransaction
 import sa.gheras.edutrack.data.dao.AssignmentDao
 import sa.gheras.edutrack.data.dao.AssignmentStudentDao
 import sa.gheras.edutrack.data.dao.AttendanceExcuseDao
+import sa.gheras.edutrack.data.dao.DailySummaryDao
 import sa.gheras.edutrack.data.dao.EvaluationDao
 import sa.gheras.edutrack.data.dao.InstallmentDao
 import sa.gheras.edutrack.data.dao.LessonLogDao
@@ -22,9 +23,12 @@ import sa.gheras.edutrack.data.dao.StudentDao
 import sa.gheras.edutrack.data.dao.SubmissionDao
 import sa.gheras.edutrack.data.dao.SubmissionFileDao
 import sa.gheras.edutrack.data.dao.SyncStateDao
+import sa.gheras.edutrack.data.dao.ThreadDao
 import sa.gheras.edutrack.data.entity.AssignmentEntity
 import sa.gheras.edutrack.data.entity.AssignmentStudentEntity
 import sa.gheras.edutrack.data.entity.AttendanceExcuseEntity
+import sa.gheras.edutrack.data.entity.DailySummaryEntity
+import sa.gheras.edutrack.data.entity.DailySummaryNoteEntity
 import sa.gheras.edutrack.data.entity.EvaluationEntity
 import sa.gheras.edutrack.data.entity.InstallmentEntity
 import sa.gheras.edutrack.data.entity.LessonLogEntity
@@ -40,6 +44,8 @@ import sa.gheras.edutrack.data.entity.StudentEntity
 import sa.gheras.edutrack.data.entity.SubmissionEntity
 import sa.gheras.edutrack.data.entity.SubmissionFileEntity
 import sa.gheras.edutrack.data.entity.SyncStateEntity
+import sa.gheras.edutrack.data.entity.ThreadEntity
+import sa.gheras.edutrack.data.entity.ThreadMessageEntity
 
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
@@ -49,6 +55,8 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         AssignmentEntity::class,
         AssignmentStudentEntity::class,
         AttendanceExcuseEntity::class,
+        DailySummaryEntity::class,
+        DailySummaryNoteEntity::class,
         EvaluationEntity::class,
         InstallmentEntity::class,
         LessonLogEntity::class,
@@ -63,9 +71,11 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         StudentEntity::class,
         SubmissionEntity::class,
         SubmissionFileEntity::class,
-        SyncStateEntity::class
+        SyncStateEntity::class,
+        ThreadEntity::class,
+        ThreadMessageEntity::class
     ],
-    version = 7,
+    version = 8,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -74,6 +84,7 @@ abstract class GherasDatabase : RoomDatabase() {
     abstract fun assignmentDao(): AssignmentDao
     abstract fun assignmentStudentDao(): AssignmentStudentDao
     abstract fun attendanceExcuseDao(): AttendanceExcuseDao
+    abstract fun dailySummaryDao(): DailySummaryDao
     abstract fun evaluationDao(): EvaluationDao
     abstract fun installmentDao(): InstallmentDao
     abstract fun lessonLogDao(): LessonLogDao
@@ -89,6 +100,7 @@ abstract class GherasDatabase : RoomDatabase() {
     abstract fun submissionDao(): SubmissionDao
     abstract fun submissionFileDao(): SubmissionFileDao
     abstract fun syncStateDao(): SyncStateDao
+    abstract fun threadDao(): ThreadDao
 
     /**
      * Replaces the whole synced scope in ONE transaction (design spec §2.3).
@@ -110,6 +122,10 @@ abstract class GherasDatabase : RoomDatabase() {
         reapplyPending: suspend (List<PendingWriteEntity>) -> Unit = {}
     ) = withTransaction {
         // 1. Clear — children before parents.
+        dailySummaryDao().clearNotes()
+        threadDao().clearMessages()
+        dailySummaryDao().clearSummaries()
+        threadDao().clearThreads()
         submissionFileDao().clear()
         submissionDao().clear()
         assignmentStudentDao().clear()
@@ -139,6 +155,10 @@ abstract class GherasDatabase : RoomDatabase() {
         evaluationDao().upsertAll(payload.evaluations)
         skillProgressDao().upsertAll(payload.skillProgress)
         lessonLogDao().upsertAll(payload.lessonLogs)
+        dailySummaryDao().upsertSummaries(payload.dailySummaries)
+        dailySummaryDao().upsertNotes(payload.dailySummaryNotes)
+        threadDao().upsertThreads(payload.threads)
+        threadDao().upsertMessages(payload.threadMessages)
         assignmentDao().upsertAll(payload.assignments)
         assignmentStudentDao().upsertAll(payload.assignmentStudents)
         submissionDao().upsertAll(payload.submissions)
@@ -283,6 +303,100 @@ abstract class GherasDatabase : RoomDatabase() {
                 """.trimIndent())
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_attendance_excuses_student_id` ON `attendance_excuses` (`student_id`)")
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_attendance_excuses_excuse_date` ON `attendance_excuses` (`excuse_date`)")
+            }
+        }
+
+        val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // 1. Create threads table
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `threads` (
+                        `id` TEXT NOT NULL,
+                        `branch_id` TEXT,
+                        `student_id` TEXT NOT NULL,
+                        `guardian_user_id` TEXT NOT NULL,
+                        `staff_user_id` TEXT NOT NULL,
+                        `subject` TEXT NOT NULL,
+                        `linked_assignment_id` TEXT,
+                        `linked_summary_id` TEXT,
+                        `status` TEXT NOT NULL DEFAULT 'open',
+                        `last_message_at` TEXT NOT NULL,
+                        `last_message_preview` TEXT,
+                        `created_at` TEXT NOT NULL,
+                        `updated_at` TEXT NOT NULL,
+                        PRIMARY KEY(`id`),
+                        FOREIGN KEY(`student_id`) REFERENCES `students`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT
+                    )
+                """.trimIndent())
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_threads_student_id` ON `threads` (`student_id`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_threads_last_message_at` ON `threads` (`last_message_at`)")
+
+                // 2. Create thread_messages table
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `thread_messages` (
+                        `id` TEXT NOT NULL,
+                        `branch_id` TEXT,
+                        `thread_id` TEXT NOT NULL,
+                        `sender_user_id` TEXT NOT NULL,
+                        `sender_role` TEXT NOT NULL,
+                        `body` TEXT NOT NULL,
+                        `attachment_storage_key` TEXT,
+                        `attachment_type` TEXT,
+                        `attachment_name` TEXT,
+                        `attachment_size_bytes` INTEGER,
+                        `sent_at` TEXT NOT NULL,
+                        `delivered_at` TEXT,
+                        `read_at` TEXT,
+                        `client_message_id` TEXT,
+                        `created_at` TEXT NOT NULL,
+                        `updated_at` TEXT NOT NULL,
+                        PRIMARY KEY(`id`),
+                        FOREIGN KEY(`thread_id`) REFERENCES `threads`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                """.trimIndent())
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_thread_messages_thread_id` ON `thread_messages` (`thread_id`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_thread_messages_sent_at` ON `thread_messages` (`sent_at`)")
+
+                // 3. Create daily_summaries table
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `daily_summaries` (
+                        `id` TEXT NOT NULL,
+                        `branch_id` TEXT,
+                        `room_id` TEXT NOT NULL,
+                        `teacher_user_id` TEXT NOT NULL,
+                        `summary_date` TEXT NOT NULL,
+                        `subject` TEXT NOT NULL,
+                        `title` TEXT NOT NULL,
+                        `class_summary` TEXT NOT NULL,
+                        `homework_summary` TEXT,
+                        `is_published` INTEGER NOT NULL DEFAULT 0,
+                        `published_at` TEXT,
+                        `created_at` TEXT NOT NULL,
+                        `updated_at` TEXT NOT NULL,
+                        PRIMARY KEY(`id`),
+                        FOREIGN KEY(`room_id`) REFERENCES `rooms`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT
+                    )
+                """.trimIndent())
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_daily_summaries_room_id` ON `daily_summaries` (`room_id`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_daily_summaries_summary_date` ON `daily_summaries` (`summary_date`)")
+
+                // 4. Create daily_summary_notes table
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `daily_summary_notes` (
+                        `id` TEXT NOT NULL,
+                        `branch_id` TEXT,
+                        `summary_id` TEXT NOT NULL,
+                        `student_id` TEXT NOT NULL,
+                        `private_note` TEXT NOT NULL,
+                        `created_at` TEXT NOT NULL,
+                        `updated_at` TEXT NOT NULL,
+                        PRIMARY KEY(`id`),
+                        FOREIGN KEY(`summary_id`) REFERENCES `daily_summaries`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE,
+                        FOREIGN KEY(`student_id`) REFERENCES `students`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT
+                    )
+                """.trimIndent())
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_daily_summary_notes_summary_id` ON `daily_summary_notes` (`summary_id`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_daily_summary_notes_student_id` ON `daily_summary_notes` (`student_id`)")
             }
         }
     }

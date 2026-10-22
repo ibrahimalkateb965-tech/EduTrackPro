@@ -38,5 +38,9 @@ data class ScopePayload(
     val submissionFiles: List<SubmissionFileEntity> = emptyList(),
     val notifications: List<NotificationEntity> = emptyList(),
     val pickupDelegates: List<PickupDelegateEntity> = emptyList(),
-    val excuses: List<AttendanceExcuseEntity> = emptyList()
+    val excuses: List<AttendanceExcuseEntity> = emptyList(),
+    val threads: List<sa.gheras.edutrack.data.entity.ThreadEntity> = emptyList(),
+    val threadMessages: List<sa.gheras.edutrack.data.entity.ThreadMessageEntity> = emptyList(),
+    val dailySummaries: List<sa.gheras.edutrack.data.entity.DailySummaryEntity> = emptyList(),
+    val dailySummaryNotes: List<sa.gheras.edutrack.data.entity.DailySummaryNoteEntity> = emptyList()
 )

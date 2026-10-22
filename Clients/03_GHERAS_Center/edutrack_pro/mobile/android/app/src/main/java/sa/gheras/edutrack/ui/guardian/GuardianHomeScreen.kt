@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.Assignment
 import androidx.compose.material.icons.filled.AutoStories
@@ -26,6 +27,7 @@ import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.FactCheck
 import androidx.compose.material.icons.filled.Grading
 import androidx.compose.material.icons.filled.HelpOutline
+import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Card
@@ -68,6 +70,8 @@ fun GuardianHomeScreen(
     onLessonsClick: (studentId: String) -> Unit,
     onSkillsClick: (studentId: String) -> Unit,
     onFeesClick: (studentId: String) -> Unit,
+    onDailySummaryClick: (studentId: String) -> Unit = {},
+    onThreadsClick: () -> Unit = {},
     onPickupClick: (studentId: String) -> Unit = {},
     showFees: Boolean = true,
     modifier: Modifier = Modifier
@@ -106,6 +110,9 @@ fun GuardianHomeScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = onThreadsClick) {
+                        Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = "المحادثات والرسائل")
+                    }
                     IconButton(onClick = viewModel::refresh) {
                         Icon(Icons.Default.Refresh, contentDescription = "تحديث")
                     }
@@ -262,6 +269,27 @@ fun GuardianHomeScreen(
                             subtitle = "متابعة المنهج والموضوعات المنجزة",
                             icon = Icons.Default.AutoStories,
                             onClick = { onLessonsClick(child.id) }
+                        )
+                    }
+
+                    // 5b. Daily Summary
+                    item {
+                        GuardianActionCard(
+                            title = "الملخص اليومي للدروس",
+                            subtitle = "ما تم إنجازه وشرحه اليوم، الواجبات، والملاحظات الخاصة",
+                            icon = Icons.Default.MenuBook,
+                            accentColor = MaterialTheme.colorScheme.primary,
+                            onClick = { onDailySummaryClick(child.id) }
+                        )
+                    }
+
+                    // 5c. Messages & Threads
+                    item {
+                        GuardianActionCard(
+                            title = "المحادثات والرسائل المباشرة",
+                            subtitle = "تواصل مباشر وخاص مع معلمات ومشرفات المركز",
+                            icon = Icons.AutoMirrored.Filled.Chat,
+                            onClick = onThreadsClick
                         )
                     }
 

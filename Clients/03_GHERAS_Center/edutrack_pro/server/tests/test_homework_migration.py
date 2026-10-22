@@ -37,23 +37,27 @@ def test_anchored_regex_url_rewriting_logic(db):
     # 2. Re-apply 017 migration to exercise step 9 against real seeded row
     with open(MIGRATION_PATH, "r", encoding="utf-8") as f:
         sql = f.read()
-    db.execute(sql)
-    db.commit()
+    clean_sql = re.sub(r"^\s*(BEGIN|COMMIT)\s*;\s*$", "", sql, flags=re.I | re.M)
 
-    # 3. Read back rewritten instructions
-    rewritten = db.execute("SELECT instructions FROM assignments WHERE id = %s", (ass_id,)).fetchone()["instructions"]
-    assert rewritten == 'Check attachment at /api/v1/me/files/sheet1.pdf and also /api/v1/me/files/audio.mp3'
-    assert '/api/v1/api/v1/' not in rewritten
-    assert '/static/uploads/' not in rewritten
+    try:
+        db.execute(clean_sql)
 
-    # 4. Verify assignment_files backfill from step 9
-    af_keys = [
-        r["storage_key"] for r in db.execute(
-            "SELECT storage_key FROM assignment_files WHERE assignment_id = %s", (ass_id,)
-        ).fetchall()
-    ]
-    assert "sheet1.pdf" in af_keys
-    assert "audio.mp3" in af_keys
+        # 3. Read back rewritten instructions
+        rewritten = db.execute("SELECT instructions FROM assignments WHERE id = %s", (ass_id,)).fetchone()["instructions"]
+        assert rewritten == 'Check attachment at /api/v1/me/files/sheet1.pdf and also /api/v1/me/files/audio.mp3'
+        assert '/api/v1/api/v1/' not in rewritten
+        assert '/static/uploads/' not in rewritten
+
+        # 4. Verify assignment_files backfill from step 9
+        af_keys = [
+            r["storage_key"] for r in db.execute(
+                "SELECT storage_key FROM assignment_files WHERE assignment_id = %s", (ass_id,)
+            ).fetchall()
+        ]
+        assert "sheet1.pdf" in af_keys
+        assert "audio.mp3" in af_keys
+    finally:
+        db.rollback()
 
 
 def test_migration_017_idempotent(db):
@@ -61,25 +65,38 @@ def test_migration_017_idempotent(db):
     with open(MIGRATION_PATH, "r", encoding="utf-8") as f:
         sql = f.read()
 
-    # Re-apply migration
-    db.execute(sql)
-    db.commit()
+    clean_sql = re.sub(r"^\s*(BEGIN|COMMIT)\s*;\s*$", "", sql, flags=re.I | re.M)
 
-    # Re-apply a second time to ensure idempotency
-    db.execute(sql)
-    db.commit()
+    try:
+        # Re-apply migration
+        db.execute(clean_sql)
+        # Re-apply a second time to ensure idempotency
+        db.execute(clean_sql)
 
-    # Verify tables exist
-    tables = [
-        r["table_name"]
-        for r in db.execute(
-            "SELECT table_name FROM information_schema.tables WHERE table_schema='public'"
-        ).fetchall()
-    ]
-    assert "staged_uploads" in tables
-    assert "assignment_files" in tables
-    assert "assignment_reminders" in tables
-    assert "assignment_reminder_recipients" in tables
+        # Verify tables exist
+        tables = [
+            r["table_name"]
+            for r in db.execute(
+                "SELECT table_name FROM information_schema.tables WHERE table_schema='public'"
+            ).fetchall()
+        ]
+        assert "staged_uploads" in tables
+        assert "assignment_files" in tables
+        assert "assignment_reminders" in tables
+        assert "assignment_reminder_recipients" in tables
+    finally:
+        db.rollback()
+
+    # After rollback, verify notifications constraint still contains all modern types (thread_message, daily_summary)
+    chk_row = db.execute("""
+        SELECT pg_get_constraintdef(c.oid) as def
+        FROM pg_constraint c
+        JOIN pg_class t ON c.conrelid = t.oid
+        WHERE c.conname = 'chk_notifications_target_type'
+    """).fetchone()
+    assert chk_row is not None, "chk_notifications_target_type constraint must exist"
+    assert "'thread_message'" in chk_row["def"], "Constraint must contain thread_message after rollback"
+    assert "'daily_summary'" in chk_row["def"], "Constraint must contain daily_summary after rollback"
 
 
 def test_migration_017_columns_and_constraints(db):

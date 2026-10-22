@@ -37,7 +37,8 @@ class AppContainer(private val context: Context) {
                 GherasDatabase.MIGRATION_3_4,
                 GherasDatabase.MIGRATION_4_5,
                 GherasDatabase.MIGRATION_5_6,
-                GherasDatabase.MIGRATION_6_7
+                GherasDatabase.MIGRATION_6_7,
+                GherasDatabase.MIGRATION_7_8
             )
             .fallbackToDestructiveMigrationOnDowngrade()
             .build()
@@ -163,6 +164,24 @@ class AppContainer(private val context: Context) {
             pickupDao = database.pickupDao(),
             pickupApi = pickupApi,
             outbox = outbox
+        )
+    }
+
+    val threadsApi: sa.gheras.edutrack.data.remote.ThreadsApi by lazy {
+        retrofit.create(sa.gheras.edutrack.data.remote.ThreadsApi::class.java)
+    }
+
+    val threadsRepository: sa.gheras.edutrack.data.repo.ThreadsRepository by lazy {
+        sa.gheras.edutrack.data.repo.ThreadsRepository(
+            threadDao = database.threadDao(),
+            threadsApi = threadsApi
+        )
+    }
+
+    val dailySummariesRepository: sa.gheras.edutrack.data.repo.DailySummariesRepository by lazy {
+        sa.gheras.edutrack.data.repo.DailySummariesRepository(
+            dailySummaryDao = database.dailySummaryDao(),
+            threadsApi = threadsApi
         )
     }
 }

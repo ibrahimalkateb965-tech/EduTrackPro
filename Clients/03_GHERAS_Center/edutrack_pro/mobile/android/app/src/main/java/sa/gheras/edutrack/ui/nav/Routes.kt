@@ -23,6 +23,9 @@ data object AccountRoute : Route
 data object TeacherHomeRoute : Route
 
 @Serializable
+data class TeacherDailySummaryRoute(val roomId: String) : Route
+
+@Serializable
 data object TeacherStudentsRoute : Route
 
 @Serializable
@@ -73,6 +76,15 @@ data object NotificationsRoute : Route
 // ---- Guardian Graph ----
 @Serializable
 data object GuardianHomeRoute : Route
+
+@Serializable
+data object GuardianThreadsRoute : Route
+
+@Serializable
+data class ThreadDetailRoute(val threadId: String) : Route
+
+@Serializable
+data class ChildDailySummaryRoute(val studentId: String) : Route
 
 @Serializable
 data class ChildAttendanceRoute(val studentId: String) : Route
