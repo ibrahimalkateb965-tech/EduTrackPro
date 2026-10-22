@@ -2,6 +2,7 @@ package sa.gheras.edutrack.data.db
 
 import sa.gheras.edutrack.data.entity.AssignmentEntity
 import sa.gheras.edutrack.data.entity.AssignmentStudentEntity
+import sa.gheras.edutrack.data.entity.AttendanceExcuseEntity
 import sa.gheras.edutrack.data.entity.EvaluationEntity
 import sa.gheras.edutrack.data.entity.InstallmentEntity
 import sa.gheras.edutrack.data.entity.LessonLogEntity
@@ -36,5 +37,6 @@ data class ScopePayload(
     val submissions: List<SubmissionEntity> = emptyList(),
     val submissionFiles: List<SubmissionFileEntity> = emptyList(),
     val notifications: List<NotificationEntity> = emptyList(),
-    val pickupDelegates: List<PickupDelegateEntity> = emptyList()
+    val pickupDelegates: List<PickupDelegateEntity> = emptyList(),
+    val excuses: List<AttendanceExcuseEntity> = emptyList()
 )

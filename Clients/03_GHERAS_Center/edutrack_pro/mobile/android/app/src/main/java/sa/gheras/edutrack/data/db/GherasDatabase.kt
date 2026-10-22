@@ -135,6 +135,7 @@ abstract class GherasDatabase : RoomDatabase() {
         installmentDao().upsertAll(payload.installments)
         receiptDao().upsertAll(payload.receipts)
         studentAttendanceDao().upsertAll(payload.attendance)
+        attendanceExcuseDao().upsertAll(payload.excuses)
         evaluationDao().upsertAll(payload.evaluations)
         skillProgressDao().upsertAll(payload.skillProgress)
         lessonLogDao().upsertAll(payload.lessonLogs)

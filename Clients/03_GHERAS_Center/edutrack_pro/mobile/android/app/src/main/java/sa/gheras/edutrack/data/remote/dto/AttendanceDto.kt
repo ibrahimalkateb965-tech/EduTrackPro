@@ -10,6 +10,8 @@ data class AttendanceDto(
     @SerialName("schedule_id") val scheduleId: String? = null,
     val date: String,
     val status: String,
+    @SerialName("is_draft") val isDraft: Boolean = false,
+    @SerialName("excuse_id") val excuseId: String? = null,
     @SerialName("late_minutes") val lateMinutes: Int? = null,
     @SerialName("excuse_note") val excuseNote: String? = null,
     @SerialName("recorded_by_user_id") val recordedByUserId: String? = null,

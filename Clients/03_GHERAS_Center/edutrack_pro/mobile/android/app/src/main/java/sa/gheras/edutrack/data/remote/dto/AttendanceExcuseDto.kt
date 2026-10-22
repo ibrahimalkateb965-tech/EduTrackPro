@@ -27,3 +27,39 @@ data class AttendanceExcuseDto(
     @SerialName("updated_at") val updatedAt: String? = null,
     @SerialName("deleted_at") val deletedAt: String? = null
 )
+
+@Serializable
+data class CreateExcuseRequest(
+    @SerialName("student_id") val studentId: String,
+    @SerialName("excuse_date") val excuseDate: String,
+    @SerialName("reason_text") val reasonText: String,
+    @SerialName("attachment_storage_key") val attachmentStorageKey: String? = null,
+    @SerialName("client_request_id") val clientRequestId: String? = null
+)
+
+@Serializable
+data class PatchExcuseRequest(
+    @SerialName("reason_text") val reasonText: String? = null,
+    @SerialName("attachment_storage_key") val attachmentStorageKey: String? = null
+)
+
+@Serializable
+data class ReviewExcuseRequest(
+    val action: String,
+    @SerialName("supervisor_notes") val supervisorNotes: String? = null
+)
+
+@Serializable
+data class ApproveRoomAttendanceResponse(
+    val approved: Boolean,
+    @SerialName("room_id") val roomId: String,
+    val date: String,
+    @SerialName("total_students") val totalStudents: Int,
+    @SerialName("notifications_sent") val notificationsSent: Int
+)
+
+@Serializable
+data class StaffExcusesResponse(
+    val items: List<AttendanceExcuseDto>,
+    val total: Int = items.size
+)
