@@ -113,6 +113,7 @@ def login(body: LoginBody, conn=Depends(get_conn)):
     phones = _phone_candidates(ident)
 
     if role_filter:
+        allowed_roles = ["teacher", "supervisor", "manager"] if role_filter in ("teacher", "staff") else [role_filter]
         query = (
             "SELECT u.id, u.username, u.password_hash, u.role, u.staff_id, u.guardian_id, u.room_id, u.student_id, u.is_active, u.token_version "
             "FROM users u "
@@ -120,12 +121,12 @@ def login(body: LoginBody, conn=Depends(get_conn)):
             "LEFT JOIN guardians g ON g.id = u.guardian_id AND g.deleted_at IS NULL "
             "LEFT JOIN students st ON st.id = u.student_id AND st.deleted_at IS NULL "
             "WHERE (u.username = %s OR u.national_id = %s OR st.national_id = %s OR u.phone = ANY(%s) OR s.phone = ANY(%s) OR g.phone = ANY(%s)) "
-            "  AND u.role = %s AND u.deleted_at IS NULL "
+            "  AND u.role = ANY(%s) AND u.deleted_at IS NULL "
             "ORDER BY CASE WHEN u.username = %s OR u.national_id = %s OR st.national_id = %s THEN 0 "
             "              WHEN u.phone = ANY(%s) THEN 1 ELSE 2 END, u.id "
             "LIMIT 10"
         )
-        params = (ident, ident, ident, phones, phones, phones, role_filter, ident, ident, ident, phones)
+        params = (ident, ident, ident, phones, phones, phones, allowed_roles, ident, ident, ident, phones)
     else:
         query = (
             "SELECT u.id, u.username, u.password_hash, u.role, u.staff_id, u.guardian_id, u.room_id, u.student_id, u.is_active, u.token_version "
@@ -164,6 +165,7 @@ def request_otp(body: RequestOtpBody, conn=Depends(get_conn)):
     ident = body.national_id.strip()
     role_filter = body.role.strip().lower()
     phones = _phone_candidates(ident)
+    allowed_roles = ["teacher", "supervisor", "manager"] if role_filter in ("teacher", "staff") else [role_filter]
 
     user = conn.execute(
         "SELECT u.id, u.username, u.role, u.staff_id, u.guardian_id, u.room_id, u.student_id, u.phone, u.is_active "
@@ -172,9 +174,9 @@ def request_otp(body: RequestOtpBody, conn=Depends(get_conn)):
         "LEFT JOIN guardians g ON g.id = u.guardian_id AND g.deleted_at IS NULL "
         "LEFT JOIN students st ON st.id = u.student_id AND st.deleted_at IS NULL "
         "WHERE (u.national_id = %s OR st.national_id = %s OR u.username = %s OR u.phone = ANY(%s) OR s.phone = ANY(%s) OR g.phone = ANY(%s)) "
-        "  AND u.role = %s AND u.deleted_at IS NULL "
+        "  AND u.role = ANY(%s) AND u.deleted_at IS NULL "
         "ORDER BY u.id LIMIT 1",
-        (ident, ident, ident, phones, phones, phones, role_filter),
+        (ident, ident, ident, phones, phones, phones, allowed_roles),
     ).fetchone()
 
     if not user or not user["is_active"]:
