@@ -11,6 +11,7 @@ DEFAULTS: dict[str, str] = {
     "center_address": "حوطة بني تميم",
     "manager_title": "مدير عام المركز",
     "manager_name": "إدارة المركز",
+    "pickup_cutoff_time": "18:30",
 }
 SETTING_KEYS = tuple(DEFAULTS)
 MAX_VALUE_LEN = 200
@@ -27,3 +28,8 @@ def load_settings(conn) -> dict[str, str]:
         conn.rollback()
         return dict(DEFAULTS)
     return {**DEFAULTS, **{r["key"]: r["value"] for r in rows if r["value"]}}
+
+
+def get_pickup_cutoff(conn) -> str:
+    """Return the cutoff time after which pickup requests are rejected (HH:MM)."""
+    return load_settings(conn).get("pickup_cutoff_time", "18:30")
