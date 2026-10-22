@@ -11,6 +11,7 @@ import org.json.JSONObject
 import sa.gheras.edutrack.data.db.GherasDatabase
 import sa.gheras.edutrack.data.entity.AssignmentEntity
 import sa.gheras.edutrack.data.entity.AssignmentStudentEntity
+import sa.gheras.edutrack.data.entity.AttendanceExcuseEntity
 import sa.gheras.edutrack.data.entity.EvaluationEntity
 import sa.gheras.edutrack.data.entity.LessonLogEntity
 import sa.gheras.edutrack.data.entity.PendingWriteEntity
@@ -95,12 +96,15 @@ class Outbox(
         val me = currentUserIdProvider()
 
         when (kind) {
-            PendingWriteEntity.KIND_ATTENDANCE -> {
+            PendingWriteEntity.KIND_ATTENDANCE,
+            PendingWriteEntity.KIND_ATTENDANCE_RECORD -> {
                 val studentId = json.optString("student_id")
                 val dateStr = json.optString("date")
                 val status = json.optString("status")
                 val note = json.optString("note").takeIf { it.isNotBlank() }
                 val date = DateParsers.parseLocalDate(dateStr) ?: LocalDate.now()
+                val isDraft = json.optBoolean("is_draft", false)
+                val excuseId = json.optString("excuse_id").takeIf { it.isNotBlank() }
 
                 val entity = StudentAttendanceEntity(
                     id = "local:$studentId:$dateStr",
@@ -109,12 +113,58 @@ class Outbox(
                     date = date,
                     status = status,
                     note = note,
+                    isDraft = isDraft,
+                    excuseId = excuseId,
                     recordedByUserId = me,
                     createdAt = now,
                     updatedAt = now,
                     deletedAt = null
                 )
                 db.studentAttendanceDao().upsert(entity)
+            }
+            PendingWriteEntity.KIND_ATTENDANCE_APPROVE -> {
+                // Room attendance approval marks local records for this date as non-draft
+            }
+            PendingWriteEntity.KIND_ATTENDANCE_EXCUSE -> {
+                val excuseId = json.optString("id").takeIf { it.isNotBlank() } ?: "local:${UUID.randomUUID()}"
+                val studentId = json.getString("student_id")
+                val dateStr = json.getString("excuse_date")
+                val date = DateParsers.parseLocalDate(dateStr) ?: LocalDate.now()
+                val reasonText = json.getString("reason_text")
+                val attachmentStorageKey = json.optString("attachment_storage_key").takeIf { it.isNotBlank() }
+                val clientRequestId = json.optString("client_request_id").takeIf { it.isNotBlank() }
+
+                val entity = AttendanceExcuseEntity(
+                    id = excuseId,
+                    branchId = null,
+                    studentId = studentId,
+                    excuseDate = date,
+                    reasonText = reasonText,
+                    attachmentStorageKey = attachmentStorageKey,
+                    status = "pending",
+                    supervisorNotes = null,
+                    reviewedAt = null,
+                    clientRequestId = clientRequestId,
+                    createdAt = now,
+                    updatedAt = now
+                )
+                db.attendanceExcuseDao().upsert(entity)
+            }
+            PendingWriteEntity.KIND_ATTENDANCE_EXCUSE_PATCH -> {
+                val excuseId = json.getString("id")
+                val existing = db.attendanceExcuseDao().getById(excuseId)
+                if (existing != null) {
+                    val newReason = json.optString("reason_text").takeIf { it.isNotBlank() } ?: existing.reasonText
+                    val newAttachment = json.optString("attachment_storage_key").takeIf { it.isNotBlank() } ?: existing.attachmentStorageKey
+                    db.attendanceExcuseDao().upsert(
+                        existing.copy(
+                            reasonText = newReason,
+                            attachmentStorageKey = newAttachment,
+                            status = "pending",
+                            updatedAt = now
+                        )
+                    )
+                }
             }
             PendingWriteEntity.KIND_DAILY_EVAL -> {
                 val studentId = json.optString("student_id")

@@ -123,7 +123,12 @@ class AppContainer(private val context: Context) {
     }
 
     val attendanceRepository: sa.gheras.edutrack.data.repo.AttendanceRepository by lazy {
-        sa.gheras.edutrack.data.repo.AttendanceRepository(database.studentAttendanceDao(), outbox)
+        sa.gheras.edutrack.data.repo.AttendanceRepository(
+            attendanceDao = database.studentAttendanceDao(),
+            excuseDao = database.attendanceExcuseDao(),
+            meApi = meApi,
+            outbox = outbox
+        )
     }
 
     val evaluationsRepository: sa.gheras.edutrack.data.repo.EvaluationsRepository by lazy {

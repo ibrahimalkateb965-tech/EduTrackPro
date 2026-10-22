@@ -98,15 +98,63 @@ class OutboxWorker(
         val json = JSONObject(item.payloadJson)
 
         when (item.kind) {
-            PendingWriteEntity.KIND_ATTENDANCE -> {
+            PendingWriteEntity.KIND_ATTENDANCE,
+            PendingWriteEntity.KIND_ATTENDANCE_RECORD -> {
+                val isDraft = json.optBoolean("is_draft", false)
                 val body = AttendanceItemBody(
                     studentId = json.getString("student_id"),
                     date = json.getString("date"),
                     status = json.getString("status"),
                     note = json.optString("note").takeIf { it.isNotBlank() }
                 )
-                val response = meApi.postAttendanceBatch(listOf(body))
+                val response = if (isDraft) {
+                    meApi.saveAttendanceDraft(listOf(body))
+                } else {
+                    meApi.postAttendanceBatch(listOf(body))
+                }
                 if (!response.isSuccessful) throw HttpException(response)
+            }
+            PendingWriteEntity.KIND_ATTENDANCE_APPROVE -> {
+                val roomId = json.getString("room_id")
+                val date = json.getString("date")
+                meApi.approveRoomAttendance(roomId, date)
+            }
+            PendingWriteEntity.KIND_ATTENDANCE_EXCUSE -> {
+                var storageKey = json.optString("attachment_storage_key").takeIf { it.isNotBlank() }
+                val localPath = json.optString("local_file_path").takeIf { it.isNotBlank() }
+                if (storageKey == null && localPath != null) {
+                    val file = File(localPath)
+                    if (file.exists()) {
+                        val mime = "image/jpeg"
+                        val requestBody = file.asRequestBody(mime.toMediaTypeOrNull())
+                        val uploadRes = meApi.uploadMedia(file.name, requestBody)
+                        storageKey = uploadRes.storageKey ?: uploadRes.url
+                    }
+                }
+                val req = sa.gheras.edutrack.data.remote.dto.CreateExcuseRequest(
+                    studentId = json.getString("student_id"),
+                    excuseDate = json.getString("excuse_date"),
+                    reasonText = json.getString("reason_text"),
+                    attachmentStorageKey = storageKey,
+                    clientRequestId = json.optString("client_request_id").takeIf { it.isNotBlank() }
+                )
+                val excuseDto = meApi.createExcuse(req)
+                val localId = json.optString("id")
+                if (localId.isNotBlank() && localId.startsWith("local:")) {
+                    val existingLocal = db.attendanceExcuseDao().getById(localId)
+                    if (existingLocal != null) {
+                        db.attendanceExcuseDao().deleteById(localId)
+                        db.attendanceExcuseDao().upsert(existingLocal.copy(id = excuseDto.id, status = excuseDto.status))
+                    }
+                }
+            }
+            PendingWriteEntity.KIND_ATTENDANCE_EXCUSE_PATCH -> {
+                val excuseId = json.getString("id")
+                val req = sa.gheras.edutrack.data.remote.dto.PatchExcuseRequest(
+                    reasonText = json.optString("reason_text").takeIf { it.isNotBlank() },
+                    attachmentStorageKey = json.optString("attachment_storage_key").takeIf { it.isNotBlank() }
+                )
+                meApi.patchExcuse(excuseId, req)
             }
             PendingWriteEntity.KIND_DAILY_EVAL -> {
                 val body = DailyEvalItemBody(
@@ -400,10 +448,17 @@ class OutboxWorker(
         ) {
         val json = JSONObject(item.payloadJson)
         when (item.kind) {
-            PendingWriteEntity.KIND_ATTENDANCE -> {
+            PendingWriteEntity.KIND_ATTENDANCE,
+            PendingWriteEntity.KIND_ATTENDANCE_RECORD -> {
                 val studentId = json.optString("student_id")
                 val dateStr = json.optString("date")
                 db.studentAttendanceDao().deleteById("local:$studentId:$dateStr")
+            }
+            PendingWriteEntity.KIND_ATTENDANCE_EXCUSE -> {
+                val excuseId = json.optString("id")
+                if (excuseId.isNotBlank()) {
+                    db.attendanceExcuseDao().deleteById(excuseId)
+                }
             }
             PendingWriteEntity.KIND_DAILY_EVAL -> {
                 val studentId = json.optString("student_id")
