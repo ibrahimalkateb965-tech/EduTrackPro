@@ -14,6 +14,7 @@ import sa.gheras.edutrack.data.remote.dto.UploadResponseDto
 import sa.gheras.edutrack.data.remote.dto.GradeSubmissionBody
 import sa.gheras.edutrack.data.remote.dto.AttendanceDto
 import sa.gheras.edutrack.data.remote.dto.AttendanceItemBody
+import sa.gheras.edutrack.data.remote.dto.SaveDraftAttendanceRequest
 import sa.gheras.edutrack.data.remote.dto.AssignmentDto
 import sa.gheras.edutrack.data.remote.dto.CreateAssignmentRequest
 import sa.gheras.edutrack.data.remote.dto.ReminderPreviewResponse
@@ -287,7 +288,12 @@ class FakeMeApi : MeApi {
         supervisorNotes = body.supervisorNotes
     )
 
-    override suspend fun saveAttendanceDraft(items: List<AttendanceItemBody>): Response<Unit> = Response.success(Unit)
+    var lastDraftRequest: SaveDraftAttendanceRequest? = null
+
+    override suspend fun saveAttendanceDraft(body: SaveDraftAttendanceRequest): Response<Unit> {
+        lastDraftRequest = body
+        return Response.success(Unit)
+    }
 
     override suspend fun approveRoomAttendance(roomId: String, date: String): ApproveRoomAttendanceResponse = ApproveRoomAttendanceResponse(
         approved = true,

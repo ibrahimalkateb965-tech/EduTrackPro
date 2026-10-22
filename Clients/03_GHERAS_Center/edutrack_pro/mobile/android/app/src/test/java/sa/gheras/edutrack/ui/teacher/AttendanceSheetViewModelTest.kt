@@ -196,10 +196,31 @@ class AttendanceSheetViewModelTest {
         approvedDeferred.await()
 
         val pendingWrites = db.pendingWriteDao().observePending().first()
-        // 2 attendance records + 1 approval record = 3
-        assertEquals(3, pendingWrites.size)
+        // 1 batch draft record + 1 approval record = 2
+        assertEquals(2, pendingWrites.size)
+        val draftWrite = pendingWrites.firstOrNull { it.kind == PendingWriteEntity.KIND_ATTENDANCE_RECORD }
+        assertNotNull("Must enqueue draft batch write", draftWrite)
         val approvalWrite = pendingWrites.firstOrNull { it.kind == PendingWriteEntity.KIND_ATTENDANCE_APPROVE }
         assertNotNull("Must enqueue approval pending write", approvalWrite)
         assertEquals("att_approve:r1:$testDate", approvalWrite?.naturalKey)
+    }
+
+    @Test
+    fun `saveDraft maps excused absence to absent in outbox payload`() = runBlocking {
+        seedData()
+        val vm = createVm()
+        loadedState(vm)
+        vm.updateStatus("s1", "غياب بعذر")
+
+        val savedDeferred = CompletableDeferred<Unit>()
+        vm.saveDraft { savedDeferred.complete(Unit) }
+        savedDeferred.await()
+
+        val pendingWrites = db.pendingWriteDao().observePending().first()
+        assertEquals(1, pendingWrites.size)
+        val payload = org.json.JSONObject(pendingWrites[0].payloadJson)
+        val items = payload.getJSONArray("items")
+        assertEquals(1, items.length())
+        assertEquals("غائب", items.getJSONObject(0).getString("status"))
     }
 }

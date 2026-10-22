@@ -54,7 +54,8 @@ class SupervisorExcusesViewModelTest {
 
         override suspend fun reviewExcuse(id: String, body: ReviewExcuseRequest): AttendanceExcuseDto {
             if (shouldThrowConflict) {
-                throw IllegalStateException("409 Conflict: Excuse already processed")
+                val errorBody = okhttp3.ResponseBody.create(okhttp3.MediaType.parse("application/json"), "{\"detail\":\"Conflict\"}")
+                throw retrofit2.HttpException(retrofit2.Response.error<Any>(409, errorBody))
             }
             lastReviewAction = body.action
             lastReviewNotes = body.supervisorNotes

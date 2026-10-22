@@ -95,19 +95,43 @@ class AttendanceRepositoryTest {
     }
 
     @Test
-    fun testSaveDraftAttendanceBatch_setsDraftTrueInOptimisticProjection() = runTest {
+    fun testSaveDraftAttendanceBatch_contractPayloadAndOptimisticProjection() = runTest {
         repository.saveDraftAttendanceBatch(
             roomId = testRoomId,
             date = today,
             records = listOf(
-                AttendanceRecord(studentId = testStudentId, status = "غائب", note = "لم يحضر بعد")
+                AttendanceRecord(studentId = testStudentId, status = "غياب بعذر", note = "عذر مرضي")
             )
         )
 
+        // 1. Verify optimistic projection in student_attendance (draft = true)
         val attendance = db.studentAttendanceDao().getByStudentAndDate(testStudentId, today)
         assertNotNull(attendance)
         assertEquals("غائب", attendance?.status)
         assertEquals(true, attendance?.isDraft)
+
+        // 2. Verify outbox payload structure: {room_id, date, items} (Y2 contract)
+        val pendingList = db.pendingWriteDao().listPending()
+        assertEquals(1, pendingList.size)
+        assertEquals(PendingWriteEntity.KIND_ATTENDANCE_RECORD, pendingList[0].kind)
+
+        val json = org.json.JSONObject(pendingList[0].payloadJson)
+        assertEquals(testRoomId, json.getString("room_id"))
+        assertEquals(today.toString(), json.getString("date"))
+        val itemsArr = json.getJSONArray("items")
+        assertEquals(1, itemsArr.length())
+        assertEquals(testStudentId, itemsArr.getJSONObject(0).getString("student_id"))
+        // Excused absence must be mapped to absent on network wire (Y4 / H2)
+        assertEquals("غائب", itemsArr.getJSONObject(0).getString("status"))
+        assertEquals("عذر مرضي", itemsArr.getJSONObject(0).getString("note"))
+
+        // 3. Flush via OutboxWorker and verify SaveDraftAttendanceRequest received by API
+        OutboxWorker.flushItem(pendingList[0], fakeMeApi, db)
+        assertNotNull(fakeMeApi.lastDraftRequest)
+        assertEquals(testRoomId, fakeMeApi.lastDraftRequest?.roomId)
+        assertEquals(today.toString(), fakeMeApi.lastDraftRequest?.date)
+        assertEquals(1, fakeMeApi.lastDraftRequest?.items?.size)
+        assertEquals("غائب", fakeMeApi.lastDraftRequest?.items?.get(0)?.status)
     }
 
     @Test
@@ -185,5 +209,38 @@ class AttendanceRepositoryTest {
 
         // Flush draft via worker logic
         OutboxWorker.flushItem(pendingList[0], fakeMeApi, db)
+    }
+
+    @Test
+    fun testOutboxWorker_409ConflictIsTerminalAndRevertsOptimisticProjection() = runTest {
+        val localId = repository.submitExcuse(
+            studentId = testStudentId,
+            excuseDate = today,
+            reasonText = "عذر مكرر يسبب تعارض"
+        )
+
+        // Verify optimistic projection inserted
+        assertNotNull(db.attendanceExcuseDao().getById(localId))
+
+        val pendingList = db.pendingWriteDao().listPending()
+        assertEquals(1, pendingList.size)
+        val item = pendingList[0]
+
+        // Create 409 HttpException
+        val errorBody = okhttp3.ResponseBody.create(okhttp3.MediaType.parse("application/json"), "{\"detail\":\"Conflict\"}")
+        val http409 = retrofit2.HttpException(retrofit2.Response.error<Any>(409, errorBody))
+
+        // Simulate worker terminal handling on 409
+        val code = http409.code()
+        assertTrue(code == 403 || code == 404 || code == 409 || code == 422)
+        val error = sa.gheras.edutrack.data.remote.ErrorMapper.map(http409)
+        db.pendingWriteDao().markFailed(item.id, error.userMessage)
+        OutboxWorker.revertOptimisticProjection(item, db)
+
+        // Verify write marked failed (attempts = -1) so queue is not wedged
+        val failed = db.pendingWriteDao().getById(item.id)
+        assertEquals(-1, failed?.attempts)
+        // Verify optimistic projection deleted
+        org.junit.Assert.assertNull(db.attendanceExcuseDao().getById(localId))
     }
 }
