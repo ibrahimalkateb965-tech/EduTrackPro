@@ -337,8 +337,8 @@ def student_report(
     counts = row_to_json(
         conn.execute(
             "SELECT count(*) FILTER(WHERE status='حاضر') present, count(*) FILTER(WHERE status='غائب') absent, "
-            "count(*) FILTER(WHERE status='متأخر') late, count(*) FILTER(WHERE status='مستأذن') excused "
-            "FROM student_attendance WHERE student_id=%s AND deleted_at IS NULL",
+            "count(*) FILTER(WHERE status='متأخر') late, count(*) FILTER(WHERE status IN ('مستأذن', 'غياب بعذر')) excused "
+            "FROM student_attendance WHERE student_id=%s AND deleted_at IS NULL AND is_draft = FALSE",
             (sid,),
         ).fetchone()
     )
@@ -391,7 +391,7 @@ def admin_report(from_: str = Query(alias="from"), to: str = Query(), conn=Depen
     _check_perm(user, "finance", "طباعة التقرير الإداري تتطلب صلاحية المالية")
     students = conn.execute("SELECT count(*) count FROM students WHERE deleted_at IS NULL").fetchone()["count"]
     att = conn.execute(
-        "SELECT count(*) FILTER(WHERE status IN ('حاضر','متأخر')) good, count(*) total FROM student_attendance WHERE date BETWEEN %s AND %s AND deleted_at IS NULL",
+        "SELECT count(*) FILTER(WHERE status IN ('حاضر','متأخر')) good, count(*) total FROM student_attendance WHERE date BETWEEN %s AND %s AND deleted_at IS NULL AND is_draft = FALSE",
         (from_, to),
     ).fetchone()
     fin = conn.execute("SELECT coalesce(sum(amount),0) total FROM payments WHERE paid_on BETWEEN %s AND %s AND deleted_at IS NULL", (from_, to)).fetchone()["total"]
@@ -486,9 +486,9 @@ def attendance_report(from_: str = Query(alias="from"), to: str = Query(), conn=
     _check_perm(user, "attendance", "طباعة تقرير الحضور والغياب تتطلب صلاحية الحضور والغياب")
     dates = [d["date"] for d in conn.execute("SELECT generate_series(%s::date, %s::date, '1 day')::date date", (from_, to)).fetchall()]
     rows = conn.execute("SELECT s.id, s.name FROM students s WHERE s.deleted_at IS NULL ORDER BY s.name").fetchall()
-    records = conn.execute("SELECT student_id, date, status FROM student_attendance WHERE date BETWEEN %s AND %s AND deleted_at IS NULL", (from_, to)).fetchall()
+    records = conn.execute("SELECT student_id, date, status FROM student_attendance WHERE date BETWEEN %s AND %s AND deleted_at IS NULL AND is_draft = FALSE", (from_, to)).fetchall()
     lookup = {(x["student_id"], x["date"]): x["status"] for x in records}
-    symbols = {"حاضر": "✓", "غائب": "✗", "متأخر": "م", "مستأذن": "ع"}
+    symbols = {"حاضر": "✓", "غائب": "✗", "متأخر": "م", "مستأذن": "ع", "غياب بعذر": "ع"}
     output = []
     for s in rows:
         cells = [{"symbol": symbols.get(lookup.get((s["id"], d)), "")} for d in dates]
@@ -626,7 +626,7 @@ def statistics(from_: str = Query(alias="from"), to: str = Query(), conn=Depends
     has_finance = user.get("role") == "manager" or user.get("permissions", {}).get("finance", False)
     total = conn.execute("SELECT count(*) count FROM students WHERE deleted_at IS NULL").fetchone()["count"]
     att = conn.execute(
-        "SELECT count(*) FILTER(WHERE status IN ('حاضر','متأخر')) good, count(*) total FROM student_attendance WHERE date BETWEEN %s AND %s AND deleted_at IS NULL",
+        "SELECT count(*) FILTER(WHERE status IN ('حاضر','متأخر')) good, count(*) total FROM student_attendance WHERE date BETWEEN %s AND %s AND deleted_at IS NULL AND is_draft = FALSE",
         (from_, to),
     ).fetchone()
     collected = conn.execute("SELECT coalesce(sum(amount),0) total FROM payments WHERE paid_on BETWEEN %s AND %s AND deleted_at IS NULL", (from_, to)).fetchone()["total"] if has_finance else 0

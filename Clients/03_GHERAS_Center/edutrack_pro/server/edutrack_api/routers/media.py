@@ -163,69 +163,124 @@ def get_authenticated_file(
     if not file_path.is_file():
         raise ApiError(404, "not_found", "الملف غير موجود")
 
-    scope = resolve_scope(conn, user)
     user_id = user["id"]
     role = user.get("role")
 
     allowed = False
 
-    # Source 4: Preview own staged upload
-    staged = conn.execute(
-        "SELECT 1 FROM staged_uploads WHERE storage_key = %s AND uploaded_by_user_id = %s",
-        (storage_key, user_id),
-    ).fetchone()
-    if staged:
-        allowed = True
+    # Staff roles (manager, supervisor) bypass resolve_scope() (P8)
+    if role in ("manager", "supervisor"):
+        # Source 5: attendance_excuses.attachment_storage_key
+        excuse = conn.execute(
+            "SELECT 1 FROM attendance_excuses WHERE attachment_storage_key = %s AND deleted_at IS NULL",
+            (storage_key,),
+        ).fetchone()
+        if excuse:
+            allowed = True
 
-    # Source 1: assignment_files
-    if not allowed:
-        ass_file = conn.execute("""
-            SELECT a.id, a.is_draft, a.teacher_user_id, ast.student_id
-            FROM assignment_files af
-            JOIN assignments a ON a.id = af.assignment_id
-            LEFT JOIN assignment_students ast ON ast.assignment_id = a.id AND ast.deleted_at IS NULL
-            WHERE af.storage_key = %s AND af.deleted_at IS NULL AND a.deleted_at IS NULL
-        """, (storage_key,)).fetchall()
-        for r in ass_file:
-            if role == "teacher" and r["teacher_user_id"] == user_id:
+        # Source 4: Preview own staged upload
+        if not allowed:
+            staged = conn.execute(
+                "SELECT 1 FROM staged_uploads WHERE storage_key = %s AND uploaded_by_user_id = %s",
+                (storage_key, user_id),
+            ).fetchone()
+            if staged:
                 allowed = True
-                break
-            if role == "guardian" and not r["is_draft"] and r["student_id"] in scope.student_ids:
-                allowed = True
-                break
 
-    # Source 2: submission_files
-    if not allowed:
-        sub_file = conn.execute("""
-            SELECT sb.id, sb.student_id, a.teacher_user_id
-            FROM submission_files sf
-            JOIN submissions sb ON sb.id = sf.submission_id
-            JOIN assignments a ON a.id = sb.assignment_id
-            WHERE sf.storage_key = %s AND sf.deleted_at IS NULL AND sb.deleted_at IS NULL
-        """, (storage_key,)).fetchall()
-        for r in sub_file:
-            if role == "guardian" and r["student_id"] in scope.student_ids:
+        # Staff can inspect assignment files or submission files
+        if not allowed:
+            ass_or_sub = conn.execute(
+                """
+                SELECT 1 FROM assignment_files WHERE storage_key = %s AND deleted_at IS NULL
+                UNION
+                SELECT 1 FROM submission_files WHERE storage_key = %s AND deleted_at IS NULL
+                UNION
+                SELECT 1 FROM submissions WHERE teacher_feedback_key = %s AND deleted_at IS NULL
+                """,
+                (storage_key, storage_key, storage_key),
+            ).fetchone()
+            if ass_or_sub:
                 allowed = True
-                break
-            if role == "teacher" and (r["teacher_user_id"] == user_id or r["student_id"] in scope.student_ids):
-                allowed = True
-                break
+    else:
+        # Non-staff roles (teacher, guardian, student)
+        scope = resolve_scope(conn, user)
 
-    # Source 3: submissions.teacher_feedback_key
-    if not allowed:
-        fb_rows = conn.execute("""
-            SELECT sb.id, sb.student_id, a.teacher_user_id
-            FROM submissions sb
-            JOIN assignments a ON a.id = sb.assignment_id
-            WHERE sb.teacher_feedback_key = %s AND sb.deleted_at IS NULL
-        """, (storage_key,)).fetchall()
-        for r in fb_rows:
-            if role == "guardian" and r["student_id"] in scope.student_ids:
-                allowed = True
-                break
-            if role == "teacher" and (r["teacher_user_id"] == user_id or r["student_id"] in scope.student_ids):
-                allowed = True
-                break
+        # Source 4: Preview own staged upload
+        staged = conn.execute(
+            "SELECT 1 FROM staged_uploads WHERE storage_key = %s AND uploaded_by_user_id = %s",
+            (storage_key, user_id),
+        ).fetchone()
+        if staged:
+            allowed = True
+
+        # Source 5: attendance_excuses.attachment_storage_key
+        if not allowed:
+            exc_rows = conn.execute(
+                """
+                SELECT ae.id, ae.student_id, s.room_id
+                FROM attendance_excuses ae
+                JOIN students s ON s.id = ae.student_id AND s.deleted_at IS NULL
+                WHERE ae.attachment_storage_key = %s AND ae.deleted_at IS NULL
+                """,
+                (storage_key,),
+            ).fetchall()
+            for r in exc_rows:
+                if role == "guardian" and r["student_id"] in scope.student_ids:
+                    allowed = True
+                    break
+                if role == "teacher" and (r["student_id"] in scope.student_ids or r["room_id"] in scope.room_ids):
+                    allowed = True
+                    break
+
+        # Source 1: assignment_files
+        if not allowed:
+            ass_file = conn.execute("""
+                SELECT a.id, a.is_draft, a.teacher_user_id, ast.student_id
+                FROM assignment_files af
+                JOIN assignments a ON a.id = af.assignment_id
+                LEFT JOIN assignment_students ast ON ast.assignment_id = a.id AND ast.deleted_at IS NULL
+                WHERE af.storage_key = %s AND af.deleted_at IS NULL AND a.deleted_at IS NULL
+            """, (storage_key,)).fetchall()
+            for r in ass_file:
+                if role == "teacher" and r["teacher_user_id"] == user_id:
+                    allowed = True
+                    break
+                if role == "guardian" and not r["is_draft"] and r["student_id"] in scope.student_ids:
+                    allowed = True
+                    break
+
+        # Source 2: submission_files
+        if not allowed:
+            sub_file = conn.execute("""
+                SELECT sb.id, sb.student_id, a.teacher_user_id
+                FROM submission_files sf
+                JOIN submissions sb ON sb.id = sf.submission_id
+                JOIN assignments a ON a.id = sb.assignment_id
+                WHERE sf.storage_key = %s AND sf.deleted_at IS NULL AND sb.deleted_at IS NULL
+            """, (storage_key,)).fetchall()
+            for r in sub_file:
+                if role == "guardian" and r["student_id"] in scope.student_ids:
+                    allowed = True
+                    break
+                if role == "teacher" and (r["teacher_user_id"] == user_id or r["student_id"] in scope.student_ids):
+                    allowed = True
+                    break
+
+        # Source 3: submissions.teacher_feedback_key
+        if not allowed:
+            fb_rows = conn.execute("""
+                SELECT sb.id, sb.student_id, a.teacher_user_id
+                FROM submissions sb
+                JOIN assignments a ON a.id = sb.assignment_id
+                WHERE sb.teacher_feedback_key = %s AND sb.deleted_at IS NULL
+            """, (storage_key,)).fetchall()
+            for r in fb_rows:
+                if role == "guardian" and r["student_id"] in scope.student_ids:
+                    allowed = True
+                    break
+                if role == "teacher" and (r["teacher_user_id"] == user_id or r["student_id"] in scope.student_ids):
+                    allowed = True
+                    break
 
     if not allowed:
         raise ApiError(404, "not_found", "الملف غير موجود")
