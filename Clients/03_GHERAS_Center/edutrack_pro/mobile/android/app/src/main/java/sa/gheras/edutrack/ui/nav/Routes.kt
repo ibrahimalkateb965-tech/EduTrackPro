@@ -124,3 +124,6 @@ data object SupervisorPickupRoute : Route
 @Serializable
 data class SupervisorHandoverRoute(val requestId: String) : Route
 
+@Serializable
+data object SupervisorExcusesRoute : Route
+

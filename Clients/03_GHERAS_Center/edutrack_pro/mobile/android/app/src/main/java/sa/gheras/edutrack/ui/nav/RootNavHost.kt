@@ -91,6 +91,8 @@ import sa.gheras.edutrack.ui.teacher.TeacherHomeViewModel
 import sa.gheras.edutrack.ui.supervisor.pickup.SupervisorGateViewModel
 import sa.gheras.edutrack.ui.supervisor.pickup.SupervisorHandoverScreen
 import sa.gheras.edutrack.ui.supervisor.pickup.SupervisorPickupScreen
+import sa.gheras.edutrack.ui.supervisor.attendance.SupervisorExcusesScreen
+import sa.gheras.edutrack.ui.supervisor.attendance.SupervisorExcusesViewModel
 import sa.gheras.edutrack.ui.teacher.pickup.TeacherChildPrepScreen
 import sa.gheras.edutrack.ui.teacher.pickup.TeacherPickupQueueScreen
 import sa.gheras.edutrack.ui.teacher.pickup.TeacherPickupViewModel
@@ -828,6 +830,9 @@ fun RootNavHost(
                         viewModel = vm,
                         onNavigateToHandover = { requestId ->
                             navController.navigate(SupervisorHandoverRoute(requestId))
+                        },
+                        onNavigateToExcuses = {
+                            navController.navigate(SupervisorExcusesRoute)
                         }
                     )
                 }
@@ -841,6 +846,18 @@ fun RootNavHost(
                     )
                     SupervisorHandoverScreen(
                         requestId = route.requestId,
+                        viewModel = vm,
+                        onNavigateBack = { navController.popBackStack() }
+                    )
+                }
+
+                composable<SupervisorExcusesRoute> {
+                    val vm: SupervisorExcusesViewModel = viewModel(
+                        factory = viewModelFactory {
+                            SupervisorExcusesViewModel(container.attendanceRepository)
+                        }
+                    )
+                    SupervisorExcusesScreen(
                         viewModel = vm,
                         onNavigateBack = { navController.popBackStack() }
                     )
