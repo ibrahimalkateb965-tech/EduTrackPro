@@ -18,6 +18,7 @@ import sa.gheras.edutrack.data.remote.dto.ApproveRoomAttendanceResponse
 import sa.gheras.edutrack.data.remote.dto.AttendanceDto
 import sa.gheras.edutrack.data.remote.dto.AttendanceExcuseDto
 import sa.gheras.edutrack.data.remote.dto.AttendanceItemBody
+import sa.gheras.edutrack.data.remote.dto.SaveDraftAttendanceRequest
 import sa.gheras.edutrack.data.remote.dto.AssignmentDto
 import sa.gheras.edutrack.data.remote.dto.BroadcastBody
 import sa.gheras.edutrack.data.remote.dto.BroadcastResultDto
@@ -283,7 +284,7 @@ interface MeApi {
     ): AttendanceExcuseDto
 
     @PUT("attendance/students/draft")
-    suspend fun saveAttendanceDraft(@Body items: List<AttendanceItemBody>): Response<Unit>
+    suspend fun saveAttendanceDraft(@Body body: SaveDraftAttendanceRequest): Response<Unit>
 
     @POST("attendance/rooms/{roomId}/days/{date}/approve")
     suspend fun approveRoomAttendance(

@@ -96,8 +96,7 @@ class Outbox(
         val me = currentUserIdProvider()
 
         when (kind) {
-            PendingWriteEntity.KIND_ATTENDANCE,
-            PendingWriteEntity.KIND_ATTENDANCE_RECORD -> {
+            PendingWriteEntity.KIND_ATTENDANCE -> {
                 val studentId = json.optString("student_id")
                 val dateStr = json.optString("date")
                 val status = json.optString("status")
@@ -121,6 +120,59 @@ class Outbox(
                     deletedAt = null
                 )
                 db.studentAttendanceDao().upsert(entity)
+            }
+            PendingWriteEntity.KIND_ATTENDANCE_RECORD -> {
+                val itemsArr = json.optJSONArray("items")
+                val dateStr = json.optString("date")
+                val date = DateParsers.parseLocalDate(dateStr) ?: LocalDate.now()
+                if (itemsArr != null) {
+                    val entities = mutableListOf<StudentAttendanceEntity>()
+                    for (i in 0 until itemsArr.length()) {
+                        val itm = itemsArr.getJSONObject(i)
+                        val studentId = itm.getString("student_id")
+                        val status = itm.getString("status")
+                        val note = itm.optString("note").takeIf { it.isNotBlank() }
+                        entities.add(
+                            StudentAttendanceEntity(
+                                id = "local:$studentId:$dateStr",
+                                branchId = null,
+                                studentId = studentId,
+                                date = date,
+                                status = status,
+                                note = note,
+                                isDraft = true,
+                                excuseId = null,
+                                recordedByUserId = me,
+                                createdAt = now,
+                                updatedAt = now,
+                                deletedAt = null
+                            )
+                        )
+                    }
+                    db.studentAttendanceDao().upsertAll(entities)
+                } else {
+                    val studentId = json.optString("student_id")
+                    val status = json.optString("status")
+                    val note = json.optString("note").takeIf { it.isNotBlank() }
+                    val isDraft = json.optBoolean("is_draft", true)
+                    val excuseId = json.optString("excuse_id").takeIf { it.isNotBlank() }
+
+                    val entity = StudentAttendanceEntity(
+                        id = "local:$studentId:$dateStr",
+                        branchId = null,
+                        studentId = studentId,
+                        date = date,
+                        status = status,
+                        note = note,
+                        isDraft = isDraft,
+                        excuseId = excuseId,
+                        recordedByUserId = me,
+                        createdAt = now,
+                        updatedAt = now,
+                        deletedAt = null
+                    )
+                    db.studentAttendanceDao().upsert(entity)
+                }
             }
             PendingWriteEntity.KIND_ATTENDANCE_APPROVE -> {
                 // Room attendance approval marks local records for this date as non-draft

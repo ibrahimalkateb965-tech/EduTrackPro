@@ -12,6 +12,13 @@ data class AttendanceItemBody(
 )
 
 @Serializable
+data class SaveDraftAttendanceRequest(
+    @SerialName("room_id") val roomId: String,
+    val date: String,
+    val items: List<AttendanceItemBody>
+)
+
+@Serializable
 data class DailyEvalItemBody(
     @SerialName("student_id") val studentId: String,
     val date: String,

@@ -9,6 +9,7 @@ import sa.gheras.edutrack.GherasApp
 import sa.gheras.edutrack.data.entity.PendingWriteEntity
 import sa.gheras.edutrack.data.remote.ErrorMapper
 import sa.gheras.edutrack.data.remote.dto.AttendanceItemBody
+import sa.gheras.edutrack.data.remote.dto.SaveDraftAttendanceRequest
 import sa.gheras.edutrack.data.remote.dto.CreateAssignmentBody
 import sa.gheras.edutrack.data.remote.dto.CreateDelegateRequest
 import sa.gheras.edutrack.data.remote.dto.DailyEvalItemBody
@@ -53,7 +54,7 @@ class OutboxWorker(
                 if (code == 401) {
                     sessionRepo.onUnauthorized()
                     return Result.retry()
-                } else if (code == 403 || code == 404 || code == 422) {
+                } else if (code == 403 || code == 404 || code == 409 || code == 422) {
                     // Terminal failure: mark attempts = -1 and revert optimistic projection
                     val error = ErrorMapper.map(e)
                     db.pendingWriteDao().markFailed(item.id, error.userMessage)
@@ -98,21 +99,61 @@ class OutboxWorker(
         val json = JSONObject(item.payloadJson)
 
         when (item.kind) {
-            PendingWriteEntity.KIND_ATTENDANCE,
-            PendingWriteEntity.KIND_ATTENDANCE_RECORD -> {
-                val isDraft = json.optBoolean("is_draft", false)
+            PendingWriteEntity.KIND_ATTENDANCE -> {
+                val rawStatus = json.getString("status")
+                val safeStatus = if (rawStatus == "غياب بعذر") "غائب" else rawStatus
                 val body = AttendanceItemBody(
                     studentId = json.getString("student_id"),
                     date = json.getString("date"),
-                    status = json.getString("status"),
+                    status = safeStatus,
                     note = json.optString("note").takeIf { it.isNotBlank() }
                 )
-                val response = if (isDraft) {
-                    meApi.saveAttendanceDraft(listOf(body))
-                } else {
-                    meApi.postAttendanceBatch(listOf(body))
-                }
+                val response = meApi.postAttendanceBatch(listOf(body))
                 if (!response.isSuccessful) throw HttpException(response)
+            }
+            PendingWriteEntity.KIND_ATTENDANCE_RECORD -> {
+                val roomId = json.optString("room_id")
+                val dateStr = json.getString("date")
+                val itemsArr = json.optJSONArray("items")
+                if (itemsArr != null && roomId.isNotBlank()) {
+                    val itemsList = mutableListOf<AttendanceItemBody>()
+                    for (i in 0 until itemsArr.length()) {
+                        val itm = itemsArr.getJSONObject(i)
+                        val rawStatus = itm.getString("status")
+                        val safeStatus = if (rawStatus == "غياب بعذر") "غائب" else rawStatus
+                        itemsList.add(
+                            AttendanceItemBody(
+                                studentId = itm.getString("student_id"),
+                                date = dateStr,
+                                status = safeStatus,
+                                note = itm.optString("note").takeIf { it.isNotBlank() }
+                            )
+                        )
+                    }
+                    val req = SaveDraftAttendanceRequest(
+                        roomId = roomId,
+                        date = dateStr,
+                        items = itemsList
+                    )
+                    val response = meApi.saveAttendanceDraft(req)
+                    if (!response.isSuccessful) throw HttpException(response)
+                } else {
+                    val rawStatus = json.getString("status")
+                    val safeStatus = if (rawStatus == "غياب بعذر") "غائب" else rawStatus
+                    val body = AttendanceItemBody(
+                        studentId = json.getString("student_id"),
+                        date = json.getString("date"),
+                        status = safeStatus,
+                        note = json.optString("note").takeIf { it.isNotBlank() }
+                    )
+                    val req = SaveDraftAttendanceRequest(
+                        roomId = roomId.ifBlank { "00000000-0000-0000-0000-000000000000" },
+                        date = json.getString("date"),
+                        items = listOf(body)
+                    )
+                    val response = meApi.saveAttendanceDraft(req)
+                    if (!response.isSuccessful) throw HttpException(response)
+                }
             }
             PendingWriteEntity.KIND_ATTENDANCE_APPROVE -> {
                 val roomId = json.getString("room_id")
@@ -124,11 +165,20 @@ class OutboxWorker(
                 val localPath = json.optString("local_file_path").takeIf { it.isNotBlank() }
                 if (storageKey == null && localPath != null) {
                     val file = File(localPath)
-                    if (file.exists()) {
-                        val mime = "image/jpeg"
-                        val requestBody = file.asRequestBody(mime.toMediaTypeOrNull())
-                        val uploadRes = meApi.uploadMedia(file.name, requestBody)
-                        storageKey = uploadRes.storageKey ?: uploadRes.url
+                    if (file.exists() && file.isFile) {
+                        if (file.length() > 25 * 1024 * 1024) {
+                            throw IllegalStateException("حجم الملف يتجاوز الحد الأقصى 25 ميجابايت")
+                        }
+                        val mediaType = when (file.extension.lowercase()) {
+                            "pdf" -> "application/pdf".toMediaTypeOrNull()
+                            "jpg", "jpeg" -> "image/jpeg".toMediaTypeOrNull()
+                            "png" -> "image/png".toMediaTypeOrNull()
+                            else -> "application/octet-stream".toMediaTypeOrNull()
+                        }
+                        val uploadRes = meApi.uploadMedia(file.name, file.asRequestBody(mediaType))
+                        storageKey = uploadRes.storageKey ?: uploadRes.url.substringAfterLast("/")
+                        json.put("attachment_storage_key", storageKey)
+                        db.pendingWriteDao().upsert(item.copy(payloadJson = json.toString()))
                     }
                 }
                 val req = sa.gheras.edutrack.data.remote.dto.CreateExcuseRequest(
@@ -144,17 +194,53 @@ class OutboxWorker(
                     val existingLocal = db.attendanceExcuseDao().getById(localId)
                     if (existingLocal != null) {
                         db.attendanceExcuseDao().deleteById(localId)
-                        db.attendanceExcuseDao().upsert(existingLocal.copy(id = excuseDto.id, status = excuseDto.status))
+                        db.attendanceExcuseDao().upsert(
+                            existingLocal.copy(
+                                id = excuseDto.id,
+                                status = excuseDto.status,
+                                attachmentStorageKey = excuseDto.attachmentStorageKey
+                            )
+                        )
                     }
                 }
             }
             PendingWriteEntity.KIND_ATTENDANCE_EXCUSE_PATCH -> {
                 val excuseId = json.getString("id")
+                var storageKey = json.optString("attachment_storage_key").takeIf { it.isNotBlank() }
+                val localPath = json.optString("local_file_path").takeIf { it.isNotBlank() }
+                if (storageKey == null && localPath != null) {
+                    val file = File(localPath)
+                    if (file.exists() && file.isFile) {
+                        if (file.length() > 25 * 1024 * 1024) {
+                            throw IllegalStateException("حجم الملف يتجاوز الحد الأقصى 25 ميجابايت")
+                        }
+                        val mediaType = when (file.extension.lowercase()) {
+                            "pdf" -> "application/pdf".toMediaTypeOrNull()
+                            "jpg", "jpeg" -> "image/jpeg".toMediaTypeOrNull()
+                            "png" -> "image/png".toMediaTypeOrNull()
+                            else -> "application/octet-stream".toMediaTypeOrNull()
+                        }
+                        val uploadRes = meApi.uploadMedia(file.name, file.asRequestBody(mediaType))
+                        storageKey = uploadRes.storageKey ?: uploadRes.url.substringAfterLast("/")
+                        json.put("attachment_storage_key", storageKey)
+                        db.pendingWriteDao().upsert(item.copy(payloadJson = json.toString()))
+                    }
+                }
                 val req = sa.gheras.edutrack.data.remote.dto.PatchExcuseRequest(
                     reasonText = json.optString("reason_text").takeIf { it.isNotBlank() },
-                    attachmentStorageKey = json.optString("attachment_storage_key").takeIf { it.isNotBlank() }
+                    attachmentStorageKey = storageKey
                 )
-                meApi.patchExcuse(excuseId, req)
+                val patched = meApi.patchExcuse(excuseId, req)
+                val existing = db.attendanceExcuseDao().getById(excuseId)
+                if (existing != null) {
+                    db.attendanceExcuseDao().upsert(
+                        existing.copy(
+                            reasonText = patched.reasonText,
+                            attachmentStorageKey = patched.attachmentStorageKey,
+                            status = patched.status
+                        )
+                    )
+                }
             }
             PendingWriteEntity.KIND_DAILY_EVAL -> {
                 val body = DailyEvalItemBody(
@@ -448,17 +534,32 @@ class OutboxWorker(
         ) {
         val json = JSONObject(item.payloadJson)
         when (item.kind) {
-            PendingWriteEntity.KIND_ATTENDANCE,
-            PendingWriteEntity.KIND_ATTENDANCE_RECORD -> {
+            PendingWriteEntity.KIND_ATTENDANCE -> {
                 val studentId = json.optString("student_id")
                 val dateStr = json.optString("date")
                 db.studentAttendanceDao().deleteById("local:$studentId:$dateStr")
+            }
+            PendingWriteEntity.KIND_ATTENDANCE_RECORD -> {
+                val itemsArr = json.optJSONArray("items")
+                val dateStr = json.optString("date")
+                if (itemsArr != null) {
+                    for (i in 0 until itemsArr.length()) {
+                        val studentId = itemsArr.getJSONObject(i).optString("student_id")
+                        db.studentAttendanceDao().deleteById("local:$studentId:$dateStr")
+                    }
+                } else {
+                    val studentId = json.optString("student_id")
+                    db.studentAttendanceDao().deleteById("local:$studentId:$dateStr")
+                }
             }
             PendingWriteEntity.KIND_ATTENDANCE_EXCUSE -> {
                 val excuseId = json.optString("id")
                 if (excuseId.isNotBlank()) {
                     db.attendanceExcuseDao().deleteById(excuseId)
                 }
+            }
+            PendingWriteEntity.KIND_ATTENDANCE_EXCUSE_PATCH -> {
+                // On patch failure, do not delete the excuse; it remains in its previous state
             }
             PendingWriteEntity.KIND_DAILY_EVAL -> {
                 val studentId = json.optString("student_id")
