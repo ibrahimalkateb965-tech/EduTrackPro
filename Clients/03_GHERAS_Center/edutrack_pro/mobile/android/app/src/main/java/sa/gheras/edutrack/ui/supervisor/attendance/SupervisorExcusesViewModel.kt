@@ -2,10 +2,13 @@ package sa.gheras.edutrack.ui.supervisor.attendance
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import retrofit2.HttpException
+import sa.gheras.edutrack.data.remote.ErrorMapper
 import sa.gheras.edutrack.data.remote.dto.AttendanceExcuseDto
 import sa.gheras.edutrack.data.repo.AttendanceRepository
 
@@ -54,9 +57,11 @@ class SupervisorExcusesViewModel(
                     isLoading = false
                 )
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                val errorMsg = ErrorMapper.map(e).userMessage
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
-                    errorMessage = e.message ?: "فشل تحميل قائمة الأعذار للمشرفة"
+                    errorMessage = errorMsg
                 )
             }
         }
@@ -97,10 +102,12 @@ class SupervisorExcusesViewModel(
                 refresh()
                 onSuccess()
             } catch (e: Exception) {
-                val err = if (e.message?.contains("409") == true || e.message?.contains("Conflict") == true) {
+                if (e is CancellationException) throw e
+                val code = (e as? HttpException)?.code()
+                val err = if (code == 409 || e.message?.contains("409") == true || e.message?.contains("Conflict") == true) {
                     "تم البت في هذا العذر مسبقاً أو حدث تعارض في البيانات"
                 } else {
-                    e.message ?: "فشل تحديث قرار العذر"
+                    ErrorMapper.map(e).userMessage
                 }
                 _uiState.value = _uiState.value.copy(
                     isProcessingAction = false,

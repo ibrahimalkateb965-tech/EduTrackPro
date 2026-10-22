@@ -116,9 +116,10 @@ class AttendanceSheetViewModel(
             val markedRecords = _uiState.value.drafts
                 .filter { it.status != null }
                 .map { draft ->
+                    val safeStatus = if (draft.status == "غياب بعذر") "غائب" else draft.status!!
                     AttendanceRecord(
                         studentId = draft.student.id,
-                        status = draft.status!!,
+                        status = safeStatus,
                         note = draft.note
                     )
                 }
@@ -133,9 +134,10 @@ class AttendanceSheetViewModel(
         viewModelScope.launch {
             _uiState.update { it.copy(isApproving = true) }
             val records = _uiState.value.drafts.map { draft ->
+                val safeStatus = if (draft.status == "غياب بعذر") "غائب" else draft.status!!
                 AttendanceRecord(
                     studentId = draft.student.id,
-                    status = draft.status!!,
+                    status = safeStatus,
                     note = draft.note
                 )
             }

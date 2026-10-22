@@ -45,17 +45,19 @@ class AttendanceRepository(
         note: String? = null,
         isDraft: Boolean = false
     ) {
+        val safeStatus = if (status == "غياب بعذر") "غائب" else status
         val payload = JSONObject().apply {
             put("student_id", studentId)
             put("date", date.toString())
-            put("status", status)
+            put("status", safeStatus)
             put("is_draft", isDraft)
             if (note != null) put("note", note)
         }.toString()
 
         val naturalKey = "att:$studentId:$date"
+        val kind = if (isDraft) PendingWriteEntity.KIND_ATTENDANCE_RECORD else PendingWriteEntity.KIND_ATTENDANCE
         outbox.enqueue(
-            kind = PendingWriteEntity.KIND_ATTENDANCE_RECORD,
+            kind = kind,
             naturalKey = naturalKey,
             payloadJson = payload
         )
@@ -76,7 +78,29 @@ class AttendanceRepository(
         date: LocalDate,
         records: List<AttendanceRecord>
     ) {
-        recordAttendanceBatch(date, records, isDraft = true)
+        val safeRecords = records.map { rec ->
+            if (rec.status == "غياب بعذر") rec.copy(status = "غائب") else rec
+        }
+        val itemsArr = org.json.JSONArray()
+        safeRecords.forEach { rec ->
+            itemsArr.put(JSONObject().apply {
+                put("student_id", rec.studentId)
+                put("status", rec.status)
+                if (rec.note != null) put("note", rec.note)
+            })
+        }
+        val payload = JSONObject().apply {
+            put("room_id", roomId)
+            put("date", date.toString())
+            put("items", itemsArr)
+        }.toString()
+
+        val naturalKey = "att_draft:$roomId:$date"
+        outbox.enqueue(
+            kind = PendingWriteEntity.KIND_ATTENDANCE_RECORD,
+            naturalKey = naturalKey,
+            payloadJson = payload
+        )
     }
 
     suspend fun approveRoomAttendance(
