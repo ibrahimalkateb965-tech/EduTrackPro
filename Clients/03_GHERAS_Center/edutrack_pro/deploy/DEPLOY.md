@@ -169,3 +169,31 @@ fetches (0-byte files), but it can re-request a URL that carries its own authori
   or the Dockerfile does (full `push.sh`).
 - Rendered files are kept in process memory: keep the API a single uvicorn process (no `--workers`).
 - At most 2 renders run at once (~150 MB of RAM each).
+
+## Verified Production Credentials & Endpoints Cheat Sheet (Milestones M1–M7)
+
+### 1. Auth Invariant & Demo Accounts
+* **Login Endpoint**: `POST /api/v1/auth/login`
+* **Response Payload Format**: Returns `{"token": "<jwt>", "user": {...}}`.
+  > [!IMPORTANT]
+  > Always extract `response["token"]` (NOT `access_token`). Using `access_token` yields `None` and results in `401 Unauthorized`.
+* **Seeded Demo Accounts (013_demo_accounts_seed.sql)**:
+  All 3 demo accounts share the unified password: **`Password123!`**
+  - **Teacher**: `username: "teacher.demo"` (phone: `0550000001`)
+  - **Guardian**: `username: "guardian.demo"` (phone: `0550000002`)
+  - **Student**: `username: "student.demo"` (national_id: `1100000001`)
+
+### 2. Live Verified Endpoints Matrix
+| Milestone | Feature | Verified Endpoint | Method & Role | Notes |
+| :--- | :--- | :--- | :--- | :--- |
+| **System** | Health | `/api/v1/health` | `GET` (Public) | Returns `{"status":"ok","version":"2.0.0"}` |
+| **System** | Auth | `/api/v1/auth/login` | `POST` (Public) | Returns `{"token":"..."}` |
+| **M1** | Pickup Requests | `/api/v1/pickup/requests/active` | `GET` (Guardian) | Active pickup calls (bare `/pickup/requests` returns 405) |
+| **M3** | Attendance Excuses | `/api/v1/attendance/excuses` | `GET` (Manager/Supervisor) | Staff review queue (returns 403 for teacher/guardian) |
+| **M3** | Submit Excuse | `/api/v1/attendance/excuses` | `POST` (Guardian) | Guardian submits medical/absence excuse |
+| **M4** | Messaging Threads | `/api/v1/threads` | `GET` (Guardian/Teacher) | Note prefix is `/threads` (NOT `/messaging/threads`) |
+| **M4** | Daily Summaries | `/api/v1/daily-summaries` | `GET` (Teacher/Staff) | Daily educational summaries |
+| **M6** | Monthly Reports | `/api/v1/monthly-reports` | `GET` (Teacher/Staff) | Student monthly assessment and evaluations |
+| **M7** | Geo Attendance | `/api/v1/staff-attendance/my-status` | `GET` (Teacher/Staff) | Real-time shift & geofence status |
+| **M7** | Geo History | `/api/v1/staff-attendance/my-history` | `GET` (Teacher/Staff) | Check-in/out historical log |
+
