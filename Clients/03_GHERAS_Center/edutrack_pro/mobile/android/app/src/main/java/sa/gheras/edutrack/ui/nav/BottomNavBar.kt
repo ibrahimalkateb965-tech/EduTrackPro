@@ -1,7 +1,9 @@
 package sa.gheras.edutrack.ui.nav
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Assessment
 import androidx.compose.material.icons.filled.Assignment
+import androidx.compose.material.icons.filled.Badge
 import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.Home
@@ -51,6 +53,8 @@ fun AppBottomNavBar(
         )
         Role.SUPERVISOR, Role.MANAGER -> listOf(
             NavItem("البوابة", Icons.Default.DirectionsCar, SupervisorPickupRoute),
+            NavItem("التقارير", Icons.Default.Assessment, SupervisorMonthlyReportsRoute),
+            NavItem("الكادر", Icons.Default.Badge, SupervisorStaffAttendanceRoute),
             NavItem("حسابي", Icons.Default.Person, AccountRoute)
         )
     }

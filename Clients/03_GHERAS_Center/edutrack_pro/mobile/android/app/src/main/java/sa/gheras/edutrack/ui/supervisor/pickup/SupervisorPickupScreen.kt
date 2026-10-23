@@ -15,6 +15,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Assessment
+import androidx.compose.material.icons.filled.Badge
 import androidx.compose.material.icons.filled.FactCheck
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
@@ -50,6 +52,8 @@ fun SupervisorPickupScreen(
     viewModel: SupervisorGateViewModel,
     onNavigateToHandover: (String) -> Unit,
     onNavigateToExcuses: (() -> Unit)? = null,
+    onNavigateToReports: (() -> Unit)? = null,
+    onNavigateToStaffAttendance: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -72,6 +76,16 @@ fun SupervisorPickupScreen(
                     if (onNavigateToExcuses != null) {
                         IconButton(onClick = onNavigateToExcuses) {
                             Icon(Icons.Default.FactCheck, contentDescription = "أعذار الغياب")
+                        }
+                    }
+                    if (onNavigateToReports != null) {
+                        IconButton(onClick = onNavigateToReports) {
+                            Icon(Icons.Default.Assessment, contentDescription = "التقارير الشهرية")
+                        }
+                    }
+                    if (onNavigateToStaffAttendance != null) {
+                        IconButton(onClick = onNavigateToStaffAttendance) {
+                            Icon(Icons.Default.Badge, contentDescription = "حضور وانصراف الكادر")
                         }
                     }
                     IconButton(onClick = { viewModel.refresh() }) {

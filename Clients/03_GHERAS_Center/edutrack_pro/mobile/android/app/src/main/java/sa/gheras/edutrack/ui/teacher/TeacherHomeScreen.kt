@@ -22,6 +22,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Assessment
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DateRange
@@ -29,6 +30,7 @@ import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.FactCheck
 import androidx.compose.material.icons.filled.Grading
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Sync
@@ -74,7 +76,9 @@ fun TeacherHomeScreen(
     onEvaluationClick: (roomId: String, date: String, subject: String) -> Unit,
     onLessonLogClick: (scheduleId: String, date: String) -> Unit,
     onDailySummaryClick: (roomId: String) -> Unit = {},
+    onMonthlyReportClick: (roomId: String) -> Unit = {},
     onPickupQueueClick: () -> Unit = {},
+    onStaffAttendanceClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -241,6 +245,50 @@ fun TeacherHomeScreen(
                     }
                 }
 
+                // Staff Geo Attendance (E01/E02)
+                item {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onStaffAttendanceClick() },
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer
+                        )
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.LocationOn,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "حضور وانصراف الكادر الجغرافي",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                                )
+                                Text(
+                                    text = "تسجيل الحضور والانصراف الذاتي بالنطاق الجغرافي للمركز",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f)
+                                )
+                            }
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                        }
+                    }
+                }
+
                 // Supervisor Evaluation & KPI Scorecard Banner
                 item {
                     TeacherEvaluationBanner()
@@ -280,7 +328,8 @@ fun TeacherHomeScreen(
                             onAttendanceClick = { onAttendanceClick(slotItem.schedule.roomId, state.selectedDate.toString()) },
                             onEvaluationClick = { onEvaluationClick(slotItem.schedule.roomId, state.selectedDate.toString(), slotItem.schedule.subject) },
                             onLessonLogClick = { onLessonLogClick(slotItem.schedule.id, state.selectedDate.toString()) },
-                            onDailySummaryClick = { onDailySummaryClick(slotItem.schedule.roomId) }
+                            onDailySummaryClick = { onDailySummaryClick(slotItem.schedule.roomId) },
+                            onMonthlyReportClick = { onMonthlyReportClick(slotItem.schedule.roomId) }
                         )
                     }
                 }
@@ -297,6 +346,7 @@ fun ScheduleSlotCard(
     onEvaluationClick: () -> Unit,
     onLessonLogClick: () -> Unit,
     onDailySummaryClick: () -> Unit = {},
+    onMonthlyReportClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val sched = slotItem.schedule
@@ -399,6 +449,22 @@ fun ScheduleSlotCard(
                 )
                 Spacer(modifier = Modifier.width(6.dp))
                 Text("إعداد ونشر الملخص اليومي للقاعة")
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+            OutlinedButton(
+                onClick = onMonthlyReportClick,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(10.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Assessment,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                    tint = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("إعداد التقارير الشهرية للطلاب")
             }
         }
     }

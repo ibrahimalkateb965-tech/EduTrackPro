@@ -19,6 +19,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.filled.Assessment
 import androidx.compose.material.icons.filled.Assignment
 import androidx.compose.material.icons.filled.AutoStories
 import androidx.compose.material.icons.filled.CheckCircle
@@ -71,6 +72,7 @@ fun GuardianHomeScreen(
     onSkillsClick: (studentId: String) -> Unit,
     onFeesClick: (studentId: String) -> Unit,
     onDailySummaryClick: (studentId: String) -> Unit = {},
+    onMonthlyReportClick: (studentId: String) -> Unit = {},
     onThreadsClick: () -> Unit = {},
     onPickupClick: (studentId: String) -> Unit = {},
     showFees: Boolean = true,
@@ -280,6 +282,17 @@ fun GuardianHomeScreen(
                             icon = Icons.Default.MenuBook,
                             accentColor = MaterialTheme.colorScheme.primary,
                             onClick = { onDailySummaryClick(child.id) }
+                        )
+                    }
+
+                    // 5c. Monthly Report
+                    item {
+                        GuardianActionCard(
+                            title = "التقرير الشهري للطالب",
+                            subtitle = "التقييم الأكاديمي والمهاري الشامل، نسب الحضور، وتوصيات المعلمة",
+                            icon = Icons.Default.Assessment,
+                            accentColor = MaterialTheme.colorScheme.primary,
+                            onClick = { onMonthlyReportClick(child.id) }
                         )
                     }
 

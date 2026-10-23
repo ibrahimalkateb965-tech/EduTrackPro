@@ -11,6 +11,8 @@ import sa.gheras.edutrack.data.dao.DailySummaryDao
 import sa.gheras.edutrack.data.dao.EvaluationDao
 import sa.gheras.edutrack.data.dao.InstallmentDao
 import sa.gheras.edutrack.data.dao.LessonLogDao
+import sa.gheras.edutrack.data.dao.MonthlyReportDao
+import sa.gheras.edutrack.data.dao.StaffAttendanceDao
 import sa.gheras.edutrack.data.dao.NotificationDao
 import sa.gheras.edutrack.data.dao.PickupDao
 import sa.gheras.edutrack.data.dao.PendingWriteDao
@@ -32,6 +34,9 @@ import sa.gheras.edutrack.data.entity.DailySummaryNoteEntity
 import sa.gheras.edutrack.data.entity.EvaluationEntity
 import sa.gheras.edutrack.data.entity.InstallmentEntity
 import sa.gheras.edutrack.data.entity.LessonLogEntity
+import sa.gheras.edutrack.data.entity.MonthlyStudentReportEntity
+import sa.gheras.edutrack.data.entity.StaffAttendanceEntity
+import sa.gheras.edutrack.data.entity.StaffShiftEntity
 import sa.gheras.edutrack.data.entity.NotificationEntity
 import sa.gheras.edutrack.data.entity.PickupDelegateEntity
 import sa.gheras.edutrack.data.entity.PendingWriteEntity
@@ -73,9 +78,12 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         SubmissionFileEntity::class,
         SyncStateEntity::class,
         ThreadEntity::class,
-        ThreadMessageEntity::class
+        ThreadMessageEntity::class,
+        MonthlyStudentReportEntity::class,
+        StaffAttendanceEntity::class,
+        StaffShiftEntity::class
     ],
-    version = 8,
+    version = 10,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -101,6 +109,8 @@ abstract class GherasDatabase : RoomDatabase() {
     abstract fun submissionFileDao(): SubmissionFileDao
     abstract fun syncStateDao(): SyncStateDao
     abstract fun threadDao(): ThreadDao
+    abstract fun monthlyReportDao(): MonthlyReportDao
+    abstract fun staffAttendanceDao(): StaffAttendanceDao
 
     /**
      * Replaces the whole synced scope in ONE transaction (design spec §2.3).
@@ -397,6 +407,96 @@ abstract class GherasDatabase : RoomDatabase() {
                 """.trimIndent())
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_daily_summary_notes_summary_id` ON `daily_summary_notes` (`summary_id`)")
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_daily_summary_notes_student_id` ON `daily_summary_notes` (`student_id`)")
+            }
+        }
+
+        val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `monthly_student_reports` (
+                        `id` TEXT NOT NULL,
+                        `branch_id` TEXT,
+                        `student_id` TEXT NOT NULL,
+                        `room_id` TEXT NOT NULL,
+                        `month` TEXT NOT NULL,
+                        `teacher_user_id` TEXT NOT NULL,
+                        `status` TEXT NOT NULL DEFAULT 'draft',
+                        `attendance_stats_json` TEXT NOT NULL,
+                        `subject_ratings_json` TEXT NOT NULL,
+                        `strengths` TEXT,
+                        `improvements` TEXT,
+                        `recommendations` TEXT,
+                        `revision_notes` TEXT,
+                        `submitted_at` TEXT,
+                        `reviewed_by_user_id` TEXT,
+                        `reviewed_at` TEXT,
+                        `published_at` TEXT,
+                        `created_at` TEXT NOT NULL,
+                        `updated_at` TEXT NOT NULL,
+                        PRIMARY KEY(`id`),
+                        FOREIGN KEY(`student_id`) REFERENCES `students`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT,
+                        FOREIGN KEY(`room_id`) REFERENCES `rooms`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT
+                    )
+                """.trimIndent())
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_monthly_student_reports_student_id_month` ON `monthly_student_reports` (`student_id`, `month`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_monthly_student_reports_room_id_month` ON `monthly_student_reports` (`room_id`, `month`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_monthly_student_reports_status` ON `monthly_student_reports` (`status`)")
+            }
+        }
+
+        val MIGRATION_9_10 = object : Migration(9, 10) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `staff_attendance` (
+                        `id` TEXT NOT NULL,
+                        `branch_id` TEXT,
+                        `staff_id` TEXT NOT NULL,
+                        `date` TEXT NOT NULL,
+                        `status` TEXT NOT NULL,
+                        `check_in_time` TEXT,
+                        `check_out_time` TEXT,
+                        `check_in_lat` REAL,
+                        `check_in_lng` REAL,
+                        `check_in_accuracy` REAL,
+                        `check_in_distance` REAL,
+                        `check_out_lat` REAL,
+                        `check_out_lng` REAL,
+                        `check_out_accuracy` REAL,
+                        `check_out_distance` REAL,
+                        `shift_id` TEXT,
+                        `late_minutes` INTEGER NOT NULL DEFAULT 0,
+                        `early_leave_minutes` INTEGER NOT NULL DEFAULT 0,
+                        `work_duration_minutes` INTEGER NOT NULL DEFAULT 0,
+                        `is_manual_override` INTEGER NOT NULL DEFAULT 0,
+                        `override_reason` TEXT,
+                        `override_by_user_id` TEXT,
+                        `override_at` TEXT,
+                        `deduction_amount` REAL NOT NULL DEFAULT 0.0,
+                        `notes` TEXT,
+                        `created_at` TEXT NOT NULL,
+                        `updated_at` TEXT NOT NULL,
+                        PRIMARY KEY(`id`)
+                    )
+                """.trimIndent())
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_staff_attendance_staff_id_date` ON `staff_attendance` (`staff_id`, `date`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_staff_attendance_date` ON `staff_attendance` (`date`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_staff_attendance_status` ON `staff_attendance` (`status`)")
+
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `staff_shifts` (
+                        `id` TEXT NOT NULL,
+                        `branch_id` TEXT,
+                        `name` TEXT NOT NULL,
+                        `shift_type` TEXT NOT NULL,
+                        `start_time` TEXT NOT NULL,
+                        `end_time` TEXT NOT NULL,
+                        `grace_period_minutes` INTEGER NOT NULL DEFAULT 15,
+                        `late_threshold_minutes` INTEGER NOT NULL DEFAULT 30,
+                        `early_leave_threshold_minutes` INTEGER NOT NULL DEFAULT 30,
+                        `is_active` INTEGER NOT NULL DEFAULT 1,
+                        PRIMARY KEY(`id`)
+                    )
+                """.trimIndent())
             }
         }
     }

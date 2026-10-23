@@ -104,6 +104,12 @@ import sa.gheras.edutrack.ui.threads.ThreadDetailScreen
 import sa.gheras.edutrack.ui.threads.ThreadDetailViewModel
 import sa.gheras.edutrack.ui.guardian.summary.ChildDailySummaryScreen
 import sa.gheras.edutrack.ui.guardian.summary.ChildDailySummaryViewModel
+import sa.gheras.edutrack.ui.teacher.report.TeacherMonthlyReportScreen
+import sa.gheras.edutrack.ui.teacher.report.TeacherMonthlyReportViewModel
+import sa.gheras.edutrack.ui.supervisor.report.SupervisorMonthlyReportsScreen
+import sa.gheras.edutrack.ui.supervisor.report.SupervisorMonthlyReportsViewModel
+import sa.gheras.edutrack.ui.guardian.report.ChildMonthlyReportScreen
+import sa.gheras.edutrack.ui.guardian.report.ChildMonthlyReportViewModel
 
 @Composable
 fun RootNavHost(
@@ -355,9 +361,32 @@ fun RootNavHost(
                         onDailySummaryClick = { roomId ->
                             navController.navigate(TeacherDailySummaryRoute(roomId))
                         },
+                        onMonthlyReportClick = { roomId ->
+                            navController.navigate(TeacherMonthlyReportRoute(roomId))
+                        },
                         onPickupQueueClick = {
                             navController.navigate(TeacherPickupQueueRoute)
+                        },
+                        onStaffAttendanceClick = {
+                            navController.navigate(StaffGeoAttendanceRoute)
                         }
+                    )
+                }
+
+                composable<TeacherMonthlyReportRoute> { backStackEntry ->
+                    val route: TeacherMonthlyReportRoute = backStackEntry.toRoute()
+                    val vm: TeacherMonthlyReportViewModel = viewModel(
+                        factory = viewModelFactory {
+                            TeacherMonthlyReportViewModel(
+                                roomId = route.roomId,
+                                monthlyReportsRepository = container.monthlyReportsRepository,
+                                studentsRepository = container.studentsRepository
+                            )
+                        }
+                    )
+                    TeacherMonthlyReportScreen(
+                        viewModel = vm,
+                        onBack = { navController.popBackStack() }
                     )
                 }
 
@@ -659,6 +688,7 @@ fun RootNavHost(
                         onSkillsClick = { studentId -> navController.navigate(ChildSkillsRoute(studentId)) },
                         onFeesClick = { studentId -> navController.navigate(FeesRoute(studentId)) },
                         onDailySummaryClick = { studentId -> navController.navigate(ChildDailySummaryRoute(studentId)) },
+                        onMonthlyReportClick = { studentId -> navController.navigate(ChildMonthlyReportRoute(studentId)) },
                         onThreadsClick = { navController.navigate(GuardianThreadsRoute) },
                         onPickupClick = { studentId ->
                             navController.navigate(PickupRequestRoute(studentId))
@@ -721,6 +751,23 @@ fun RootNavHost(
                         onNavigateToThread = { threadId ->
                             navController.navigate(ThreadDetailRoute(threadId))
                         }
+                    )
+                }
+
+                composable<ChildMonthlyReportRoute> { backStackEntry ->
+                    val route: ChildMonthlyReportRoute = backStackEntry.toRoute()
+                    val vm: ChildMonthlyReportViewModel = viewModel(
+                        factory = viewModelFactory {
+                            ChildMonthlyReportViewModel(
+                                studentId = route.studentId,
+                                monthlyReportsRepository = container.monthlyReportsRepository,
+                                studentsRepository = container.studentsRepository
+                            )
+                        }
+                    )
+                    ChildMonthlyReportScreen(
+                        viewModel = vm,
+                        onBack = { navController.popBackStack() }
                     )
                 }
 
@@ -920,6 +967,12 @@ fun RootNavHost(
                         },
                         onNavigateToExcuses = {
                             navController.navigate(SupervisorExcusesRoute)
+                        },
+                        onNavigateToReports = {
+                            navController.navigate(SupervisorMonthlyReportsRoute)
+                        },
+                        onNavigateToStaffAttendance = {
+                            navController.navigate(SupervisorStaffAttendanceRoute)
                         }
                     )
                 }
@@ -945,6 +998,50 @@ fun RootNavHost(
                         }
                     )
                     SupervisorExcusesScreen(
+                        viewModel = vm,
+                        onNavigateBack = { navController.popBackStack() }
+                    )
+                }
+
+                composable<SupervisorMonthlyReportsRoute> {
+                    val vm: SupervisorMonthlyReportsViewModel = viewModel(
+                        factory = viewModelFactory {
+                            SupervisorMonthlyReportsViewModel(container.monthlyReportsRepository)
+                        }
+                    )
+                    SupervisorMonthlyReportsScreen(
+                        viewModel = vm,
+                        onBack = { navController.popBackStack() }
+                    )
+                }
+
+                composable<StaffGeoAttendanceRoute> {
+                    val staffId = container.sessionStore.user?.id ?: ""
+                    val vm: sa.gheras.edutrack.ui.staff.StaffGeoAttendanceViewModel = viewModel(
+                        factory = viewModelFactory {
+                            sa.gheras.edutrack.ui.staff.StaffGeoAttendanceViewModel(
+                                staffId = staffId,
+                                staffAttendanceRepository = container.staffAttendanceRepository
+                            )
+                        }
+                    )
+                    sa.gheras.edutrack.ui.staff.StaffGeoAttendanceScreen(
+                        viewModel = vm,
+                        onNavigateBack = { navController.popBackStack() }
+                    )
+                }
+
+                composable<SupervisorStaffAttendanceRoute> {
+                    val staffId = container.sessionStore.user?.id
+                    val vm: sa.gheras.edutrack.ui.supervisor.attendance.SupervisorStaffAttendanceViewModel = viewModel(
+                        factory = viewModelFactory {
+                            sa.gheras.edutrack.ui.supervisor.attendance.SupervisorStaffAttendanceViewModel(
+                                currentStaffId = staffId,
+                                staffAttendanceRepository = container.staffAttendanceRepository
+                            )
+                        }
+                    )
+                    sa.gheras.edutrack.ui.supervisor.attendance.SupervisorStaffAttendanceScreen(
                         viewModel = vm,
                         onNavigateBack = { navController.popBackStack() }
                     )

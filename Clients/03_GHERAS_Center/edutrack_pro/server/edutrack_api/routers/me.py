@@ -380,3 +380,38 @@ def list_my_daily_summaries(
     return [row_to_json(s) for s in summaries]
 
 
+@router.get("/monthly-reports")
+def list_my_monthly_reports(
+    student_id: UUID,
+    month: str | None = None,
+    scope: Scope = _SCOPE,
+    conn=_CONN,
+) -> list[dict]:
+    _only(scope, "guardian", "student")
+    if scope.student_ids is not None and student_id not in scope.student_ids:
+        raise ApiError(403, "forbidden", "الطالب لا ينتمي لسجل أبنائك")
+    from edutrack_api.repositories import monthly_reports_repo
+    reports = monthly_reports_repo.list_guardian_monthly_reports(
+        conn=conn,
+        guardian_student_ids=[student_id],
+        month=month,
+    )
+    return [row_to_json(r) for r in reports]
+
+
+@router.get("/monthly-reports/{report_id}")
+def get_my_monthly_report(
+    report_id: UUID,
+    scope: Scope = _SCOPE,
+    conn=_CONN,
+) -> dict:
+    _only(scope, "guardian", "student")
+    from edutrack_api.repositories import monthly_reports_repo
+    report = monthly_reports_repo.get_monthly_report_by_id(conn, report_id)
+    if not report or report["status"] != "published":
+        raise ApiError(404, "not_found", "التقرير غير متاح أو قيد الاعتماد")
+    if scope.student_ids is not None and report["student_id"] not in scope.student_ids:
+        raise ApiError(403, "forbidden", "الطالب لا ينتمي لسجل أبنائك")
+    return row_to_json(report)
+
+

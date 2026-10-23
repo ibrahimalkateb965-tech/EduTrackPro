@@ -37,6 +37,12 @@ New_System_Design/
 fleet_orders/
 fleet_templates/
 fleet_proposal.json
+fleet_target.json
+start_fleet_dashboard.sh
+GEMINI_WORKER_NODE_SETUP.md
+WORKER_NODE_SETUP_GUIDE.md
+Subagents.md
+Odoo
 PROJECT_CONTEXT.md
 GOOGLE_ADS_API_RESUMPTION.md
 open_*.bat

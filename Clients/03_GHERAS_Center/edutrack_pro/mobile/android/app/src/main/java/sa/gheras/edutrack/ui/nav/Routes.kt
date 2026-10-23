@@ -26,6 +26,9 @@ data object TeacherHomeRoute : Route
 data class TeacherDailySummaryRoute(val roomId: String) : Route
 
 @Serializable
+data class TeacherMonthlyReportRoute(val roomId: String) : Route
+
+@Serializable
 data object TeacherStudentsRoute : Route
 
 @Serializable
@@ -87,6 +90,9 @@ data class ThreadDetailRoute(val threadId: String) : Route
 data class ChildDailySummaryRoute(val studentId: String) : Route
 
 @Serializable
+data class ChildMonthlyReportRoute(val studentId: String) : Route
+
+@Serializable
 data class ChildAttendanceRoute(val studentId: String) : Route
 
 @Serializable
@@ -138,4 +144,13 @@ data class SupervisorHandoverRoute(val requestId: String) : Route
 
 @Serializable
 data object SupervisorExcusesRoute : Route
+
+@Serializable
+data object SupervisorMonthlyReportsRoute : Route
+
+@Serializable
+data object StaffGeoAttendanceRoute : Route
+
+@Serializable
+data object SupervisorStaffAttendanceRoute : Route
 

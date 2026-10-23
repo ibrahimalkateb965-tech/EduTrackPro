@@ -38,7 +38,9 @@ class AppContainer(private val context: Context) {
                 GherasDatabase.MIGRATION_4_5,
                 GherasDatabase.MIGRATION_5_6,
                 GherasDatabase.MIGRATION_6_7,
-                GherasDatabase.MIGRATION_7_8
+                GherasDatabase.MIGRATION_7_8,
+                GherasDatabase.MIGRATION_8_9,
+                GherasDatabase.MIGRATION_9_10
             )
             .fallbackToDestructiveMigrationOnDowngrade()
             .build()
@@ -182,6 +184,28 @@ class AppContainer(private val context: Context) {
         sa.gheras.edutrack.data.repo.DailySummariesRepository(
             dailySummaryDao = database.dailySummaryDao(),
             threadsApi = threadsApi
+        )
+    }
+
+    val monthlyReportsApi: sa.gheras.edutrack.data.remote.MonthlyReportsApi by lazy {
+        retrofit.create(sa.gheras.edutrack.data.remote.MonthlyReportsApi::class.java)
+    }
+
+    val monthlyReportsRepository: sa.gheras.edutrack.data.repo.MonthlyReportsRepository by lazy {
+        sa.gheras.edutrack.data.repo.MonthlyReportsRepository(
+            monthlyReportDao = database.monthlyReportDao(),
+            monthlyReportsApi = monthlyReportsApi
+        )
+    }
+
+    val staffAttendanceApi: sa.gheras.edutrack.data.remote.StaffAttendanceApi by lazy {
+        retrofit.create(sa.gheras.edutrack.data.remote.StaffAttendanceApi::class.java)
+    }
+
+    val staffAttendanceRepository: sa.gheras.edutrack.data.repo.StaffAttendanceRepository by lazy {
+        sa.gheras.edutrack.data.repo.StaffAttendanceRepository(
+            staffAttendanceDao = database.staffAttendanceDao(),
+            staffAttendanceApi = staffAttendanceApi
         )
     }
 }

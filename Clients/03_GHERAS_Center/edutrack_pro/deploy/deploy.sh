@@ -28,7 +28,7 @@ command -v docker >/dev/null || die "docker is not installed"
 docker compose version >/dev/null 2>&1 || die "docker compose v2 is required"
 command -v openssl >/dev/null || die "openssl is required"
 for f in db/postgres/001_schema.sql db/postgres/002_reference.sql db/postgres/003_phase2.sql db/postgres/004_phase3.sql db/postgres/005_saturday.sql db/postgres/006_settings.sql db/postgres/007_revoked_tokens_purge.sql db/postgres/008_national_id_auth_and_student_role.sql db/postgres/009_whatsapp_auth_otp.sql db/postgres/010_notifications_v2.sql db/postgres/011_token_version.sql db/postgres/012_enterprise_expansion.sql db/postgres/013_demo_accounts_seed.sql db/postgres/014_dynamic_groups.sql \
-         db/postgres/015_allergies_and_bus.sql db/postgres/016_pickup_requests.sql db/postgres/017_homework_revisions.sql db/postgres/018_attendance_excuses.sql \
+         db/postgres/015_allergies_and_bus.sql db/postgres/016_pickup_requests.sql db/postgres/017_homework_revisions.sql db/postgres/018_attendance_excuses.sql db/postgres/019_messaging_and_daily_summary.sql db/postgres/020_monthly_student_reports.sql db/postgres/021_staff_geo_attendance.sql \
          server/Dockerfile server/uv.lock web/dashboard/index.html assets/gheras_logo.png \
          deploy/backup.sh deploy/edutrack-backup.service deploy/edutrack-backup.timer; do
   [[ -f "$ROOT/$f" ]] || die "missing $f — sync the full edutrack_pro tree first"
@@ -75,16 +75,17 @@ ALL_MIGRATIONS=(
   009_whatsapp_auth_otp.sql 010_notifications_v2.sql 011_token_version.sql
   012_enterprise_expansion.sql 013_demo_accounts_seed.sql 014_dynamic_groups.sql
   015_allergies_and_bus.sql 016_pickup_requests.sql 017_homework_revisions.sql
-  018_attendance_excuses.sql
+  018_attendance_excuses.sql 019_messaging_and_daily_summary.sql 020_monthly_student_reports.sql
+  021_staff_geo_attendance.sql
 )
 
 if [[ "$("${PSQL[@]}" -c "SELECT to_regclass('public.users') IS NOT NULL")" != "t" ]]; then
-  log "Empty database — applying migrations 001 -> 018"
+  log "Empty database — applying migrations 001 -> 020"
   for m in "${ALL_MIGRATIONS[@]}"; do
     "${PSQL[@]}" -f "/docker-entrypoint-initdb.d/$m" >/dev/null
   done
 else
-  log "Applying incremental idempotent migrations (003 -> 018)"
+  log "Applying incremental idempotent migrations (003 -> 020)"
   for m in "${ALL_MIGRATIONS[@]:2}"; do
     "${PSQL[@]}" -f "/docker-entrypoint-initdb.d/$m" >/dev/null || true
   done
