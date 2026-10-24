@@ -1,5 +1,6 @@
 import os
 import re
+import uuid
 from datetime import date, datetime
 from decimal import Decimal
 from pathlib import Path
@@ -711,15 +712,21 @@ async def print_pdf_download(token: str) -> Response:
 @router.get("/public/receipts/{payment_ref}/pdf")
 async def public_receipt_pdf(payment_ref: str, request: Request, conn=Depends(get_conn)) -> Response:
     """Public capability endpoint to view/download official receipt PDF without login."""
+    try:
+        uuid_obj = uuid.UUID(payment_ref)
+        canonical_uuid = str(uuid_obj)
+    except (ValueError, AttributeError):
+        raise ApiError(404, "not_found", "سند القبض غير موجود أو تم حذفه")
+
     item = conn.execute(
         """SELECT r.receipt_no, p.id AS payment_id, s.name AS student_name
            FROM payments p
            JOIN receipts r ON r.payment_id = p.id
            JOIN students s ON s.id = p.student_id
-           WHERE (p.id::text = %s OR r.receipt_no::text = %s)
+           WHERE p.id::text = %s
              AND p.deleted_at IS NULL AND r.deleted_at IS NULL AND s.deleted_at IS NULL
            LIMIT 1""",
-        (payment_ref, payment_ref),
+        (canonical_uuid,),
     ).fetchone()
     if not item:
         raise ApiError(404, "not_found", "سند القبض غير موجود أو تم حذفه")
@@ -733,7 +740,6 @@ async def public_receipt_pdf(payment_ref: str, request: Request, conn=Depends(ge
     cache_candidates = [
         cache_dir / f"receipt_{payment_id}.pdf",
         cache_dir / f"receipt_{receipt_no}.pdf",
-        cache_dir / f"receipt_{payment_ref}.pdf",
     ]
 
     for c in cache_candidates:

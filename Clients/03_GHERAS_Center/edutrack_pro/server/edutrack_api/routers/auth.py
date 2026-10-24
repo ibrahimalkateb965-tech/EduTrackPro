@@ -1,8 +1,10 @@
 import hmac
+import time
+from collections import defaultdict
 from datetime import UTC, datetime, timezone
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Response
+from fastapi import APIRouter, Depends, Request, Response
 from pydantic import BaseModel
 
 from edutrack_api.audit import write_audit
@@ -23,6 +25,27 @@ from edutrack_api.services.whatsapp import (
 router = APIRouter()
 
 SANDBOX_MASTER_OTP = "1234"
+
+_LOGIN_ATTEMPTS: dict[str, list[float]] = defaultdict(list)
+_RATE_LIMIT_WINDOW = 60.0  # seconds
+_RATE_LIMIT_MAX_ATTEMPTS = 5  # max attempts per window
+
+
+def _check_rate_limit(key: str) -> None:
+    now = time.time()
+    attempts = [t for t in _LOGIN_ATTEMPTS[key] if now - t < _RATE_LIMIT_WINDOW]
+    _LOGIN_ATTEMPTS[key] = attempts
+    if len(attempts) >= _RATE_LIMIT_MAX_ATTEMPTS:
+        raise ApiError(429, "rate_limited", "تم تجاوز الحد المسموح من محاولات الدخول. يرجى الانتظار 60 ثانية والمحاولة مرة أخرى.")
+
+
+def _record_failed_attempt(key: str) -> None:
+    now = time.time()
+    _LOGIN_ATTEMPTS[key].append(now)
+
+
+def _clear_rate_limit(key: str) -> None:
+    _LOGIN_ATTEMPTS.pop(key, None)
 
 
 def _whatsapp_sandbox(settings) -> bool:
@@ -107,8 +130,21 @@ def _phone_candidates(ident: str) -> list[str]:
 
 
 @router.post("/auth/login")
-def login(body: LoginBody, conn=Depends(get_conn)):
+def login(body: LoginBody, request: Request, conn=Depends(get_conn)):
     ident = body.username.strip()
+
+    client_ip = request.headers.get("x-forwarded-for", "").split(",")[0].strip()
+    if not client_ip and request.client:
+        client_ip = request.client.host
+    if not client_ip:
+        client_ip = "unknown"
+
+    ip_key = f"ip:{client_ip}"
+    user_key = f"user:{ident.lower()}"
+
+    _check_rate_limit(ip_key)
+    _check_rate_limit(user_key)
+
     role_filter = body.role.strip().lower() if body.role else None
     phones = _phone_candidates(ident)
 
@@ -151,7 +187,12 @@ def login(body: LoginBody, conn=Depends(get_conn)):
             break
 
     if not authenticated_user:
+        _record_failed_attempt(ip_key)
+        _record_failed_attempt(user_key)
         raise ApiError(401, "unauthorized", "بيانات الدخول غير صحيحة")
+
+    _clear_rate_limit(ip_key)
+    _clear_rate_limit(user_key)
 
     user = authenticated_user
     return {

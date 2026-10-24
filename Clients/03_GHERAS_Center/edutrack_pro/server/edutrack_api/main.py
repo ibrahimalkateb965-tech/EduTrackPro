@@ -31,11 +31,13 @@ async def lifespan(app: FastAPI):
 
 
 def create_app() -> FastAPI:
+    enable_docs = os.getenv("ENABLE_API_DOCS", "false").lower() in ("1", "true", "yes")
     app = FastAPI(
         title="Gheras EduTrack API",
         version=__version__,
-        docs_url="/api/v1/docs",
-        openapi_url="/api/v1/openapi.json",
+        docs_url="/api/v1/docs" if enable_docs else None,
+        redoc_url="/api/v1/redoc" if enable_docs else None,
+        openapi_url="/api/v1/openapi.json" if enable_docs else None,
         lifespan=lifespan,
     )
     settings = get_settings()
