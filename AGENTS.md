@@ -64,6 +64,10 @@ This document is the canonical entry point for all AI agents, coding assistants,
   - **n8n** automation workflows, webhook processors, and LLM router architectures.
   - Visualization & System Architecture: **Autovem Flowchart Studio** (`tools/flowchart_studio/`) for 4K architectural diagramming with WCAG AA compliance.
 - **Memory & Decisions**: Live in the **Autovem Brain** vault (`Brain/`). Every agent boots from `Brain/00_Home.md` and follows its navigation rules (one master note, max depth 2). `.agents/MEMORY_STORE.md` is frozen history since 2026-10-13: do not load at boot, do not append.
+  - **Brain Vault Pilot Governance Standard ([C-107]):**
+    1. *Mandatory Session Logging:* Every orchestrator (`Claude Code`, `Antigravity IDE`, `agcli`, `OpenCode`) must log one `PILOT` line under `## Pilot` in `Brain/06_Daily/YYYY-MM-DD.md` at session close: `- PILOT HH:MM [Agent] job=<job-or-none> boot_files=<n> boot_kb=<n> hit=<1|0> misses=<n> note=<short text>`.
+    2. *Arabic Note Sizing Standard:* Evaluate note bloat strictly by line count ($\le 300$ lines), not by KB (which UTF-8 Arabic 2-byte encoding inflates). Decompose notes > 300 lines into master index ($\le 100$ lines) + topic sub-notes ($\le 250$ lines).
+    3. *Wiki-Link Sanitization:* Write ANSI escape codes as `\x1b[` or `ESC[`, never `^[[`, to prevent regex link checkers from reporting false-positive broken links.
 
 ### Pillar 3: Application Engineering (Mobile & Web)
 - **Android Engineering**: Kotlin, Jetpack Compose, Material 3, Room DB, WorkManager, Offline-first sync, and Google Play Console compliance (D-U-N-S, Organization account standards).
