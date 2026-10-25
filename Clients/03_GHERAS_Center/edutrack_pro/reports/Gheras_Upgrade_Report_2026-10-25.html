@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <title>تقرير إنجاز وترقية تشغيلية — مركز غراس التعلمي</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap');
+
+    :root {
+      --primary: #047857;
+      --primary-dark: #065f46;
+      --primary-light: #ecfdf5;
+      --accent: #0284c7;
+      --accent-light: #f0f9ff;
+      --warning: #b45309;
+      --warning-light: #fffbeb;
+      --danger: #b91c1c;
+      --danger-light: #fef2f2;
+      --text-main: #0f172a;
+      --text-muted: #475569;
+      --border: #e2e8f0;
+      --bg-card: #ffffff;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Cairo', system-ui, -apple-system, sans-serif;
+    }
+
+    body {
+      background: #f8fafc;
+      color: var(--text-main);
+      line-height: 1.6;
+      font-size: 13px;
+      padding: 30px;
+    }
+
+    .report-container {
+      max-width: 900px;
+      margin: 0 auto;
+      background: #ffffff;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 40px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+    }
+
+    /* Header */
+    .report-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 2px solid var(--primary);
+      padding-bottom: 20px;
+      margin-bottom: 30px;
+    }
+
+    .brand-section h1 {
+      font-size: 22px;
+      font-weight: 900;
+      color: var(--primary-dark);
+      margin-bottom: 4px;
+    }
+
+    .brand-section .subtitle {
+      font-size: 13px;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    .meta-badge {
+      text-align: left;
+      font-size: 11px;
+      color: var(--text-muted);
+      background: var(--primary-light);
+      padding: 10px 16px;
+      border-radius: 8px;
+      border: 1px solid #a7f3d0;
+    }
+
+    .meta-badge strong {
+      color: var(--primary-dark);
+      font-weight: 800;
+    }
+
+    /* Executive Highlights */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-bottom: 30px;
+    }
+
+    .kpi-card {
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px;
+      text-align: center;
+    }
+
+    .kpi-card.success {
+      border-color: #a7f3d0;
+      background: var(--primary-light);
+    }
+
+    .kpi-card .val {
+      font-size: 20px;
+      font-weight: 900;
+      color: var(--primary-dark);
+      margin-bottom: 2px;
+    }
+
+    .kpi-card .label {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-weight: 700;
+    }
+
+    /* Section Styling */
+    h2 {
+      font-size: 16px;
+      font-weight: 800;
+      color: var(--primary-dark);
+      margin: 25px 0 12px 0;
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    h3 {
+      font-size: 13px;
+      font-weight: 700;
+      color: #334155;
+      margin: 14px 0 8px 0;
+    }
+
+    p {
+      margin-bottom: 10px;
+      text-align: justify;
+      color: #334155;
+    }
+
+    /* Comparison Table */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 15px 0;
+      font-size: 12px;
+    }
+
+    th, td {
+      border: 1px solid var(--border);
+      padding: 10px 12px;
+      text-align: right;
+    }
+
+    th {
+      background: #f1f5f9;
+      font-weight: 800;
+      color: #1e293b;
+    }
+
+    .table-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 700;
+    }
+
+    .badge-old { background: #fee2e2; color: #991b1b; }
+    .badge-new { background: #dcfce7; color: #166534; }
+
+    /* Callout Box */
+    .callout {
+      background: #f0fdfa;
+      border-right: 4px solid var(--primary);
+      border-radius: 6px;
+      padding: 12px 16px;
+      margin: 15px 0;
+      font-size: 12px;
+    }
+
+    .callout-title {
+      font-weight: 800;
+      color: var(--primary-dark);
+      margin-bottom: 4px;
+    }
+
+    /* Steps list */
+    .step-box {
+      background: #f8fafc;
+      border: 1px dashed #cbd5e1;
+      border-radius: 8px;
+      padding: 14px 18px;
+      margin: 15px 0;
+    }
+
+    .step-box ol {
+      padding-right: 20px;
+    }
+
+    .step-box li {
+      margin-bottom: 6px;
+      font-size: 12px;
+      color: #334155;
+    }
+
+    .step-box li strong {
+      color: var(--primary-dark);
+    }
+
+    /* Footer */
+    .report-footer {
+      border-top: 1px solid var(--border);
+      padding-top: 20px;
+      margin-top: 40px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .signature-area {
+      font-weight: 700;
+      color: var(--primary-dark);
+    }
+
+    @media print {
+      body {
+        padding: 0;
+        background: #ffffff;
+      }
+      .report-container {
+        border: none;
+        box-shadow: none;
+        padding: 0;
+        max-width: 100%;
+      }
+      .page-break {
+        page-break-before: always;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="report-container">
+
+    <!-- Header -->
+    <header class="report-header">
+      <div class="brand-section">
+        <h1>مركز غراس التعلمي (Gheras Center)</h1>
+        <div class="subtitle">تقرير إنجاز وترقية تشغيلية — منصة EduTrack Pro الذكية (v2.0.0)</div>
+      </div>
+      <div class="meta-badge">
+        <div><strong>التاريخ:</strong> 25 أكتوبر 2026م</div>
+        <div><strong>الجهة المطورة:</strong> وكالة Autovemtech للتقنية</div>
+        <div><strong>البيئة:</strong> خادم الإنتاج الحي (gheras.autovem.tech)</div>
+      </div>
+    </header>
+
+    <!-- KPI Summary Grid -->
+    <div class="kpi-grid">
+      <div class="kpi-card success">
+        <div class="val">100%</div>
+        <div class="label">عزل الإدارة المالية للمشرف</div>
+      </div>
+      <div class="kpi-card success">
+        <div class="val">ذري موحد</div>
+        <div class="label">تفعيل وسداد اشتراك الباص</div>
+      </div>
+      <div class="kpi-card success">
+        <div class="val">25/25</div>
+        <div class="label">اختبارات مؤتمتة معتمدة</div>
+      </div>
+      <div class="kpi-card success">
+        <div class="val">نشط حي</div>
+        <div class="label">حالة النشر والتشغيل</div>
+      </div>
+    </div>
+
+    <!-- Section 1 -->
+    <h2>1. الملخص التنفيذي</h2>
+    <p>
+      استجابةً لمتطلبات إدارة <strong>مركز غراس التعلمي</strong> في ضبط الحوكمة المالية ورفع كفاءة وسرعة التحصيل المكتبي، تم تطوير وتدقيق ونشر حزمة ترقيات تقنية شاملة لنظام <strong>EduTrack Pro</strong>. ركزت الحزمة على محورين رئيسيين: <strong>عزل الصلاحيات المالية الحساسة عن حساب المشرف</strong> مع تثبيت السجلات ضد التعديل أو الحذف، و<strong>إعادة هندسة نافذة سند القبض السريع</strong> لإتاحة تفعيل واشتراك وسداد رسوم الباص فورياً للطلاب غير المشتركين مسبقاً (مثل حالة الطالب <em>نايف محمد البرغش</em>) مع تفصيل الأقساط وعزل محاسبة الباص في الطباعة.
+    </p>
+
+    <!-- Section 2 -->
+    <h2>2. المحور الأول: حوكمة صلاحيات المشرف وعزل الإدارة المالية</h2>
+    <p>
+      تم فصل المهام الإشرافية الميدانية عن الإدارة المالية العليا لتحقيق أعلى درجات الأمان المالي والمحاسبي:
+    </p>
+
+    <table>
+      <thead>
+        <tr>
+          <th style="width: 25%;">مجال الصلاحية</th>
+          <th style="width: 35%;">الوضع السابق</th>
+          <th style="width: 40%;">الوضع الجديد المعتمد</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>الإدارة المالية المركزية</strong></td>
+          <td><span class="table-badge badge-old">تداخل محتمل</span> إمكانية الوصول للخزينة والمصروفات والرواتب.</td>
+          <td><span class="table-badge badge-new">محظور كلياً</span> حجب صفحات الخزينة والمصروفات والتقارير المالية وحصرها بالمدير العام فقط.</td>
+        </tr>
+        <tr>
+          <td><strong>التحصيل وإصدار السندات</strong></td>
+          <td><span class="table-badge badge-old">مرتبط بالمالية</span> الحاجة لصلاحيات واسعة لإصدار سند.</td>
+          <td><span class="table-badge badge-new">تحصيل مكتبي منضبط</span> تسجيل الطلاب وتحصيل الدفعات وإصدار السندات الفورية دون الوصول للخزينة.</td>
+        </tr>
+        <tr>
+          <td><strong>سلامة السجلات (Immutability)</strong></td>
+          <td><span class="table-badge badge-old">غير مقفل</span> احتمالية تعديل أو إلغاء الدفعات السابقة.</td>
+          <td><span class="table-badge badge-new">قفل برمجي صارم</span> منع المشرف من تعديل أو حذف أي سند مالي بعد إصداره نهائياً.</td>
+        </tr>
+        <tr>
+          <td><strong>إدارة الصلاحيات</strong></td>
+          <td>قوائم غير واضحة وتداخل في الأدوار.</td>
+          <td>تصميم تفاعلي بنظام البطاقات يوضح حدود مسؤوليات كل مشرف بشفافية كاملة.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- Section 3 -->
+    <div class="page-break"></div>
+    <h2>3. المحور الثاني: تطوير منظومة سداد الرسوم واشتراكات الباص</h2>
+    <p>
+      عالجت التحديثات التحديات التي واجهت المشرفة عند التعامل مع الطلاب المسددين للدراسة ولكنهم يرغبون بالاشتراك في النقل، مع تقديم تجربة مرنة وشاملة:
+    </p>
+
+    <div class="callout">
+      <div class="callout-title">معالجة حالة الطالب "نايف محمد البرغش" (نموذج الطالب المسدد دراسياً):</div>
+      كان الطالب مسدداً لكامل الرسوم الدراسية (0.00 ر.س متبقي) وغير مشترك بالباص؛ فكانت النافذة السابقة تمنع أي إدخال وتغلق السداد. الآن، تتعرف النافذة تلقائياً على حالته وتوجه المشرفة مباشرة إلى <strong>"تفعيل اشتراك جديد في الباص وسداد الرسوم"</strong> مع إبراز زر تفعيل تفاعلي فوري.
+    </div>
+
+    <h3>أهم المزايا التقنية المنفذة في نافذة سند القبض:</h3>
+    <ul>
+      <li style="margin-bottom: 6px;"><strong>بطاقات المؤشرات اللحظية:</strong> عرض 3 بطاقات ملخصة في قمة النافذة: المتبقي من الرسوم الدراسية، حالة ورسوم الباص، وإجمالي الذمة المالية المستحقة.</li>
+      <li style="margin-bottom: 6px;"><strong>تفعيل اشتراك الباص الجديد (bus_new):</strong> إدخال رسوم الاشتراك المقررة والمبلغ المسدد (كاملاً أو كدفعة أولى) في معاملة ذرية واحدة لا تتجزأ.</li>
+      <li style="margin-bottom: 6px;"><strong>تجديد الاشتراك للطلاب المشتركين:</strong> دعم تجديد اشتراك الطلاب المسددين لاشتراكاتهم السابقة دون مساس بالمديونيات أو الحسابات التاريخية.</li>
+      <li style="margin-bottom: 6px;"><strong>السداد المشترك الذكي (combined):</strong> سداد دفعة دراسية ورسوم باص معاً بسند واحد يوزع المبالغ محاسبياً في خطوة واحدة.</li>
+      <li style="margin-bottom: 6px;"><strong>جدول استعراض واستهداف الأقساط:</strong> جدول تفاعلي للأقساط الدراسية المستحقة ومواعيدها يتيح النقر المباشر لاستهداف القسط تلقائياً.</li>
+      <li style="margin-bottom: 6px;"><strong>عزل السندات المطبوعة والشفافية المحاسبية:</strong> تسمية السند بحسب نوعه (دراسي / باص / مشترك)، مع جدول محاسبي واضح يوضح لولي الأمر ما سُدد للباص وما تبقى منه بدقة تامة.</li>
+      <li style="margin-bottom: 6px;"><strong>التحسين البصري:</strong> توسيط كامل المحتوى داخل النافذة، وتعيين البيان الافتراضي للسند إلى <code>"سداد رسوم"</code>.</li>
+    </ul>
+
+    <!-- Section 4 -->
+    <h2>4. خطوات التشغيل الميداني للمشرفات (Quick SOP)</h2>
+    <div class="step-box">
+      <ol>
+        <li>من صفحة <strong>"الطلاب"</strong>، اضغط على زر <strong>"سند قبض"</strong> أمام اسم الطالب.</li>
+        <li><strong>إذا كان الطالب غير مشترك بالباص:</strong> اختر <code>🚌 تفعيل اشتراك جديد في الباص وسداد الرسوم</code> (أو اضغط زر <code>+ تفعيل الاشتراك وسداد الرسوم</code> الأخضر في بطاقة الباص).</li>
+        <li>أدخل <strong>رسوم الاشتراك المقررة</strong> (مثلاً: 800 ر.س) و<strong>المبلغ المسدد حالياً</strong> (مثلاً: 800 ر.س أو 400 ر.س كدفعة أولى).</li>
+        <li>اختر طريقة السداد (كاش / مدى / تحويل بنكي) واضغط <strong>"💳 تفعيل اشتراك الباص وإصدار سند القبض"</strong>.</li>
+        <li>تفتح نافذة الطباعة فوراً بسند رسمي موثق ومفصل، ويتم تفعيل الطالب في قائمة الباص لحظياً.</li>
+      </ol>
+    </div>
+
+    <!-- Section 5 -->
+    <h2>5. معايير الموثوقية والتحقق البرمجي</h2>
+    <p>
+      خضعت التعديلات لتدقيق معماري مزدوج ومستقل عبر <strong>Claude Code CLI (Opus Max)</strong>، واجتازت كافة الاختبارات التلقائية المعتمدة (25 اختباراً ناجحاً بنسبة 100%) بما يضمن الأمان المالي وعدم ضياع أي حقوق للمركز أو أولياء الأمور.
+    </p>
+
+    <!-- Footer -->
+    <footer class="report-footer">
+      <div>تم النشر والاعتماد التشغيلي على خادم الإنتاج بنجاح — جاهز للاستخدام اليومي المباشر.</div>
+      <div class="signature-area">وكالة أوتوفيم للحلول التقنية والنمو الرقمي (Autovemtech)</div>
+    </footer>
+
+  </div>
+
+</body>
+</html>
