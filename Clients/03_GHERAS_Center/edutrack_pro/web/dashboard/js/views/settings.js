@@ -32,25 +32,24 @@ export async function render(container, api) {
   const currentPwdInput = el('input', { type: 'password', name: 'current_password', required: 'required', autocomplete: 'current-password' });
   const newPwdInput = el('input', { type: 'password', name: 'new_password', required: 'required', minlength: '8', autocomplete: 'new-password' });
   const confirmPwdInput = el('input', { type: 'password', name: 'confirm_password', required: 'required', minlength: '8', autocomplete: 'new-password' });
-  const savePwdBtn = el('button', { class: 'button', type: 'submit' }, 'حفظ كلمة المرور الجديدة');
+  const savePwdBtn = el('button', { class: 'button', type: 'submit', style: 'padding: 9px 18px; font-weight: 700; border-radius: 8px;' }, '💾 حفظ كلمة المرور الجديدة');
 
   const isSupervisor = me && me.role === 'supervisor';
 
   const pwdForm = isSupervisor
-    ? el('div', { class: 'card', style: 'padding: 16px; border-right: 4px solid #0284c7; background: #f8fafc;' },
-        el('h2', { style: 'margin-top:0; font-size:16px;' }, '🔐 بيانات الحساب والأمان'),
-        el('p', { class: 'muted', style: 'margin:0;' }, 'تغيير كلمة المرور وإدارة الحسابات مخصصة حصرياً للمدير العام. في حال رغبتكم بتحديث كلمة المرور، يرجى مراجعة إدارة المركز.')
+    ? el('div', { class: 'card', style: 'padding: 18px; border-right: 4px solid #0284c7; background: #f8fafc;' },
+        el('h2', { style: 'margin-top:0; font-size:16px; display:flex; align-items:center; gap:8px;' }, '🔐 بيانات الحساب والأمان'),
+        el('p', { class: 'muted', style: 'margin:0; font-size:13px; line-height:1.6;' }, 'تغيير كلمة المرور وإدارة الحسابات مخصصة حصرياً للمدير العام. في حال رغبتكم بتحديث كلمة المرور، يرجى مراجعة إدارة المركز.')
       )
     : el('form', { class: 'card' },
-        el('h2', { style: 'margin-top:0; font-size:18px;' }, '🔐 تغيير كلمة المرور'),
-        el('p', { class: 'muted', style: 'margin-bottom:14px;' }, 'يجب ألا تقل كلمة المرور الجديدة عن 8 خانات'),
-        el('div', { class: 'form-grid' },
-          el('label', {}, 'كلمة المرور الحالية', currentPwdInput),
-          el('div', {}),
-          el('label', {}, 'كلمة المرور الجديدة', newPwdInput),
-          el('label', {}, 'تأكيد كلمة المرور الجديدة', confirmPwdInput)
+        el('h2', { style: 'margin-top:0; font-size:17px; display:flex; align-items:center; gap:8px;' }, '🔐 تغيير كلمة المرور'),
+        el('p', { class: 'muted', style: 'margin-bottom:16px; font-size:13px;' }, 'يجب ألا تقل كلمة المرور الجديدة عن 8 خانات'),
+        el('div', { class: 'form-grid', style: 'grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px;' },
+          el('label', {}, el('span', { style: 'font-weight: 600; font-size: 13px;' }, 'كلمة المرور الحالية *'), currentPwdInput),
+          el('label', {}, el('span', { style: 'font-weight: 600; font-size: 13px;' }, 'كلمة المرور الجديدة (8 خانات فأكثر) *'), newPwdInput),
+          el('label', {}, el('span', { style: 'font-weight: 600; font-size: 13px;' }, 'تأكيد كلمة المرور الجديدة *'), confirmPwdInput)
         ),
-        el('div', { class: 'form-actions' }, savePwdBtn)
+        el('div', { class: 'form-actions', style: 'margin-top:16px;' }, savePwdBtn)
       );
 
   if (!isSupervisor) pwdForm.addEventListener('submit', async event => {
@@ -92,48 +91,44 @@ export async function render(container, api) {
       el('tr', {}, el('td', { colspan: '5', class: 'muted', style: 'text-align:center;' }, 'جاري تحميل المستخدمين...'))
     );
 
-    const addManagerBtn = el('button', {
-      class: 'button',
-      type: 'button',
-      style: 'background: #7c3aed; border-color: #6d28d9; color: #fff;'
-    }, '👑 إضافة حساب مدير عام (أدمن)');
-
-    const addSupervisorBtn = el('button', {
-      class: 'button button-outline',
-      type: 'button'
-    }, '➕ إضافة حساب مشرف');
-
     const addTeacherBtn = el('button', {
       class: 'button',
       type: 'button',
-      style: 'background: #1d4ed8; border-color: #1e40af; color: #fff;'
-    }, '👨‍🏫 إضافة حساب معلم');
+      style: 'background: #1d4ed8; color: #fff; font-size: 13px; font-weight: 600; padding: 7px 14px; border-radius: 8px;'
+    }, '👨‍🏫 إضافة معلم');
 
     const addGuardianBtn = el('button', {
       class: 'button',
       type: 'button',
-      style: 'background: #059669; border-color: #047857; color: #fff;'
-    }, '👨‍👩‍👧 إضافة حساب ولي أمر');
+      style: 'background: #059669; color: #fff; font-size: 13px; font-weight: 600; padding: 7px 14px; border-radius: 8px;'
+    }, '👨‍👩‍👧 إضافة ولي أمر');
 
     const addStudentBtn = el('button', {
       class: 'button',
       type: 'button',
-      style: 'background: #0284c7; border-color: #0369a1; color: #fff;'
-    }, '🎓 إضافة حساب طالب');
+      style: 'background: #0284c7; color: #fff; font-size: 13px; font-weight: 600; padding: 7px 14px; border-radius: 8px;'
+    }, '🎓 إضافة طالب');
 
+    const addSupervisorBtn = el('button', {
+      class: 'button',
+      type: 'button',
+      style: 'background: #0f8b8d; color: #fff; font-size: 13px; font-weight: 600; padding: 7px 14px; border-radius: 8px;'
+    }, '🛡️ إضافة مشرف');
 
-
-
-
+    const addManagerBtn = el('button', {
+      class: 'button',
+      type: 'button',
+      style: 'background: #7c3aed; color: #fff; font-size: 13px; font-weight: 600; padding: 7px 14px; border-radius: 8px;'
+    }, '👑 إضافة مدير');
 
     let activeUsersTab = 'all';
-    const userTabsBar = el('div', { class: 'toolbar', style: 'margin-bottom:12px; gap:6px; flex-wrap:wrap;' });
+    const userTabsBar = el('div', { class: 'toolbar', style: 'margin-bottom:16px; gap:8px; flex-wrap:wrap;' });
     const USER_TABS = [
-      ['all', 'كل الحسابات'],
-      ['teachers', '👨‍🏫 المعلمون'],
-      ['guardians', '👨‍👩‍👧 أولياء الأمور'],
-      ['students', '🎓 الطلاب'],
-      ['admins', '👑 الإدارة والمشرفون']
+      ['all', 'كل الحسابات', '👥'],
+      ['teachers', 'المعلمون', '👨‍🏫'],
+      ['guardians', 'أولياء الأمور', '👨‍👩‍👧'],
+      ['students', 'الطلاب', '🎓'],
+      ['admins', 'الإدارة والمشرفون', '👑']
     ];
 
     userMgmtCard = el('div', { class: 'card', style: 'margin-top:20px;' },
@@ -171,13 +166,25 @@ export async function render(container, api) {
 
     function renderUsersRows(tabId = activeUsersTab) {
       activeUsersTab = tabId;
+
+      const countFor = id => {
+        if (id === 'teachers') return allLoadedUsers.filter(u => u.role === 'teacher').length;
+        if (id === 'guardians') return allLoadedUsers.filter(u => u.role === 'guardian').length;
+        if (id === 'students') return allLoadedUsers.filter(u => u.role === 'student').length;
+        if (id === 'admins') return allLoadedUsers.filter(u => u.role === 'manager' || u.role === 'supervisor').length;
+        return allLoadedUsers.length;
+      };
+
       userTabsBar.replaceChildren(
-        ...USER_TABS.map(([id, label]) => {
+        ...USER_TABS.map(([id, label, icon]) => {
+          const count = countFor(id);
+          const isActive = activeUsersTab === id;
           const btn = el('button', {
-            class: activeUsersTab === id ? 'button' : 'button button-outline',
             type: 'button',
-            style: 'padding:4px 12px; font-size:13px;'
-          }, label);
+            style: isActive
+              ? 'background: #0f8b8d; color: #fff; border: 1.5px solid #0f8b8d; border-radius: 20px; font-weight: 700; padding: 6px 14px; font-size: 13px; cursor: pointer; box-shadow: 0 2px 4px rgba(15,139,141,0.2);'
+              : 'background: #f8fafc; color: #475569; border: 1.5px solid #e2e8f0; border-radius: 20px; font-weight: 600; padding: 6px 14px; font-size: 13px; cursor: pointer; transition: all 0.15s ease;'
+          }, `${icon} ${label} (${count})`);
           btn.onclick = () => renderUsersRows(id);
           return btn;
         })
@@ -297,12 +304,18 @@ export async function render(container, api) {
           permsCell.append(el('span', { class: 'muted' }, '—'));
         }
 
-        const actionsCell = el('td', { style: 'display:flex; gap:6px; flex-wrap:wrap;' });
+        const actionsCell = el('td', { style: 'display:flex; gap:6px; flex-wrap:wrap; align-items:center;' });
         if (u.role === 'supervisor') {
-          const editPermsBtn = el('button', { class: 'button button-outline', type: 'button', style: 'padding:4px 8px; font-size:12px;' }, 'الصلاحيات');
+          const editPermsBtn = el('button', {
+            class: 'button button-outline',
+            type: 'button',
+            style: 'padding:5px 10px; font-size:12px; font-weight:600; border-radius:6px; color:#0f8b8d; border-color:#0f8b8d;'
+          }, '⚙️ الصلاحيات');
           editPermsBtn.onclick = () => openPermissionsModal(api, u, loadUsersList);
           actionsCell.append(editPermsBtn);
         }
+        resetBtn.textContent = '🔑 كلمة المرور';
+        resetBtn.style.cssText = 'padding:5px 10px; font-size:12px; font-weight:600; border-radius:6px;';
         actionsCell.append(resetBtn);
 
         if (u.id !== me?.id) {
@@ -311,8 +324,8 @@ export async function render(container, api) {
             class: 'button button-outline',
             type: 'button',
             style: isManagerAccount
-              ? 'color:#991b1b; border-color:#f87171; background:#fee2e2; font-weight:600; padding:4px 8px; font-size:12px;'
-              : 'color:#dc2626; border-color:#fca5a5; background:#fef2f2; padding:4px 8px; font-size:12px;'
+              ? 'color:#991b1b; border-color:#f87171; background:#fee2e2; font-weight:600; padding:5px 10px; font-size:12px; border-radius:6px;'
+              : 'color:#dc2626; border-color:#fca5a5; background:#fef2f2; font-weight:600; padding:5px 10px; font-size:12px; border-radius:6px;'
           }, '🗑 حذف');
 
           delBtn.onclick = () => {

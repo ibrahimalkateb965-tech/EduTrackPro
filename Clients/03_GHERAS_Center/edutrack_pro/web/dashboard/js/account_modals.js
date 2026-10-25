@@ -61,48 +61,130 @@ export function showCredentialsModal(username, password, roleText, targetName, e
   };
 }
 
-export function openPermissionsModal(api, user, onUpdated) {
-  const perms = user.permissions || {};
-  const permStudents = el('input', { type: 'checkbox', checked: Boolean(perms.students) });
-  const permAttendance = el('input', { type: 'checkbox', checked: Boolean(perms.attendance) });
-  const permDailyEval = el('input', { type: 'checkbox', checked: Boolean(perms.daily_evaluation) });
-  const permMonthlyEval = el('input', { type: 'checkbox', checked: Boolean(perms.monthly_evaluation) });
+function createSupervisorPermissionCard(key, icon, title, desc, checked) {
+  const chk = el('input', {
+    type: 'checkbox',
+    name: `perm_${key}`,
+    checked: Boolean(checked),
+    style: 'width: 20px; height: 20px; accent-color: #0f8b8d; cursor: pointer; margin: 0; flex-shrink: 0;'
+  });
 
-  const modalSubmit = el('button', { class: 'button', type: 'submit' }, 'حفظ الصلاحيات');
-  const modalForm = el('form', { class: 'form-grid' },
-    el('p', { style: 'grid-column: 1 / -1;' }, `تعديل صلاحيات المشرف: `, el('strong', {}, user.username)),
-    el('div', { style: 'grid-column: 1 / -1;' },
-      el('div', { style: 'display: grid; gap: 8px;' },
-        el('label', { style: 'display: flex; gap: 8px; align-items: center; font-weight: normal;' }, permStudents, '♟ إدارة وسجلات الطلاب'),
-        el('label', { style: 'display: flex; gap: 8px; align-items: center; font-weight: normal;' }, permAttendance, '☑ تسجيل الحضور والغياب (طلاب وموظفين)'),
-        el('label', { style: 'display: flex; gap: 8px; align-items: center; font-weight: normal;' }, permDailyEval, '★ إدخال التقييم اليومي للطلاب'),
-        el('label', { style: 'display: flex; gap: 8px; align-items: center; font-weight: normal;' }, permMonthlyEval, '▥ التقييم الشهري وتقارير الإنجاز')
+  const card = el('label', {
+    style: `display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 12px 14px; border-radius: 10px; border: 1.5px solid ${checked ? '#0f8b8d' : '#e2e8f0'}; background: ${checked ? '#f0fdfa' : '#ffffff'}; cursor: pointer; transition: all 0.2s ease; margin-bottom: 8px;`
+  },
+    el('div', { style: 'display: flex; align-items: center; gap: 12px;' },
+      el('span', { style: `font-size: 20px; display: flex; align-items: center; justify-content: center; width: 38px; height: 38px; border-radius: 8px; background: ${checked ? '#ccfbf1' : '#f1f5f9'}; color: #0f766e; flex-shrink: 0;` }, icon),
+      el('div', {},
+        el('div', { style: 'font-size: 14px; font-weight: 700; color: #1e293b;' }, title),
+        el('div', { style: 'font-size: 12px; color: #64748b; margin-top: 2px;' }, desc)
       )
     ),
-    el('div', { class: 'form-actions', style: 'grid-column: 1 / -1; margin-top: 14px;' }, modalSubmit)
+    chk
   );
 
-  const { close } = modal(`تعديل صلاحيات المشرف (${user.username})`, modalForm);
+  chk.addEventListener('change', () => {
+    if (chk.checked) {
+      card.style.borderColor = '#0f8b8d';
+      card.style.background = '#f0fdfa';
+      card.querySelector('span').style.background = '#ccfbf1';
+    } else {
+      card.style.borderColor = '#e2e8f0';
+      card.style.background = '#ffffff';
+      card.querySelector('span').style.background = '#f1f5f9';
+    }
+  });
+
+  return { chk, card };
+}
+
+function createSupervisorFinanceNotice() {
+  return el('div', {
+    style: 'display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: #fffbeb; border: 1px solid #fef3c7; border-radius: 8px; color: #92400e; font-size: 12px; margin-top: 8px; line-height: 1.5;'
+  },
+    el('span', { style: 'font-size: 18px; flex-shrink: 0;' }, '🔒'),
+    el('span', {}, 'الحماية المالية: الصلاحيات المالية وإعدادات النظام محصورة حصرياً بحساب المدير العام (الأدمن) ولا تمنح للمشرفين.')
+  );
+}
+
+export function openPermissionsModal(api, user, onUpdated) {
+  const perms = user.permissions || {};
+  const pStudents = createSupervisorPermissionCard('students', '🎓', 'إدارة وسجلات الطلاب', 'تسجيل وقبول الطلاب، استعراض الملفات، وإصدار سندات القبض وتحصيل الرسوم.', perms.students);
+  const pAttendance = createSupervisorPermissionCard('attendance', '📋', 'تسجيل الحضور والغياب', 'رصد وتعديل سجلات حضور وغياب الطلاب والموظفين واعتماد طلبات الاستئذان.', perms.attendance);
+  const pDailyEval = createSupervisorPermissionCard('daily_eval', '⭐', 'إدخال التقييم اليومي', 'تسجيل درجات الحفظ والتسميع اليومي ومتابعة الورد القرآني.', perms.daily_evaluation);
+  const pMonthlyEval = createSupervisorPermissionCard('monthly_eval', '📊', 'التقييم الشهري والتقارير', 'اعتماد التقييمات الشهرية وإصدار وطباعة كشوفات الإنجاز الدورية.', perms.monthly_evaluation);
+
+  const userBadge = el('div', {
+    style: 'display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; background: #f0fdfa; border: 1px solid #ccfbf1; border-radius: 10px; margin-bottom: 14px;'
+  },
+    el('div', { style: 'display: flex; align-items: center; gap: 10px;' },
+      el('span', { style: 'font-size: 20px; width: 36px; height: 36px; border-radius: 50%; background: #0f8b8d; color: #fff; display: flex; align-items: center; justify-content: center;' }, '👤'),
+      el('div', {},
+        el('div', { style: 'font-size: 14px; font-weight: 700; color: #0f766e;' }, user.name || user.username),
+        el('div', { style: 'font-size: 12px; color: #64748b;' }, `اسم المستخدم: ${user.username}`)
+      )
+    ),
+    el('span', { class: 'badge', style: 'background: #0f8b8d; color: #fff; font-weight: 700; padding: 4px 10px; font-size: 11px;' }, 'مشرف نظام')
+  );
+
+  const modalSubmit = el('button', {
+    class: 'button',
+    type: 'submit',
+    style: 'width: 100%; padding: 11px; font-size: 14px; font-weight: 700; background: #0f8b8d; margin-top: 14px; border-radius: 8px;'
+  }, '💾 حفظ وتطبيق الصلاحيات');
+
+  const modalForm = el('form', { style: 'display: flex; flex-direction: column;' },
+    userBadge,
+    el('div', { style: 'font-size: 13px; font-weight: 700; color: #334155; margin-bottom: 8px;' }, 'تحديد صلاحيات المشرف النشطة:'),
+    pStudents.card,
+    pAttendance.card,
+    pDailyEval.card,
+    pMonthlyEval.card,
+    createSupervisorFinanceNotice(),
+    modalSubmit
+  );
+
+  const dialog = modal(`تعديل صلاحيات المشرف (${user.username})`, modalForm);
+  if (dialog && dialog.panel) {
+    dialog.panel.style.maxWidth = '580px';
+    const head = dialog.panel.querySelector('.modal-head');
+    if (head) {
+      head.style.position = 'relative';
+      head.style.display = 'flex';
+      head.style.justifyContent = 'center';
+      head.style.alignItems = 'center';
+      const h2 = head.querySelector('h2');
+      if (h2) { h2.style.textAlign = 'center'; h2.style.width = '100%'; h2.style.fontSize = '17px'; }
+      const closeBtn = head.querySelector('.modal-close');
+      if (closeBtn) {
+        closeBtn.style.position = 'absolute';
+        closeBtn.style.left = '0';
+        closeBtn.style.top = '50%';
+        closeBtn.style.transform = 'translateY(-50%)';
+      }
+    }
+  }
 
   modalForm.onsubmit = async ev => {
     ev.preventDefault();
     modalSubmit.disabled = true;
+    modalSubmit.textContent = 'جاري حفظ الصلاحيات...';
     try {
       await api.patch(`users/${user.id}`, {
         permissions: {
-          students: permStudents.checked,
-          attendance: permAttendance.checked,
-          daily_evaluation: permDailyEval.checked,
-          monthly_evaluation: permMonthlyEval.checked,
+          students: pStudents.chk.checked,
+          attendance: pAttendance.chk.checked,
+          daily_evaluation: pDailyEval.chk.checked,
+          monthly_evaluation: pMonthlyEval.chk.checked,
           finance: false
         }
       });
       toast('تم تحديث صلاحيات المشرف بنجاح');
-      close();
+      dialog.close();
       if (onUpdated) onUpdated();
     } catch (err) {
       toast(err.message || 'فشل تحديث الصلاحيات', true);
       modalSubmit.disabled = false;
+      modalSubmit.textContent = '💾 حفظ وتطبيق الصلاحيات';
     }
   };
 }
@@ -115,26 +197,45 @@ export function openCreateManagerModal(api, onCreated) {
   const modalSubmit = el('button', {
     class: 'button',
     type: 'submit',
-    style: 'background: #7c3aed; border-color: #6d28d9; color: #fff;'
-  }, 'تأكيد إنشاء حساب المدير');
+    style: 'width: 100%; padding: 11px; font-size: 14px; font-weight: 700; background: #7c3aed; border-color: #6d28d9; color: #fff; margin-top: 14px; border-radius: 8px;'
+  }, '👑 تأكيد إنشاء حساب المدير العام');
 
   const modalForm = el('form', { class: 'form-grid' },
-    el('label', { style: 'grid-column: 1 / -1;' }, el('span', {}, 'اسم المستخدم للمدير العام (أدمن)'), usernameInput),
-    el('label', { style: 'grid-column: 1 / -1;' }, el('span', {}, 'كلمة المرور المؤقتة'), pwdInput),
-    el('label', { style: 'grid-column: 1 / -1;' }, el('span', {}, 'تأكيد كلمة المرور'), pwdConfirmInput),
+    el('label', { style: 'grid-column: 1 / -1;' }, el('span', { style: 'font-weight: 600; font-size: 13px;' }, 'اسم المستخدم للمدير العام (أدمن) *'), usernameInput),
+    el('label', { style: 'grid-column: 1 / -1;' }, el('span', { style: 'font-weight: 600; font-size: 13px;' }, 'كلمة المرور المؤقتة *'), pwdInput),
+    el('label', { style: 'grid-column: 1 / -1;' }, el('span', { style: 'font-weight: 600; font-size: 13px;' }, 'تأكيد كلمة المرور *'), pwdConfirmInput),
     el('div', {
       class: 'card',
       style: 'grid-column: 1 / -1; background: #faf5ff; border: 1px solid #e9d5ff; padding: 12px; margin-top: 6px; border-radius: 8px;'
     },
-      el('div', { style: 'color: #6b21a8; font-weight: 600; margin-bottom: 4px;' }, '👑 تنبيه أمني عالي الحساسية:'),
-      el('div', { style: 'color: #581c87; font-size: 13px; line-height: 1.6;' },
-        'حساب المدير العام (الأدمن) يمتلك وصولاً كاملاً وغير مقيد لكافة بيانات الطلاب، المعلمين، الحلقات، التقارير والعمليات المالية والرواتب، بالإضافة لصلاحية تعديل الإعدادات وإدارة الحسابات. يرجى منح هذا الدور فقط للأشخاص المخولين رسمياً.'
+      el('div', { style: 'color: #6b21a8; font-weight: 700; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;' }, '👑 تنبيه أمني عالي الحساسية:'),
+      el('div', { style: 'color: #581c87; font-size: 12px; line-height: 1.6;' },
+        'حساب المدير العام (الأدمن) يمتلك وصولاً كاملاً لكافة بيانات الطلاب، المعلمين، الحلقات، التقارير والعمليات المالية والرواتب، بالإضافة لصلاحية تعديل الإعدادات وإدارة الحسابات. يرجى منح هذا الدور فقط للأشخاص المخولين رسمياً.'
       )
     ),
-    el('div', { class: 'form-actions', style: 'grid-column: 1 / -1; margin-top: 14px;' }, modalSubmit)
+    el('div', { style: 'grid-column: 1 / -1;' }, modalSubmit)
   );
 
-  const { close } = modal('👑 إنشاء حساب مدير عام (أدمن جديد)', modalForm);
+  const dialog = modal('👑 إنشاء حساب مدير عام (أدمن جديد)', modalForm);
+  if (dialog && dialog.panel) {
+    dialog.panel.style.maxWidth = '540px';
+    const head = dialog.panel.querySelector('.modal-head');
+    if (head) {
+      head.style.position = 'relative';
+      head.style.display = 'flex';
+      head.style.justifyContent = 'center';
+      head.style.alignItems = 'center';
+      const h2 = head.querySelector('h2');
+      if (h2) { h2.style.textAlign = 'center'; h2.style.width = '100%'; h2.style.fontSize = '17px'; }
+      const closeBtn = head.querySelector('.modal-close');
+      if (closeBtn) {
+        closeBtn.style.position = 'absolute';
+        closeBtn.style.left = '0';
+        closeBtn.style.top = '50%';
+        closeBtn.style.transform = 'translateY(-50%)';
+      }
+    }
+  }
 
   modalForm.onsubmit = async ev => {
     ev.preventDefault();
@@ -156,6 +257,7 @@ export function openCreateManagerModal(api, onCreated) {
     }
 
     modalSubmit.disabled = true;
+    modalSubmit.textContent = 'جاري إنشاء الحساب...';
     try {
       const payload = {
         username,
@@ -171,12 +273,13 @@ export function openCreateManagerModal(api, onCreated) {
       };
       await api.post('users', payload);
       toast('تم إنشاء حساب المدير العام (الأدمن) بنجاح');
-      close();
+      dialog.close();
       showCredentialsModal(username, password, 'مدير عام (أدمن)', username);
       if (onCreated) onCreated();
     } catch (err) {
       toast(err.message || 'فشلت عملية إنشاء حساب المدير', true);
       modalSubmit.disabled = false;
+      modalSubmit.textContent = '👑 تأكيد إنشاء حساب المدير العام';
     }
   };
 }
@@ -184,29 +287,67 @@ export function openCreateManagerModal(api, onCreated) {
 export function openCreateSupervisorModal(api, onCreated) {
   const usernameInput = el('input', { type: 'text', required: 'required', autocomplete: 'off', placeholder: 'اسم المستخدم (مثال: supervisor_hoda)' });
   const pwdInput = el('input', { type: 'text', required: 'required', minlength: '8', value: generateSecureTempPassword(), style: 'font-family:Consolas,monospace;' });
+  const refreshPwdBtn = el('button', {
+    class: 'button button-outline',
+    type: 'button',
+    style: 'padding: 6px 12px; font-size: 12px; white-space: nowrap; flex-shrink: 0;'
+  }, '🔄 توليد كلمة مرور');
+  refreshPwdBtn.onclick = () => { pwdInput.value = generateSecureTempPassword(); };
 
-  const permStudents = el('input', { type: 'checkbox', checked: true });
-  const permAttendance = el('input', { type: 'checkbox', checked: true });
-  const permDailyEval = el('input', { type: 'checkbox', checked: true });
-  const permMonthlyEval = el('input', { type: 'checkbox', checked: false });
+  const pStudents = createSupervisorPermissionCard('students', '🎓', 'إدارة وسجلات الطلاب', 'تسجيل وقبول الطلاب، استعراض الملفات، وإصدار سندات القبض وتحصيل الرسوم.', true);
+  const pAttendance = createSupervisorPermissionCard('attendance', '📋', 'تسجيل الحضور والغياب', 'رصد وتعديل سجلات حضور وغياب الطلاب والموظفين واعتماد طلبات الاستئذان.', true);
+  const pDailyEval = createSupervisorPermissionCard('daily_eval', '⭐', 'إدخال التقييم اليومي', 'تسجيل درجات الحفظ والتسميع اليومي ومتابعة الورد القرآني.', true);
+  const pMonthlyEval = createSupervisorPermissionCard('monthly_eval', '📊', 'التقييم الشهري والتقارير', 'اعتماد التقييمات الشهرية وإصدار وطباعة كشوفات الإنجاز الدورية.', false);
 
-  const modalSubmit = el('button', { class: 'button', type: 'submit' }, 'تأكيد إنشاء الحساب');
-  const modalForm = el('form', { class: 'form-grid' },
-    el('label', { style: 'grid-column: 1 / -1;' }, el('span', {}, 'اسم المستخدم للمشرف'), usernameInput),
-    el('label', { style: 'grid-column: 1 / -1;' }, el('span', {}, 'كلمة المرور المؤقتة'), pwdInput),
-    el('div', { style: 'grid-column: 1 / -1; margin-top: 6px;' },
-      el('h4', { style: 'margin: 0 0 8px 0; font-size:14px;' }, 'تحديد صلاحيات المشرف:'),
-      el('div', { style: 'display: grid; gap: 8px;' },
-        el('label', { style: 'display: flex; gap: 8px; align-items: center; font-weight: normal;' }, permStudents, '♟ إدارة وسجلات الطلاب'),
-        el('label', { style: 'display: flex; gap: 8px; align-items: center; font-weight: normal;' }, permAttendance, '☑ تسجيل الحضور والغياب (طلاب وموظفين)'),
-        el('label', { style: 'display: flex; gap: 8px; align-items: center; font-weight: normal;' }, permDailyEval, '★ إدخال التقييم اليومي للطلاب'),
-        el('label', { style: 'display: flex; gap: 8px; align-items: center; font-weight: normal;' }, permMonthlyEval, '▥ التقييم الشهري وتقارير الإنجاز')
+  const modalSubmit = el('button', {
+    class: 'button',
+    type: 'submit',
+    style: 'width: 100%; padding: 11px; font-size: 14px; font-weight: 700; background: #0f8b8d; margin-top: 14px; border-radius: 8px;'
+  }, '➕ تأكيد إنشاء حساب المشرف');
+
+  const modalForm = el('form', { style: 'display: flex; flex-direction: column; gap: 10px;' },
+    el('label', {},
+      el('span', { style: 'font-weight: 600; font-size: 13px; display: block; margin-bottom: 4px;' }, 'اسم المستخدم للمشرف *'),
+      usernameInput
+    ),
+    el('label', {},
+      el('span', { style: 'font-weight: 600; font-size: 13px; display: block; margin-bottom: 4px;' }, 'كلمة المرور المؤقتة *'),
+      el('div', { style: 'display: flex; gap: 8px; align-items: center;' },
+        pwdInput,
+        refreshPwdBtn
       )
     ),
-    el('div', { class: 'form-actions', style: 'grid-column: 1 / -1; margin-top: 14px;' }, modalSubmit)
+    el('div', { style: 'margin-top: 8px;' },
+      el('div', { style: 'font-size: 13px; font-weight: 700; color: #334155; margin-bottom: 8px;' }, 'تحديد صلاحيات المشرف:'),
+      pStudents.card,
+      pAttendance.card,
+      pDailyEval.card,
+      pMonthlyEval.card,
+      createSupervisorFinanceNotice()
+    ),
+    modalSubmit
   );
 
-  const { close } = modal('➕ إنشاء حساب مشرف بصلاحيات محددة', modalForm);
+  const dialog = modal('➕ إنشاء حساب مشرف بصلاحيات محددة', modalForm);
+  if (dialog && dialog.panel) {
+    dialog.panel.style.maxWidth = '580px';
+    const head = dialog.panel.querySelector('.modal-head');
+    if (head) {
+      head.style.position = 'relative';
+      head.style.display = 'flex';
+      head.style.justifyContent = 'center';
+      head.style.alignItems = 'center';
+      const h2 = head.querySelector('h2');
+      if (h2) { h2.style.textAlign = 'center'; h2.style.width = '100%'; h2.style.fontSize = '17px'; }
+      const closeBtn = head.querySelector('.modal-close');
+      if (closeBtn) {
+        closeBtn.style.position = 'absolute';
+        closeBtn.style.left = '0';
+        closeBtn.style.top = '50%';
+        closeBtn.style.transform = 'translateY(-50%)';
+      }
+    }
+  }
 
   modalForm.onsubmit = async ev => {
     ev.preventDefault();
@@ -215,27 +356,29 @@ export function openCreateSupervisorModal(api, onCreated) {
       return;
     }
     modalSubmit.disabled = true;
+    modalSubmit.textContent = 'جاري إنشاء الحساب...';
     try {
       const payload = {
         username: usernameInput.value.trim(),
         password: pwdInput.value,
         role: 'supervisor',
         permissions: {
-          students: permStudents.checked,
-          attendance: permAttendance.checked,
-          daily_evaluation: permDailyEval.checked,
-          monthly_evaluation: permMonthlyEval.checked,
+          students: pStudents.chk.checked,
+          attendance: pAttendance.chk.checked,
+          daily_evaluation: pDailyEval.chk.checked,
+          monthly_evaluation: pMonthlyEval.chk.checked,
           finance: false
         }
       };
       await api.post('users', payload);
       toast('تم إنشاء حساب المشرف وتعيين الصلاحيات بنجاح');
-      close();
+      dialog.close();
       showCredentialsModal(payload.username, payload.password, 'مشرف', payload.username);
       if (onCreated) onCreated();
     } catch (err) {
       toast(err.message || 'فشلت عملية إنشاء الحساب', true);
       modalSubmit.disabled = false;
+      modalSubmit.textContent = '➕ تأكيد إنشاء حساب المشرف';
     }
   };
 }
@@ -293,7 +436,26 @@ export async function openCreateTeacherModal(api, onCreated, defaultStaffId = nu
     el('div', { class: 'form-actions', style: 'grid-column: 1 / -1; margin-top: 14px;' }, modalSubmit)
   );
 
-  const { close } = modal('👨‍🏫 إنشاء حساب معلم لتطبيق الهاتف', modalForm);
+  const dialog = modal('👨‍🏫 إنشاء حساب معلم لتطبيق الهاتف', modalForm);
+  if (dialog && dialog.panel) {
+    dialog.panel.style.maxWidth = '540px';
+    const head = dialog.panel.querySelector('.modal-head');
+    if (head) {
+      head.style.position = 'relative';
+      head.style.display = 'flex';
+      head.style.justifyContent = 'center';
+      head.style.alignItems = 'center';
+      const h2 = head.querySelector('h2');
+      if (h2) { h2.style.textAlign = 'center'; h2.style.width = '100%'; h2.style.fontSize = '17px'; }
+      const closeBtn = head.querySelector('.modal-close');
+      if (closeBtn) {
+        closeBtn.style.position = 'absolute';
+        closeBtn.style.left = '0';
+        closeBtn.style.top = '50%';
+        closeBtn.style.transform = 'translateY(-50%)';
+      }
+    }
+  }
 
   modalForm.onsubmit = async ev => {
     ev.preventDefault();
@@ -312,6 +474,7 @@ export async function openCreateTeacherModal(api, onCreated, defaultStaffId = nu
     }
 
     modalSubmit.disabled = true;
+    modalSubmit.textContent = 'جاري إنشاء الحساب...';
     try {
       const member = activeStaff.find(s => s.id === staffId);
       const payload = {
@@ -331,12 +494,13 @@ export async function openCreateTeacherModal(api, onCreated, defaultStaffId = nu
       };
       await api.post('users', payload);
       toast(`تم إنشاء حساب المعلم بنجاح: ${username}`);
-      close();
+      dialog.close();
       showCredentialsModal(username, password, 'معلم', member?.name || username, `الحلقة المسندة: ${roomSelect.options[roomSelect.selectedIndex]?.text || 'بدون'}`);
       if (onCreated) onCreated();
     } catch (err) {
       toast(err.message || 'فشلت عملية إنشاء حساب المعلم', true);
       modalSubmit.disabled = false;
+      modalSubmit.textContent = 'تأكيد إنشاء حساب المعلم';
     }
   };
 }
@@ -376,7 +540,7 @@ export async function openCreateGuardianModal(api, onCreated, defaultStudentId =
       return (s.name || '').includes(q) || (s.national_id || '').includes(q) || (s.guardian_phone || '').includes(q);
     });
     if (!filtered.length) {
-      studentCheckboxesContainer.append(el('div', { class: 'muted', style: 'padding:6px; font-size:13px;' }, 'لا توجد نتائج مطابقة'));
+      studentCheckboxesContainer.append(el('div', { class: 'muted', style: 'padding: 10px; font-size: 13px; text-align: center;' }, 'لا توجد نتائج مطابقة'));
       return;
     }
     filtered.forEach(s => {
@@ -384,13 +548,31 @@ export async function openCreateGuardianModal(api, onCreated, defaultStudentId =
       if (defaultStudentId && s.id === defaultStudentId) {
         chk.checked = true;
       }
-      const item = el('label', { style: 'display:flex; align-items:center; gap:8px; cursor:pointer; font-weight:normal; padding:3px 4px; border-radius:4px;' },
-        chk,
-        el('span', {}, `${s.name} (${s.group_name || 'طالب'})`),
-        s.guardian_phone ? el('span', { class: 'muted', style: 'font-size:11px;' }, `[هاتف: ${s.guardian_phone}]`) : null
+      const item = el('label', {
+        style: `display: flex; align-items: center; justify-content: space-between; gap: 8px; cursor: pointer; font-weight: normal; padding: 6px 10px; border-radius: 6px; border: 1px solid ${chk.checked ? '#0f8b8d' : '#f1f5f9'}; background: ${chk.checked ? '#f0fdfa' : '#fff'}; transition: all 0.15s ease;`
+      },
+        el('div', { style: 'display: flex; align-items: center; gap: 8px;' },
+          el('span', { style: 'font-weight: 600; font-size: 13px; color: #1e293b;' }, s.name),
+          el('span', { class: 'badge', style: 'font-size: 11px;' }, s.group_name || 'طالب'),
+          s.guardian_phone ? el('span', { class: 'muted', style: 'font-size: 11px;' }, `[هاتف: ${s.guardian_phone}]`) : null
+        ),
+        chk
       );
-      item.onmouseover = () => { item.style.background = '#f8fafc'; };
-      item.onmouseout = () => { item.style.background = ''; };
+      item.onmouseover = () => {
+        if (!chk.checked) { item.style.background = '#f8fafc'; item.style.borderColor = '#cbd5e1'; }
+      };
+      item.onmouseout = () => {
+        if (!chk.checked) { item.style.background = '#fff'; item.style.borderColor = '#f1f5f9'; }
+      };
+      chk.addEventListener('change', () => {
+        if (chk.checked) {
+          item.style.background = '#f0fdfa';
+          item.style.borderColor = '#0f8b8d';
+        } else {
+          item.style.background = '#fff';
+          item.style.borderColor = '#f1f5f9';
+        }
+      });
       studentCheckboxesContainer.append(item);
     });
   }
@@ -449,7 +631,26 @@ export async function openCreateGuardianModal(api, onCreated, defaultStudentId =
     el('div', { class: 'form-actions', style: 'grid-column: 1 / -1; margin-top: 14px;' }, modalSubmit)
   );
 
-  const { close } = modal('👨‍👩‍👧 إنشاء حساب ولي أمر جديد وربط الأبناء', modalForm);
+  const dialog = modal('👨‍👩‍👧 إنشاء حساب ولي أمر جديد وربط الأبناء', modalForm);
+  if (dialog && dialog.panel) {
+    dialog.panel.style.maxWidth = '580px';
+    const head = dialog.panel.querySelector('.modal-head');
+    if (head) {
+      head.style.position = 'relative';
+      head.style.display = 'flex';
+      head.style.justifyContent = 'center';
+      head.style.alignItems = 'center';
+      const h2 = head.querySelector('h2');
+      if (h2) { h2.style.textAlign = 'center'; h2.style.width = '100%'; h2.style.fontSize = '17px'; }
+      const closeBtn = head.querySelector('.modal-close');
+      if (closeBtn) {
+        closeBtn.style.position = 'absolute';
+        closeBtn.style.left = '0';
+        closeBtn.style.top = '50%';
+        closeBtn.style.transform = 'translateY(-50%)';
+      }
+    }
+  }
 
   modalForm.onsubmit = async ev => {
     ev.preventDefault();
@@ -465,6 +666,7 @@ export async function openCreateGuardianModal(api, onCreated, defaultStudentId =
     }
 
     modalSubmit.disabled = true;
+    modalSubmit.textContent = 'جاري إنشاء الحساب...';
     try {
       const payload = {
         username: phone,
@@ -477,13 +679,14 @@ export async function openCreateGuardianModal(api, onCreated, defaultStudentId =
       };
       await api.post('users', payload);
       toast(`تم إنشاء حساب ولي الأمر بنجاح: ${phone}`);
-      close();
+      dialog.close();
       const selectedStudentNames = studentsList.filter(s => selectedStudentIds.includes(s.id)).map(s => s.name).join('، ');
       showCredentialsModal(phone, password, 'ولي أمر', name, selectedStudentNames ? `الأبناء المرتبطون: ${selectedStudentNames}` : 'لم يتم ربط طلاب بعد');
       if (onCreated) onCreated();
     } catch (err) {
       toast(err.message || 'فشلت عملية إنشاء حساب ولي الأمر', true);
       modalSubmit.disabled = false;
+      modalSubmit.textContent = 'تأكيد إنشاء حساب ولي الأمر';
     }
   };
 }
@@ -582,7 +785,26 @@ export async function openCreateStudentModal(api, onCreated, defaultStudentId = 
     el('div', { class: 'form-actions', style: 'grid-column: 1 / -1; margin-top: 14px;' }, modalSubmit)
   );
 
-  const { close } = modal('🎓 إنشاء حساب طالب في التطبيق مع الربط بولي الأمر', modalForm);
+  const dialog = modal('🎓 إنشاء حساب طالب في التطبيق مع الربط بولي الأمر', modalForm);
+  if (dialog && dialog.panel) {
+    dialog.panel.style.maxWidth = '560px';
+    const head = dialog.panel.querySelector('.modal-head');
+    if (head) {
+      head.style.position = 'relative';
+      head.style.display = 'flex';
+      head.style.justifyContent = 'center';
+      head.style.alignItems = 'center';
+      const h2 = head.querySelector('h2');
+      if (h2) { h2.style.textAlign = 'center'; h2.style.width = '100%'; h2.style.fontSize = '17px'; }
+      const closeBtn = head.querySelector('.modal-close');
+      if (closeBtn) {
+        closeBtn.style.position = 'absolute';
+        closeBtn.style.left = '0';
+        closeBtn.style.top = '50%';
+        closeBtn.style.transform = 'translateY(-50%)';
+      }
+    }
+  }
 
   modalForm.onsubmit = async ev => {
     ev.preventDefault();
@@ -601,6 +823,7 @@ export async function openCreateStudentModal(api, onCreated, defaultStudentId = 
     }
 
     modalSubmit.disabled = true;
+    modalSubmit.textContent = 'جاري إنشاء الحساب...';
     try {
       const studentPayload = {
         username: studentUsername,
@@ -633,12 +856,13 @@ export async function openCreateStudentModal(api, onCreated, defaultStudentId = 
       }
 
       toast(`تم إنشاء حساب الطالب بنجاح: ${student.name}`);
-      close();
+      dialog.close();
       showCredentialsModal(studentUsername, studentPassword, 'طالب', student.name, extraNotes);
       if (onCreated) onCreated();
     } catch (err) {
       toast(err.message || 'فشلت عملية إنشاء حساب الطالب', true);
       modalSubmit.disabled = false;
+      modalSubmit.textContent = 'تأكيد إنشاء حساب الطالب';
     }
   };
 }
