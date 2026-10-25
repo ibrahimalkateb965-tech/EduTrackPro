@@ -6,6 +6,7 @@ import sa.gheras.edutrack.data.local.session.SessionStore
 
 class AuthInterceptor(
     private val sessionStore: SessionStore,
+    private val allowedHost: String? = null,
     private val onUnauthorized: () -> Unit = {}
 ) : Interceptor {
 
@@ -16,7 +17,10 @@ class AuthInterceptor(
         val requestBuilder = originalRequest.newBuilder()
         val token = sessionStore.token
 
-        if (!token.isNullOrBlank() && originalRequest.header("Authorization") == null) {
+        val host = originalRequest.url.host
+        val isAllowedHost = allowedHost?.equals(host, ignoreCase = true) ?: isKnownInternalHost(host)
+
+        if (isAllowedHost && !token.isNullOrBlank() && originalRequest.header("Authorization") == null) {
             requestBuilder.header("Authorization", "Bearer $token")
         }
 
@@ -28,5 +32,12 @@ class AuthInterceptor(
         }
 
         return response
+    }
+
+    private fun isKnownInternalHost(host: String): Boolean {
+        return host.equals("gheras.autovem.tech", ignoreCase = true) ||
+            host == "127.0.0.1" ||
+            host == "10.0.2.2" ||
+            host == "localhost"
     }
 }
