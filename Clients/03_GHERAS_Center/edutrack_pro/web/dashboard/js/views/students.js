@@ -324,7 +324,7 @@ async function openQuickPaymentModal(api, student) {
 
   let profile = null;
   try {
-    profile = await api.fetch('reports/student/' + student.id);
+    profile = await api.get('reports/student/' + student.id);
   } catch (err) {
     container.replaceChildren(
       el('div', { style: 'padding:16px; background:#fee2e2; border-radius:8px; color:#991b1b; font-size:13px; text-align:center;' },
@@ -337,7 +337,7 @@ async function openQuickPaymentModal(api, student) {
     return;
   }
 
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Riyadh' }).format(new Date());
   const stData = profile.student || student;
   const balance = profile.balance || { total_planned: 0, total_paid: 0, outstanding: 0 };
   const tuitionPlanned = Number(balance.total_planned || 0);
@@ -588,16 +588,22 @@ async function openQuickPaymentModal(api, student) {
       combinedRow.style.display = 'none';
       singleAmountLabel.textContent = 'المبلغ المسدد للدراسة (ر.س) *';
 
-      // Default amount
+      // Default amount and max bounds
       if (installmentSelect.value) {
         const found = unpaidInstallments.find(x => x.id === installmentSelect.value);
-        if (found) singleAmountInput.value = found.remainingNum > 0 ? found.remainingNum.toFixed(2) : '';
+        if (found) {
+          singleAmountInput.value = found.remainingNum > 0 ? found.remainingNum.toFixed(2) : '';
+          singleAmountInput.max = found.remainingNum.toFixed(2);
+        }
       } else if (unpaidInstallments.length > 0) {
         singleAmountInput.value = unpaidInstallments[0].remainingNum.toFixed(2);
+        singleAmountInput.max = tuitionOutstanding.toFixed(2);
       } else if (tuitionOutstanding > 0) {
         singleAmountInput.value = tuitionOutstanding.toFixed(2);
+        singleAmountInput.max = tuitionOutstanding.toFixed(2);
       } else {
         singleAmountInput.value = '';
+        singleAmountInput.max = '0.00';
       }
       noteInput.value = 'سداد رسوم دراسية';
     } else if (purpose === 'bus') {
@@ -606,16 +612,19 @@ async function openQuickPaymentModal(api, student) {
       combinedRow.style.display = 'none';
       singleAmountLabel.textContent = 'المبلغ المسدد للباص والنقل (ر.س) *';
       singleAmountInput.value = busRemaining > 0 ? busRemaining.toFixed(2) : '';
+      singleAmountInput.max = busRemaining.toFixed(2);
       noteInput.value = 'سداد رسوم اشتراك الباص';
     } else if (purpose === 'combined') {
       installmentRow.style.display = unpaidInstallments.length > 0 ? 'block' : 'none';
       singleAmountRow.style.display = 'none';
       combinedRow.style.display = 'block';
 
-      // Prefill combined values
+      // Prefill combined values and set max bounds
       const defaultTuition = unpaidInstallments.length > 0 ? unpaidInstallments[0].remainingNum : tuitionOutstanding;
       combinedTuitionInput.value = defaultTuition > 0 ? defaultTuition.toFixed(2) : '0.00';
+      combinedTuitionInput.max = tuitionOutstanding.toFixed(2);
       combinedBusInput.value = busRemaining > 0 ? busRemaining.toFixed(2) : '0.00';
+      combinedBusInput.max = busRemaining.toFixed(2);
       updateCombinedTotal();
       noteInput.value = 'سداد رسوم دراسية واشتراك باص';
     }
@@ -685,21 +694,25 @@ async function openQuickPaymentModal(api, student) {
     const purpose = purposeSelect.value;
     let totalVal = 0;
     let busVal = 0;
+    let tuitionVal = 0;
     let targetInstallmentId = null;
 
     if (purpose === 'tuition') {
       totalVal = parseFloat(singleAmountInput.value) || 0;
       busVal = 0;
+      tuitionVal = totalVal;
       targetInstallmentId = installmentSelect.value || null;
     } else if (purpose === 'bus') {
       totalVal = parseFloat(singleAmountInput.value) || 0;
       busVal = totalVal;
+      tuitionVal = 0;
       targetInstallmentId = null;
     } else if (purpose === 'combined') {
       const t = parseFloat(combinedTuitionInput.value) || 0;
       const b = parseFloat(combinedBusInput.value) || 0;
       totalVal = t + b;
       busVal = b;
+      tuitionVal = t;
       targetInstallmentId = installmentSelect.value || null;
     }
 
@@ -708,9 +721,33 @@ async function openQuickPaymentModal(api, student) {
       return;
     }
 
+    // Q3 & Q1: Tuition Cap Validation
+    if (tuitionVal > 0) {
+      if (tuitionOutstanding <= 0) {
+        toast('تم سداد كامل الرسوم الدراسية المقررة للطالب مسبقاً', true);
+        return;
+      }
+      if (tuitionVal > (tuitionOutstanding + 0.01)) {
+        toast(`المبلغ المسدد للدراسة (${fmtSAR(tuitionVal)}) يتجاوز الرسوم الدراسية المتبقية (${fmtSAR(tuitionOutstanding)})`, true);
+        return;
+      }
+      if (targetInstallmentId) {
+        const found = unpaidInstallments.find(x => x.id === targetInstallmentId);
+        if (found && tuitionVal > (found.remainingNum + 0.01)) {
+          toast(`المبلغ المسدد (${fmtSAR(tuitionVal)}) يتجاوز المتبقي من هذا القسط (${fmtSAR(found.remainingNum)})`, true);
+          return;
+        }
+      }
+    }
+
+    // Bus Cap Validation
     if (busVal > 0) {
       if (!hasBus) {
         toast('الطالب غير مشترك في خدمة الباص', true);
+        return;
+      }
+      if (busRemaining <= 0) {
+        toast('تم سداد كامل رسوم الباص مسبقاً', true);
         return;
       }
       if (busVal > (busRemaining + 0.01)) {

@@ -514,6 +514,49 @@ def _create_hook(conn, repo, table: str, data: dict, actor: dict) -> tuple[dict,
                     author_id = new_staff["id"]
             if author_id:
                 data["author_id"] = author_id
+    elif table == "payments":
+        bus_amount = _money(data.get("bus_amount") or 0)
+        pay_amount = _money(data.get("amount") or 0)
+        if pay_amount <= 0:
+            raise ApiError(400, "validation_error", "مبلغ الدفعة يجب أن يكون أكبر من الصفر")
+        if bus_amount < 0 or bus_amount > pay_amount:
+            raise ApiError(400, "validation_error", "مبلغ سداد الباص غير صالح أو يتجاوز المبلغ الإجمالي")
+        if bus_amount > 0:
+            st = conn.execute("SELECT bus_fee, bus_paid, has_bus_subscription FROM students WHERE id = %s", (data["student_id"],)).fetchone()
+            if not st or not st.get("has_bus_subscription"):
+                raise ApiError(400, "validation_error", "الطالب غير مشترك في خدمة الباص")
+            if _money(st["bus_paid"]) + bus_amount > _money(st["bus_fee"]):
+                raise ApiError(400, "validation_error", "المبلغ المسدد للباص يتجاوز المتبقي من رسوم الباص")
+
+        tuition_amount = pay_amount - bus_amount
+        # Q3: Tuition Overpayment Check
+        if tuition_amount > 0:
+            bal_row = conn.execute(
+                "SELECT total_planned, balance FROM v_student_balance WHERE student_id = %s",
+                (data["student_id"],)
+            ).fetchone()
+            if bal_row and bal_row["total_planned"] is not None and _money(bal_row["total_planned"]) > 0:
+                rem_tuition = _money(bal_row["balance"])
+                if rem_tuition <= 0:
+                    raise ApiError(400, "validation_error", "تم سداد كامل الرسوم الدراسية للطالب مسبقاً")
+                if tuition_amount > rem_tuition:
+                    raise ApiError(400, "validation_error", f"المبلغ المسدد للدراسة ({tuition_amount}) يتجاوز الرسوم الدراسية المتبقية ({rem_tuition})")
+
+        # Q2 & Q1: Installment Ownership & Target Overflow Check
+        if data.get("installment_id"):
+            inst = conn.execute(
+                "SELECT i.id, i.amount, i.paid_amount, fp.student_id "
+                "FROM installments i JOIN fee_plans fp ON fp.id = i.fee_plan_id "
+                "WHERE i.id = %s AND i.deleted_at IS NULL AND fp.deleted_at IS NULL",
+                (data["installment_id"],)
+            ).fetchone()
+            if not inst:
+                raise ApiError(404, "not_found", "القسط المحدد غير موجود")
+            if str(inst["student_id"]) != str(data["student_id"]):
+                raise ApiError(400, "validation_error", "القسط المحدد لا يتبع للطالب المحدد")
+            inst_rem = _money(inst["amount"]) - _money(inst["paid_amount"])
+            if tuition_amount > inst_rem:
+                raise ApiError(400, "validation_error", f"المبلغ المسدد للدراسة ({tuition_amount}) يتجاوز المتبقي من هذا القسط ({inst_rem})")
     row = repo.create(data)
     if table == "students":
         g_phone = data.get("guardian_phone") or data.get("father_phone") or data.get("mother_phone")
@@ -534,16 +577,11 @@ def _create_hook(conn, repo, table: str, data: dict, actor: dict) -> tuple[dict,
         row["installments"] = generate_installments(conn, row)
     elif table == "payments":
         bus_amount = _money(row.get("bus_amount") or 0)
-        if bus_amount < 0 or bus_amount > _money(row["amount"]):
-            raise ApiError(400, "validation_error", "مبلغ سداد الباص غير صالح أو يتجاوز المبلغ الإجمالي")
         if bus_amount > 0:
-            st = conn.execute("SELECT bus_fee, bus_paid, has_bus_subscription FROM students WHERE id = %s FOR UPDATE", (row["student_id"],)).fetchone()
-            if not st or not st.get("has_bus_subscription"):
-                raise ApiError(400, "validation_error", "الطالب غير مشترك في خدمة الباص")
-            new_bus_paid = _money(st["bus_paid"]) + bus_amount
-            if new_bus_paid > _money(st["bus_fee"]):
-                raise ApiError(400, "validation_error", "المبلغ المسدد للباص يتجاوز المتبقي من رسوم الباص")
-            conn.execute("UPDATE students SET bus_paid = %s WHERE id = %s", (new_bus_paid, row["student_id"]))
+            conn.execute(
+                "UPDATE students SET bus_paid = bus_paid + %s WHERE id = %s",
+                (bus_amount, row["student_id"]),
+            )
         touched = allocate_payment(conn, row, row.get("installment_id"))
         row["installments_touched"] = touched
         row["receipt"] = issue_receipt(conn, row["id"], issued_by=actor.get("id"))
