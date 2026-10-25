@@ -2,8 +2,8 @@
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="utf-8">
-<title>سند قبض</title>
-<link rel="stylesheet" href="../print.css">
+<title>{{receipt_title}}</title>
+<link rel="stylesheet" href="../print.css?v=20261025_1">
 </head>
 <body class="page-a5-landscape">
 <div class="sheet">
@@ -12,70 +12,139 @@
     <div class="doc-header-center">
       <div class="doc-center-name">{{center_name}}</div>
       <div class="doc-tagline">من غراس تبدأ المعرفة وتصنع القمة</div>
-      <div class="doc-title">سند قبض</div>
+      <div class="doc-title">{{receipt_title}}</div>
     </div>
     <div class="doc-meta">
       <div class="meta-row"><span class="meta-label">رقم السند:</span> {{receipt_no}}</div>
       <div class="meta-row"><span class="meta-label">التاريخ:</span> <bdi>{{date}}</bdi></div>
+      <div class="meta-row"><span class="meta-label">نوع السند:</span> <span class="receipt-type-pill">{{receipt_type_badge}}</span></div>
     </div>
   </header>
 
   <main class="doc-body">
-    <table>
+    <!-- Basic Information Table -->
+    <table class="receipt-main-table">
       <tbody>
         <tr>
-          <th scope="row">الطالب</th>
-          <td>{{student_name}}</td>
-          <th scope="row">طريقة الدفع</th>
-          <td>{{method}}</td>
+          <th scope="row" style="width:16%;">اسم الطالب</th>
+          <td style="width:34%; font-weight:700;">{{student_name}}</td>
+          <th scope="row" style="width:16%;">طريقة الدفع</th>
+          <td style="width:34%;">{{method}}</td>
         </tr>
         <tr>
-          <th scope="row">المبلغ</th>
-          <td>{{amount}} ريال</td>
-          <th scope="row">مرجع القسط</th>
-          <td>{{installment_ref}}</td>
+          <th scope="row">إجمالي مبلغ السند</th>
+          <td class="receipt-amount-cell">{{amount}} ريال</td>
+          <th scope="row">البيان / الملاحظات</th>
+          <td>{{note}}</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- Case A: Bus Only Payment -->
+    {{#is_bus_only}}
+    <div class="receipt-section-title">🚌 تفاصيل سداد رسوم اشتراك الباص والنقل</div>
+    <table class="receipt-details-table">
+      <tbody>
+        <tr>
+          <th scope="row" style="width:25%;">المسدد للباص في هذا السند</th>
+          <td class="highlight-val" style="width:25%;">{{bus_paid_amount}} ريال</td>
+          <th scope="row" style="width:25%;">رسوم الباص المقررة</th>
+          <td style="width:25%;">{{bus_fee}} ريال</td>
         </tr>
         <tr>
-          <th scope="row">إجمالي الرسوم</th>
+          <th scope="row">إجمالي المسدد للباص حتى تاريخه</th>
+          <td>{{bus_total_paid}} ريال</td>
+          <th scope="row">المتبقي من رسوم الباص</th>
+          <td class="status-cell">
+            <strong>{{bus_remaining}} ريال</strong>
+            {{#bus_is_fully_paid}}<span class="paid-badge">✓ مسدد بالكامل</span>{{/bus_is_fully_paid}}
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="receipt-info-box">
+      <span class="info-title">🎓 موقف الرسوم الدراسية للطالب:</span>
+      إجمالي الرسوم المقررة: {{total_fee}} ريال | المتبقي للدراسة: {{remaining_balance}} ريال
+      {{#has_installments}}— القسط القادم يستحق بتاريخ <bdi>{{next_due_date}}</bdi> (بقيمة {{next_installment_amount}} ريال){{/has_installments}}
+      {{#tuition_is_fully_paid}}— <span class="paid-badge">✓ الرسوم الدراسية مسددة بالكامل</span>{{/tuition_is_fully_paid}}
+    </div>
+    {{/is_bus_only}}
+
+    <!-- Case B: Tuition Only Payment -->
+    {{#is_tuition_only}}
+    <div class="receipt-section-title">🎓 تفاصيل سداد الرسوم الدراسية والأقساط</div>
+    <table class="receipt-details-table">
+      <tbody>
+        <tr>
+          <th scope="row" style="width:25%;">المسدد للدراسة في هذا السند</th>
+          <td class="highlight-val" style="width:25%;">{{amount}} ريال</td>
+          <th scope="row" style="width:25%;">مرجع القسط</th>
+          <td style="width:25%;">{{installment_ref}}</td>
+        </tr>
+        <tr>
+          <th scope="row">إجمالي الرسوم الدراسية</th>
           <td>{{total_fee}} ريال</td>
-          <th scope="row">المتبقي</th>
-          <td>{{remaining_balance}} ريال</td>
+          <th scope="row">المتبقي من الرسوم الدراسية</th>
+          <td class="status-cell">
+            <strong>{{remaining_balance}} ريال</strong>
+            {{#is_fully_paid}}<span class="paid-badge">✓ مسدد بالكامل</span>{{/is_fully_paid}}
+          </td>
         </tr>
         {{#has_installments}}
         <tr>
           <th scope="row">الأقساط المتبقية</th>
-          <td>{{remaining_installments_count}}</td>
+          <td>{{remaining_installments_count}} ({{interval_label}})</td>
           <th scope="row">تاريخ القسط القادم</th>
-          <td><bdi>{{next_due_date}}</bdi></td>
-        </tr>
-        <tr>
-          <th scope="row">قيمة القسط القادم</th>
-          <td>{{next_installment_amount}} ريال</td>
-          <th scope="row">دورية الأقساط</th>
-          <td>{{interval_label}}</td>
+          <td><bdi>{{next_due_date}}</bdi> (بقيمة {{next_installment_amount}} ريال)</td>
         </tr>
         {{/has_installments}}
-        {{^has_installments}}
-        {{#is_fully_paid}}
-        <tr>
-          <td colspan="4">الرسوم مسددة بالكامل</td>
-        </tr>
-        {{/is_fully_paid}}
-        {{/has_installments}}
-        {{#has_bus}}
-        <tr class="receipt-bus-row">
-          <th scope="row">رسوم اشتراك الباص</th>
-          <td>{{bus_fee}} ريال</td>
-          <th scope="row">المسدد من الباص</th>
-          <td>{{bus_paid_amount}} ريال</td>
-        </tr>
-        <tr class="receipt-bus-row">
-          <th scope="row">المتبقي من الباص</th>
-          <td colspan="3">{{bus_remaining}} ريال</td>
-        </tr>
-        {{/has_bus}}
       </tbody>
     </table>
+
+    {{#has_bus}}
+    <div class="receipt-info-box">
+      <span class="info-title">🚌 موقف اشتراك الباص والنقل:</span>
+      {{#bus_is_fully_paid}}رسوم الباص مسددة بالكامل ({{bus_fee}} ريال) ✓{{/bus_is_fully_paid}}
+      {{^bus_is_fully_paid}}متبقي {{bus_remaining}} ريال من رسوم الباص المقررة ({{bus_fee}} ريال) — لم يتضمن هذا السند سداداً للباص{{/bus_is_fully_paid}}
+    </div>
+    {{/has_bus}}
+    {{/is_tuition_only}}
+
+    <!-- Case C: Combined Payment (Tuition + Bus) -->
+    {{#is_combined}}
+    <div class="receipt-section-title">🔄 تفاصيل السداد المشترك (رسوم دراسية + اشتراك باص)</div>
+    <table class="receipt-details-table">
+      <tbody>
+        <tr>
+          <th scope="row" style="width:25%;">المسدد للدراسة في هذا السند</th>
+          <td class="highlight-val" style="width:25%;">{{registration_paid_amount}} ريال (مرجع: {{installment_ref}})</td>
+          <th scope="row" style="width:25%;">المسدد للباص في هذا السند</th>
+          <td class="highlight-val" style="width:25%;">{{bus_paid_amount}} ريال</td>
+        </tr>
+        <tr>
+          <th scope="row">إجمالي الرسوم الدراسية</th>
+          <td>
+            {{total_fee}} ريال (متبقي: {{remaining_balance}} ريال)
+            {{#tuition_is_fully_paid}}<span class="paid-badge">✓ مسدد</span>{{/tuition_is_fully_paid}}
+          </td>
+          <th scope="row">رسوم الباص المقررة</th>
+          <td>
+            {{bus_fee}} ريال (متبقي: {{bus_remaining}} ريال)
+            {{#bus_is_fully_paid}}<span class="paid-badge">✓ مسدد</span>{{/bus_is_fully_paid}}
+          </td>
+        </tr>
+        {{#has_installments}}
+        <tr>
+          <th scope="row">الأقساط الدراسية المتبقية</th>
+          <td>{{remaining_installments_count}} ({{interval_label}})</td>
+          <th scope="row">تاريخ القسط القادم</th>
+          <td><bdi>{{next_due_date}}</bdi> (بقيمة {{next_installment_amount}} ريال)</td>
+        </tr>
+        {{/has_installments}}
+      </tbody>
+    </table>
+    {{/is_combined}}
 
     <div class="amount-words">
       <span class="amount-words-label">المبلغ كتابةً:</span>
@@ -101,6 +170,6 @@
     <span>صفحة 1 من 1</span>
   </footer>
 </div>
-<script type="module" src="../print_engine.js?v=20261017_8"></script>
+<script type="module" src="../print_engine.js?v=20261025_1"></script>
 </body>
 </html>

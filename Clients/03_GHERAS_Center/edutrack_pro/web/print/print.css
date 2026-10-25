@@ -240,6 +240,73 @@ h4 {
   height: 6mm;
 }
 
+.receipt-section-title {
+  font-size: 8.5pt;
+  font-weight: 700;
+  color: var(--g-teal-dark);
+  margin: 1.2mm 0 0.8mm;
+  display: flex;
+  align-items: center;
+  gap: 1.5mm;
+}
+
+.receipt-info-box {
+  margin-top: 1.2mm;
+  padding: 1mm 2.2mm;
+  background: var(--g-bg);
+  border: 0.3mm solid var(--g-border);
+  border-radius: 1mm;
+  font-size: 7.8pt;
+  color: var(--g-muted);
+  line-height: 1.4;
+}
+
+.receipt-info-box .info-title {
+  font-weight: 700;
+  color: var(--g-teal-dark);
+  margin-inline-end: 1.5mm;
+}
+
+.receipt-amount-cell {
+  font-size: 9.5pt;
+  font-weight: 700;
+  color: var(--g-teal-dark);
+}
+
+.highlight-val {
+  font-weight: 700;
+  color: var(--g-teal-dark);
+}
+
+.paid-badge {
+  display: inline-block;
+  padding: 0.2mm 1.5mm;
+  border-radius: 0.8mm;
+  background: #dcfce7;
+  color: #15803d;
+  font-weight: 700;
+  font-size: 7.2pt;
+  margin-inline-start: 1.5mm;
+}
+
+.receipt-type-pill {
+  display: inline-block;
+  font-size: 7.5pt;
+  font-weight: 700;
+  padding: 0.2mm 1.8mm;
+  border-radius: 0.8mm;
+  background: #e0f2fe;
+  color: #0369a1;
+}
+
+.receipt-main-table {
+  margin-bottom: 1mm;
+}
+
+.receipt-details-table {
+  margin-bottom: 1mm;
+}
+
 .doc-footer {
   display: flex;
   align-items: center;

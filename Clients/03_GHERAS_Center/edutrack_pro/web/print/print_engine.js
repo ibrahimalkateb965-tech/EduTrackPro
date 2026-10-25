@@ -355,8 +355,21 @@ async function initPrintEngine() {
     return;
   }
 
-  // Preserve the raw template HTML before any mutations
-  const rawHtml = document.body.innerHTML;
+  // Preserve the raw template HTML before any mutations (fetch raw file to prevent browser table foster parenting)
+  let rawHtml = '';
+  try {
+    const tplRes = await fetch(window.location.pathname);
+    if (tplRes.ok) {
+      const fullText = await tplRes.text();
+      const bodyMatch = fullText.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+      rawHtml = bodyMatch ? bodyMatch[1] : fullText;
+    }
+  } catch (e) {
+    console.warn('[PrintEngine] Could not fetch raw template, using innerHTML fallback', e);
+  }
+  if (!rawHtml) {
+    rawHtml = document.body.innerHTML;
+  }
 
   // Build query string from location search
   const searchParams = new URLSearchParams(window.location.search);

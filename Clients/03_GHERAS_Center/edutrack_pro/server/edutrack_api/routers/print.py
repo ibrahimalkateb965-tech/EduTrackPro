@@ -168,7 +168,7 @@ def receipt(
     if not pid:
         raise ApiError(400, "validation_error", "رقم الدفعة أو السند مطلوب")
 
-    select_fields = """r.receipt_no, p.id AS payment_id, r.issued_on, r.issued_by_user_id, p.amount, COALESCE(p.bus_amount, 0) AS bus_amount, p.method,
+    select_fields = """r.receipt_no, p.id AS payment_id, r.issued_on, r.issued_by_user_id, p.amount, COALESCE(p.bus_amount, 0) AS bus_amount, p.method, COALESCE(p.note, '') AS note,
                p.student_id, s.name AS student_name, s.has_bus_subscription,
                COALESCE(s.bus_fee, 0) AS bus_fee, COALESCE(s.bus_paid, 0) AS bus_paid, COALESCE(s.bus_remaining, 0) AS bus_remaining,
                s.guardian_phone, s.father_phone, s.mother_phone,
@@ -204,16 +204,42 @@ def receipt(
 
     amount = float(item["amount"])
     bus_amount = float(item.get("bus_amount") or 0)
-    reg_paid = amount - bus_amount
+    reg_paid = max(0.0, amount - bus_amount)
     has_bus = bool(item.get("has_bus_subscription") or bus_amount > 0)
     bus_fee = float(item.get("bus_fee") or 0)
-    bus_paid_amount = bus_amount
+    bus_total_paid = float(item.get("bus_paid") or 0)
     bus_remaining = float(item.get("bus_remaining") or 0)
+    bus_paid_amount = bus_amount
+    bus_previous_paid = max(0.0, bus_total_paid - bus_paid_amount)
+    bus_is_fully_paid = bool(has_bus and bus_remaining <= 0)
+
+    is_bus_only = bool(bus_amount > 0 and reg_paid <= 0)
+    is_tuition_only = bool(bus_amount <= 0 and reg_paid > 0)
+    is_combined = bool(bus_amount > 0 and reg_paid > 0)
+
+    if is_bus_only:
+        receipt_title = "سند قبض — رسوم اشتراك الباص والنقل"
+        receipt_type_badge = "اشتراك باص"
+        purpose_type = "bus_only"
+    elif is_combined:
+        receipt_title = "سند قبض — رسوم دراسية واشتراك باص"
+        receipt_type_badge = "سداد مشترك"
+        purpose_type = "combined"
+    else:
+        receipt_title = "سند قبض — الرسوم الدراسية"
+        receipt_type_badge = "رسوم دراسية"
+        purpose_type = "tuition_only"
+
+    note = item.get("note") or "سداد رسوم"
 
     phone = item.get("guardian_phone") or item.get("father_phone") or item.get("mother_phone")
     guardian_whatsapp = _normalize_guardian_whatsapp(phone)
     payment_ref = item.get("payment_id") or pid
     public_pdf_url = f"https://gheras.autovem.tech/api/v1/public/receipts/{payment_ref}/pdf"
+
+    installment_data = _installment_breakdown(conn, item["student_id"], reg_paid, item["balance"], item["fee_plan_id"])
+    tuition_is_fully_paid = installment_data.get("is_fully_paid", False)
+    is_fully_paid = bus_is_fully_paid if is_bus_only else tuition_is_fully_paid
 
     return _resp({
         "template": "receipt",
@@ -225,14 +251,26 @@ def receipt(
         "registration_paid_amount": reg_paid,
         "installment_ref": item["seq_no"] or "—",
         "amount_words": arabic_amount_words(Decimal(str(item["amount"]))),
+        "note": note,
+        "receipt_title": receipt_title,
+        "receipt_type_badge": receipt_type_badge,
+        "purpose_type": purpose_type,
+        "is_bus_only": is_bus_only,
+        "is_tuition_only": is_tuition_only,
+        "is_combined": is_combined,
         "has_bus": has_bus,
         "bus_fee": bus_fee,
         "bus_paid_amount": bus_paid_amount,
+        "bus_total_paid": bus_total_paid,
+        "bus_previous_paid": bus_previous_paid,
         "bus_remaining": bus_remaining,
+        "bus_is_fully_paid": bus_is_fully_paid,
         "receiver_name": item.get("receiver_name") or "",
         "guardian_whatsapp": guardian_whatsapp,
         "public_pdf_url": public_pdf_url,
-        **_installment_breakdown(conn, item["student_id"], reg_paid, item["balance"], item["fee_plan_id"]),
+        **installment_data,
+        "is_fully_paid": is_fully_paid,
+        "tuition_is_fully_paid": tuition_is_fully_paid,
     }, conn)
 
 
