@@ -128,3 +128,13 @@ def test_plain_fee_plan_endpoint_unchanged(db, client, manager):
     _, inst, _, _ = _plan_state(db, sid)
     assert [float(i["amount"]) for i in inst] == [300, 300, 300]
     assert [i["due_date"] for i in inst] == [TODAY + datetime.timedelta(days=30 * k) for k in range(3)]
+
+
+def test_registration_with_card_payment_method(db, client, manager):
+    res = _register(
+        client, manager, "طالب بطاقة",
+        registration_fee=500, initial_payment_amount=500, payment_method="بطاقة"
+    )
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body["initial_payment"]["method"] == "بطاقة"
