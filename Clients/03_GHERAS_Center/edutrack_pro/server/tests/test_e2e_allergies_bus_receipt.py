@@ -315,3 +315,122 @@ def test_direct_bus_payment_and_report_installments(client, db, manager):
     assert float(st["bus_remaining"]) == 150.0
 
 
+def test_new_bus_subscription_activation_via_payment(client, db, manager):
+    res = _register(
+        client, manager, registration_fee=600, initial_payment_amount=200, **PLAN_TERMS,
+        has_bus_subscription=False, bus_fee=0, bus_paid=0,
+    )
+    assert res.status_code == 200, res.text
+    sid = res.json()["id"]
+
+    # Student starts without bus
+    st = client.get(f"/api/v1/students/{sid}", headers=manager).json()
+    assert st["has_bus_subscription"] is False
+
+    # Activate bus via payment with new_bus_fee
+    pay_res = client.post(
+        "/api/v1/payments",
+        json={"student_id": sid, "amount": 300, "bus_amount": 300, "new_bus_fee": 800, "method": "كاش", "paid_on": "2026-10-25"},
+        headers=manager,
+    )
+    assert pay_res.status_code == 200, pay_res.text
+    st = client.get(f"/api/v1/students/{sid}", headers=manager).json()
+    assert st["has_bus_subscription"] is True
+    assert float(st["bus_fee"]) == 800.0
+    assert float(st["bus_paid"]) == 300.0
+    assert float(st["bus_remaining"]) == 500.0
+
+
+def test_bus_subscription_renewal_when_fully_paid(client, db, manager):
+    res = _register(
+        client, manager, registration_fee=600, initial_payment_amount=200, **PLAN_TERMS,
+        has_bus_subscription=True, bus_fee=400, bus_paid=400,
+    )
+    assert res.status_code == 200, res.text
+    sid = res.json()["id"]
+
+    # Student has 0 bus balance
+    st = client.get(f"/api/v1/students/{sid}", headers=manager).json()
+    assert float(st["bus_remaining"]) == 0.0
+
+    # Renew bus subscription with new fee of 500 and paying 500
+    pay_res = client.post(
+        "/api/v1/payments",
+        json={"student_id": sid, "amount": 500, "bus_amount": 500, "new_bus_fee": 500, "method": "كاش", "paid_on": "2026-10-25"},
+        headers=manager,
+    )
+    assert pay_res.status_code == 200, pay_res.text
+    st = client.get(f"/api/v1/students/{sid}", headers=manager).json()
+    assert float(st["bus_fee"]) == 900.0
+    assert float(st["bus_paid"]) == 900.0
+    assert float(st["bus_remaining"]) == 0.0
+
+
+def test_new_bus_fee_rejected_when_balance_owed(client, db, manager):
+    res = _register(
+        client, manager, registration_fee=600, initial_payment_amount=200, **PLAN_TERMS,
+        has_bus_subscription=True, bus_fee=500, bus_paid=200,
+    )
+    assert res.status_code == 200, res.text
+    sid = res.json()["id"]
+
+    # Student owes 300 SAR for bus
+    pay_res = client.post(
+        "/api/v1/payments",
+        json={"student_id": sid, "amount": 200, "bus_amount": 200, "new_bus_fee": 400, "method": "كاش", "paid_on": "2026-10-25"},
+        headers=manager,
+    )
+    assert pay_res.status_code == 400
+    assert "لا يمكن تجديد" in pay_res.text
+
+
+def test_bus_payment_rejected_for_unsubscribed_student_without_new_bus_fee(client, db, manager):
+    res = _register(
+        client, manager, registration_fee=600, initial_payment_amount=200, **PLAN_TERMS,
+        has_bus_subscription=False, bus_fee=0, bus_paid=0,
+    )
+    assert res.status_code == 200, res.text
+    sid = res.json()["id"]
+
+    pay_res = client.post(
+        "/api/v1/payments",
+        json={"student_id": sid, "amount": 100, "bus_amount": 100, "method": "كاش", "paid_on": "2026-10-25"},
+        headers=manager,
+    )
+    assert pay_res.status_code == 400
+    assert "الطالب غير مشترك في خدمة الباص" in pay_res.text
+
+
+def test_new_bus_fee_atomicity_rollback_on_failure(client, db, manager):
+    res = _register(
+        client, manager, registration_fee=600, initial_payment_amount=200, **PLAN_TERMS,
+        has_bus_subscription=False, bus_fee=0, bus_paid=0,
+    )
+    assert res.status_code == 200, res.text
+    sid = res.json()["id"]
+
+    # Pass an invalid installment_id that will fail installment check
+    fake_inst_id = "00000000-0000-0000-0000-000000000001"
+    pay_res = client.post(
+        "/api/v1/payments",
+        json={
+            "student_id": sid,
+            "amount": 500,
+            "bus_amount": 300,
+            "new_bus_fee": 800,
+            "installment_id": fake_inst_id,
+            "method": "كاش",
+            "paid_on": "2026-10-25",
+        },
+        headers=manager,
+    )
+    assert pay_res.status_code in (400, 404)
+
+    # Verify rollback: student should still have has_bus_subscription=False
+    st = client.get(f"/api/v1/students/{sid}", headers=manager).json()
+    assert st["has_bus_subscription"] is False
+    assert float(st["bus_fee"] or 0) == 0.0
+    assert float(st["bus_paid"] or 0) == 0.0
+
+
+

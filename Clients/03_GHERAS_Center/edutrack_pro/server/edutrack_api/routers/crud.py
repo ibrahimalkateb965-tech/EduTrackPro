@@ -521,9 +521,36 @@ def _create_hook(conn, repo, table: str, data: dict, actor: dict) -> tuple[dict,
             raise ApiError(400, "validation_error", "مبلغ الدفعة يجب أن يكون أكبر من الصفر")
         if bus_amount < 0 or bus_amount > pay_amount:
             raise ApiError(400, "validation_error", "مبلغ سداد الباص غير صالح أو يتجاوز المبلغ الإجمالي")
+        new_bus_fee = data.pop("new_bus_fee", None)
+        if new_bus_fee is not None:
+            if _money(new_bus_fee) <= 0:
+                raise ApiError(400, "validation_error", "رسوم اشتراك الباص المقررة غير صالحة")
+            if bus_amount <= 0:
+                raise ApiError(400, "validation_error", "يجب سداد دفعة عند تفعيل أو تجديد اشتراك الباص")
+            if bus_amount > _money(new_bus_fee):
+                raise ApiError(400, "validation_error", "المبلغ المسدد للباص يتجاوز رسوم الاشتراك المقررة")
+
+            st = conn.execute("SELECT bus_fee, bus_paid, has_bus_subscription FROM students WHERE id = %s", (data["student_id"],)).fetchone()
+            if not st:
+                raise ApiError(404, "not_found", "الطالب غير موجود")
+
+            if st.get("has_bus_subscription"):
+                if _money(st["bus_fee"]) > _money(st["bus_paid"]):
+                    raise ApiError(400, "validation_error", "لا يمكن تجديد أو تفعيل اشتراك جديد قبل سداد الرسوم السابقة المتبقية")
+                target_fee = _money(st["bus_fee"]) + _money(new_bus_fee)
+            else:
+                target_fee = _money(new_bus_fee)
+
+            conn.execute(
+                "UPDATE students SET has_bus_subscription = true, bus_fee = %s WHERE id = %s",
+                (target_fee, data["student_id"]),
+            )
+
         if bus_amount > 0:
             st = conn.execute("SELECT bus_fee, bus_paid, has_bus_subscription FROM students WHERE id = %s", (data["student_id"],)).fetchone()
-            if not st or not st.get("has_bus_subscription"):
+            if not st:
+                raise ApiError(404, "not_found", "الطالب غير موجود")
+            if not st.get("has_bus_subscription"):
                 raise ApiError(400, "validation_error", "الطالب غير مشترك في خدمة الباص")
             if _money(st["bus_paid"]) + bus_amount > _money(st["bus_fee"]):
                 raise ApiError(400, "validation_error", "المبلغ المسدد للباص يتجاوز المتبقي من رسوم الباص")

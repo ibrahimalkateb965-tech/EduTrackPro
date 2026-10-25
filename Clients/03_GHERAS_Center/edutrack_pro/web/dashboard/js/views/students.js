@@ -409,13 +409,24 @@ async function openQuickPaymentModal(api, student) {
     },
       el('div', { style: 'font-size:12px; font-weight:700; color:#475569; display:flex; justify-content:center; align-items:center; gap:6px;' },
         el('span', {}, '🚌 رسوم الباص والنقل'),
-        hasBus ? (busRemaining <= 0 ? el('span', { style: 'color:#15803d; font-size:11px;' }, '✓ مسدد بالكامل') : null) : el('span', { style: 'color:#94a3b8; font-size:11px;' }, 'غير مشترك')
+        hasBus ? (busRemaining <= 0 ? el('span', { style: 'color:#15803d; font-size:11px;' }, '✓ مسدد بالكامل') : null) : el('span', { style: 'color:#b45309; font-size:11px; background:#fef3c7; padding:1px 6px; border-radius:4px;' }, 'غير مشترك')
       ),
-      el('div', { style: 'font-size:18px; font-weight:800; color:' + (hasBus ? (busRemaining > 0 ? '#c2410c' : '#15803d') : '#94a3b8') + '; margin:4px 0; text-align:center;' },
+      el('div', { style: 'font-size:18px; font-weight:800; color:' + (hasBus ? (busRemaining > 0 ? '#c2410c' : '#15803d') : '#64748b') + '; margin:4px 0; text-align:center;' },
         hasBus ? fmtSAR(busRemaining) : '0.00 ر.س'
       ),
       el('div', { style: 'font-size:11px; color:#64748b; text-align:center;' },
-        hasBus ? `المسدد: ${fmtSAR(busPaid)} / الإجمالي: ${fmtSAR(busFee)}` : 'الطالب غير مشترك بخدمة النقل'
+        hasBus ? `المسدد: ${fmtSAR(busPaid)} / الإجمالي: ${fmtSAR(busFee)}` :
+        el('button', {
+          type: 'button',
+          class: 'button button-outline',
+          style: 'padding:2px 10px; font-size:11px; font-weight:700; color:#047857; border-color:#10b981; background:#ffffff; margin-top:4px; display:inline-block;',
+          title: 'تفعيل اشتراك جديد وسداد الرسوم',
+          onclick: () => {
+            purposeSelect.value = 'bus_new';
+            applyPurposeUI();
+            newBusFeeInput.focus();
+          }
+        }, '+ تفعيل الاشتراك وسداد الرسوم')
       )
     ),
 
@@ -489,12 +500,27 @@ async function openQuickPaymentModal(api, student) {
   }
 
   // 3. Form Controls
-  const purposeOptions = [
-    el('option', { value: 'tuition' }, '🎓 سداد رسوم دراسية / أقساط')
-  ];
-  if (hasBus) {
+  const purposeOptions = [];
+  if (tuitionOutstanding > 0) {
+    purposeOptions.push(el('option', { value: 'tuition' }, `🎓 سداد رسوم دراسية / أقساط (متبقي: ${fmtSAR(tuitionOutstanding)})`));
+  } else {
+    purposeOptions.push(el('option', { value: 'tuition' }, '🎓 الرسوم الدراسية مسددة بالكامل (0.00 ر.س)'));
+  }
+
+  if (hasBus && busRemaining > 0) {
     purposeOptions.push(el('option', { value: 'bus' }, `🚌 سداد رسوم الباص والنقل (متبقي: ${fmtSAR(busRemaining)})`));
-    purposeOptions.push(el('option', { value: 'combined' }, '🔄 سداد مشترك (رسوم دراسية + باص)'));
+  } else if (!hasBus) {
+    purposeOptions.push(el('option', { value: 'bus_new' }, '🚌 تفعيل اشتراك جديد في الباص وسداد الرسوم'));
+  } else if (hasBus && busRemaining <= 0) {
+    purposeOptions.push(el('option', { value: 'bus_new' }, '🚌 تجديد اشتراك الباص / سداد رسوم جديدة'));
+  }
+
+  if (tuitionOutstanding > 0) {
+    if (hasBus && busRemaining > 0) {
+      purposeOptions.push(el('option', { value: 'combined' }, '🔄 سداد مشترك (رسوم دراسية + باص)'));
+    } else {
+      purposeOptions.push(el('option', { value: 'combined_new' }, '🔄 سداد مشترك (دراسة + تفعيل اشتراك باص جديد)'));
+    }
   }
 
   const purposeSelect = el('select', {
@@ -528,6 +554,45 @@ async function openQuickPaymentModal(api, student) {
   const singleAmountRow = el('div', { style: 'margin-bottom:10px; text-align:center;' },
     singleAmountLabel,
     singleAmountInput
+  );
+
+  // New Bus Subscription Inputs
+  const newBusFeeInput = el('input', {
+    type: 'number',
+    step: '0.01',
+    min: '0.01',
+    placeholder: 'مثال: 800',
+    style: 'width:100%; padding:8px; border-radius:8px; border:1px solid #cbd5e1; font-size:13px; font-weight:600; text-align:center;'
+  });
+
+  const newBusPaidInput = el('input', {
+    type: 'number',
+    step: '0.01',
+    min: '0.01',
+    placeholder: 'المسدد حالياً (كامل أو دفعة أولى)',
+    style: 'width:100%; padding:8px; border-radius:8px; border:1px solid #cbd5e1; font-size:13px; font-weight:600; text-align:center;'
+  });
+
+  newBusFeeInput.addEventListener('input', () => {
+    if (!newBusPaidInput.value || parseFloat(newBusPaidInput.value) === parseFloat(newBusFeeInput.value)) {
+      newBusPaidInput.value = newBusFeeInput.value;
+    }
+  });
+
+  const newBusRow = el('div', {
+    style: 'display:none; margin-bottom:10px; background:#ecfdf5; border:1px solid #a7f3d0; padding:10px; border-radius:8px; text-align:center;'
+  },
+    el('div', { style: 'font-size:12px; font-weight:700; color:#065f46; margin-bottom:8px;' }, '🚌 إعداد وتفعيل اشتراك الباص والنقل'),
+    el('div', { style: 'display:grid; grid-template-columns: 1fr 1fr; gap:10px;' },
+      el('div', {},
+        el('label', { style: 'display:block; font-size:11px; font-weight:700; margin-bottom:4px; color:#334155; text-align:center;' }, 'رسوم الاشتراك المقررة (ر.س) *'),
+        newBusFeeInput
+      ),
+      el('div', {},
+        el('label', { style: 'display:block; font-size:11px; font-weight:700; margin-bottom:4px; color:#334155; text-align:center;' }, 'المبلغ المسدد حالياً (ر.س) *'),
+        newBusPaidInput
+      )
+    )
   );
 
   // Combined Amount Inputs
@@ -609,7 +674,9 @@ async function openQuickPaymentModal(api, student) {
       installmentRow.style.display = unpaidInstallments.length > 0 ? 'block' : 'none';
       singleAmountRow.style.display = 'block';
       combinedRow.style.display = 'none';
+      newBusRow.style.display = 'none';
       singleAmountLabel.textContent = 'المبلغ المسدد للدراسة (ر.س) *';
+      saveBtn.textContent = '💳 تسجيل الدفعة وإصدار سند القبض';
 
       // Default amount and max bounds
       if (installmentSelect.value) {
@@ -633,14 +700,25 @@ async function openQuickPaymentModal(api, student) {
       installmentRow.style.display = 'none';
       singleAmountRow.style.display = 'block';
       combinedRow.style.display = 'none';
+      newBusRow.style.display = 'none';
       singleAmountLabel.textContent = 'المبلغ المسدد للباص والنقل (ر.س) *';
       singleAmountInput.value = busRemaining > 0 ? busRemaining.toFixed(2) : '';
       singleAmountInput.max = busRemaining.toFixed(2);
-      noteInput.value = 'سداد رسوم';
+      saveBtn.textContent = '💳 تسجيل دفعة الباص وإصدار سند القبض';
+      noteInput.value = 'سداد رسوم اشتراك الباص';
+    } else if (purpose === 'bus_new') {
+      installmentRow.style.display = 'none';
+      singleAmountRow.style.display = 'none';
+      combinedRow.style.display = 'none';
+      newBusRow.style.display = 'block';
+      saveBtn.textContent = '💳 تفعيل اشتراك الباص وإصدار سند القبض';
+      noteInput.value = 'سداد رسوم اشتراك الباص';
     } else if (purpose === 'combined') {
       installmentRow.style.display = unpaidInstallments.length > 0 ? 'block' : 'none';
       singleAmountRow.style.display = 'none';
       combinedRow.style.display = 'block';
+      newBusRow.style.display = 'none';
+      saveBtn.textContent = '💳 تسجيل الدفعة المشتركة وإصدار سند القبض';
 
       // Prefill combined values and set max bounds
       const defaultTuition = unpaidInstallments.length > 0 ? unpaidInstallments[0].remainingNum : tuitionOutstanding;
@@ -649,6 +727,17 @@ async function openQuickPaymentModal(api, student) {
       combinedBusInput.value = busRemaining > 0 ? busRemaining.toFixed(2) : '0.00';
       combinedBusInput.max = busRemaining.toFixed(2);
       updateCombinedTotal();
+      noteInput.value = 'سداد رسوم';
+    } else if (purpose === 'combined_new') {
+      installmentRow.style.display = unpaidInstallments.length > 0 ? 'block' : 'none';
+      singleAmountRow.style.display = 'block';
+      singleAmountLabel.textContent = 'المبلغ المسدد للدراسة (ر.س) *';
+      const defaultTuition = unpaidInstallments.length > 0 ? unpaidInstallments[0].remainingNum : tuitionOutstanding;
+      singleAmountInput.value = defaultTuition > 0 ? defaultTuition.toFixed(2) : '0.00';
+      singleAmountInput.max = tuitionOutstanding.toFixed(2);
+      combinedRow.style.display = 'none';
+      newBusRow.style.display = 'block';
+      saveBtn.textContent = '💳 سداد الدراسة وتفعيل الباص وإصدار السند';
       noteInput.value = 'سداد رسوم';
     }
   }
@@ -675,8 +764,14 @@ async function openQuickPaymentModal(api, student) {
   }
 
   // Initial trigger
-  if (tuitionOutstanding <= 0 && busRemaining > 0 && hasBus) {
-    purposeSelect.value = 'bus';
+  if (tuitionOutstanding <= 0) {
+    if (hasBus && busRemaining > 0) {
+      purposeSelect.value = 'bus';
+    } else {
+      purposeSelect.value = 'bus_new';
+    }
+  } else {
+    purposeSelect.value = 'tuition';
   }
   applyPurposeUI();
 
@@ -691,6 +786,7 @@ async function openQuickPaymentModal(api, student) {
       ),
       installmentRow,
       singleAmountRow,
+      newBusRow,
       combinedRow,
       el('div', { style: 'display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-bottom:10px;' },
         el('div', {},
@@ -719,6 +815,7 @@ async function openQuickPaymentModal(api, student) {
     let busVal = 0;
     let tuitionVal = 0;
     let targetInstallmentId = null;
+    let newBusFee = null;
 
     if (purpose === 'tuition') {
       totalVal = parseFloat(singleAmountInput.value) || 0;
@@ -730,12 +827,53 @@ async function openQuickPaymentModal(api, student) {
       busVal = totalVal;
       tuitionVal = 0;
       targetInstallmentId = null;
+    } else if (purpose === 'bus_new') {
+      const fee = parseFloat(newBusFeeInput.value) || 0;
+      const paid = parseFloat(newBusPaidInput.value) || 0;
+      if (fee <= 0) {
+        toast('يرجى تحديد رسوم اشتراك الباص المقررة بشكل صحيح', true);
+        return;
+      }
+      if (paid <= 0) {
+        toast('يرجى تحديد المبلغ المسدد للباص بشكل صحيح', true);
+        return;
+      }
+      if (paid > fee) {
+        toast('المبلغ المسدد للباص لا يمكن أن يتجاوز رسوم الاشتراك المقررة', true);
+        return;
+      }
+      newBusFee = fee;
+      busVal = paid;
+      tuitionVal = 0;
+      totalVal = paid;
+      targetInstallmentId = null;
     } else if (purpose === 'combined') {
       const t = parseFloat(combinedTuitionInput.value) || 0;
       const b = parseFloat(combinedBusInput.value) || 0;
       totalVal = t + b;
       busVal = b;
       tuitionVal = t;
+      targetInstallmentId = installmentSelect.value || null;
+    } else if (purpose === 'combined_new') {
+      const t = parseFloat(singleAmountInput.value) || 0;
+      const fee = parseFloat(newBusFeeInput.value) || 0;
+      const paid = parseFloat(newBusPaidInput.value) || 0;
+      if (fee <= 0) {
+        toast('يرجى تحديد رسوم اشتراك الباص المقررة بشكل صحيح', true);
+        return;
+      }
+      if (paid <= 0) {
+        toast('يرجى تحديد المبلغ المسدد للباص بشكل صحيح', true);
+        return;
+      }
+      if (paid > fee) {
+        toast('المبلغ المسدد للباص لا يمكن أن يتجاوز رسوم الاشتراك المقررة', true);
+        return;
+      }
+      newBusFee = fee;
+      busVal = paid;
+      tuitionVal = t;
+      totalVal = t + paid;
       targetInstallmentId = installmentSelect.value || null;
     }
 
@@ -744,7 +882,7 @@ async function openQuickPaymentModal(api, student) {
       return;
     }
 
-    // Q3 & Q1: Tuition Cap Validation
+    // Tuition Cap Validation
     if (tuitionVal > 0) {
       if (tuitionOutstanding <= 0) {
         toast('تم سداد كامل الرسوم الدراسية المقررة للطالب مسبقاً', true);
@@ -763,8 +901,8 @@ async function openQuickPaymentModal(api, student) {
       }
     }
 
-    // Bus Cap Validation
-    if (busVal > 0) {
+    // Standard Bus Cap Validation
+    if (busVal > 0 && purpose !== 'bus_new' && purpose !== 'combined_new') {
       if (!hasBus) {
         toast('الطالب غير مشترك في خدمة الباص', true);
         return;
@@ -784,6 +922,7 @@ async function openQuickPaymentModal(api, student) {
     const printWindow = window.open('about:blank', '_blank');
 
     try {
+      // Record Payment (server handles atomic activation/renewal via new_bus_fee)
       const payload = {
         student_id: student.id,
         amount: totalVal,
@@ -792,6 +931,9 @@ async function openQuickPaymentModal(api, student) {
         paid_on: dateInput.value || todayStr,
         note: noteInput.value.trim() || 'سداد رسوم'
       };
+      if (newBusFee !== null) {
+        payload.new_bus_fee = newBusFee;
+      }
       if (targetInstallmentId) {
         payload.installment_id = targetInstallmentId;
       }

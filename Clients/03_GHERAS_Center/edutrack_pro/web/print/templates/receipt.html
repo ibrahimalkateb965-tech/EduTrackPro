@@ -45,13 +45,13 @@
     <div class="receipt-section-title">🚌 تفاصيل سداد رسوم اشتراك الباص والنقل</div>
     <table class="receipt-details-table">
       <tbody>
-        <tr>
+        <tr class="receipt-bus-row">
           <th scope="row" style="width:25%;">المسدد للباص في هذا السند</th>
           <td class="highlight-val" style="width:25%;">{{bus_paid_amount}} ريال</td>
           <th scope="row" style="width:25%;">رسوم الباص المقررة</th>
           <td style="width:25%;">{{bus_fee}} ريال</td>
         </tr>
-        <tr>
+        <tr class="receipt-bus-row">
           <th scope="row">إجمالي المسدد للباص حتى تاريخه</th>
           <td>{{bus_total_paid}} ريال</td>
           <th scope="row">المتبقي من رسوم الباص</th>
@@ -122,7 +122,7 @@
           <th scope="row" style="width:25%;">المسدد للباص في هذا السند</th>
           <td class="highlight-val" style="width:25%;">{{bus_paid_amount}} ريال</td>
         </tr>
-        <tr>
+        <tr class="receipt-bus-row">
           <th scope="row">إجمالي الرسوم الدراسية</th>
           <td>
             {{total_fee}} ريال (متبقي: {{remaining_balance}} ريال)
