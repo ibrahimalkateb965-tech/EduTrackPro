@@ -285,6 +285,14 @@ function studentRow(student, api) {
   }, '⭐ سلوكي');
   behaviorBtn.addEventListener('click', () => openBehaviorLogModal(api, student));
 
+  const receiptBtn = el('button', {
+    class: 'button button-outline',
+    type: 'button',
+    style: 'color:#047857; border-color:#6ee7b7; background:#ecfdf5; padding:5px 8px; font-size:12px; margin-right:4px;',
+    title: 'تحصيل رسوم وطباعة سند قبض'
+  }, '💳 سند قبض');
+  receiptBtn.addEventListener('click', () => openQuickPaymentModal(api, student));
+
   const deleteBtn = el('button', {
     class: 'button button-outline',
     type: 'button',
@@ -300,8 +308,103 @@ function studentRow(student, api) {
     el('td', {}, roomLabel(student)),
     guardianCol,
     el('td', {}, statusBadge(student)),
-    el('td', {}, edit, ' ', printCard, ' ', commBtn, ' ', behaviorBtn, ' ', deleteBtn)
+    el('td', {}, edit, ' ', receiptBtn, ' ', printCard, ' ', commBtn, ' ', behaviorBtn, ' ', deleteBtn)
   );
+}
+
+function openQuickPaymentModal(api, student) {
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const amountInput = el('input', {
+    type: 'number',
+    step: '0.01',
+    min: '0.01',
+    placeholder: 'مثال: 500',
+    required: 'required',
+    style: 'width:100%; padding:8px; border-radius:8px; border:1px solid #cbd5e1;'
+  });
+  const methodSelect = el('select', {
+    style: 'width:100%; padding:8px; border-radius:8px; border:1px solid #cbd5e1;'
+  },
+    el('option', { value: 'كاش' }, 'كاش'),
+    el('option', { value: 'مدى' }, 'مدى / بطاقة'),
+    el('option', { value: 'تحويل بنكي' }, 'تحويل بنكي')
+  );
+  const dateInput = el('input', {
+    type: 'date',
+    value: todayStr,
+    style: 'width:100%; padding:8px; border-radius:8px; border:1px solid #cbd5e1;'
+  });
+  const noteInput = el('input', {
+    type: 'text',
+    value: 'سداد رسوم دراسية',
+    style: 'width:100%; padding:8px; border-radius:8px; border:1px solid #cbd5e1;'
+  });
+
+  const saveBtn = el('button', {
+    class: 'button',
+    type: 'button',
+    style: 'width:100%; padding:10px; font-weight:700; margin-top:12px; background:#047857;'
+  }, '💳 تسجيل الدفعة وإصدار سند القبض');
+
+  const content = el('div', {},
+    el('p', { style: 'font-size:13px; color:#64748b; margin-top:0;' },
+      'تحصيل رسوم وإصدار سند قبض للطالب: ',
+      el('strong', {}, student.name || '—')
+    ),
+    el('div', { style: 'margin-bottom:8px;' },
+      el('label', { style: 'display:block; font-size:12px; font-weight:700; margin-bottom:4px;' }, 'المبلغ المسدد (ر.س) *'),
+      amountInput
+    ),
+    el('div', { style: 'margin-bottom:8px;' },
+      el('label', { style: 'display:block; font-size:12px; font-weight:700; margin-bottom:4px;' }, 'طريقة السداد'),
+      methodSelect
+    ),
+    el('div', { style: 'margin-bottom:8px;' },
+      el('label', { style: 'display:block; font-size:12px; font-weight:700; margin-bottom:4px;' }, 'تاريخ السداد'),
+      dateInput
+    ),
+    el('div', { style: 'margin-bottom:8px;' },
+      el('label', { style: 'display:block; font-size:12px; font-weight:700; margin-bottom:4px;' }, 'البيان / ملاحظات'),
+      noteInput
+    ),
+    saveBtn
+  );
+
+  const dialog = modal(`سند قبض — ${student.name}`, content);
+
+  saveBtn.onclick = async () => {
+    const val = parseFloat(amountInput.value);
+    if (!val || val <= 0) {
+      toast('يرجى إدخال مبلغ صحيح', true);
+      return;
+    }
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'جاري تسجيل الدفعة وإصدار السند...';
+    const printWindow = window.open('about:blank', '_blank');
+    try {
+      const res = await api.post('payments', {
+        student_id: student.id,
+        amount: val,
+        method: methodSelect.value,
+        paid_on: dateInput.value || todayStr,
+        note: noteInput.value.trim() || 'سداد رسوم'
+      });
+      toast('تم تسجيل الدفعة بنجاح! جاري فتح سند القبض...');
+      if (dialog && dialog.close) dialog.close();
+      const paymentId = res.id;
+      if (paymentId && printWindow) {
+        printWindow.location.href = `../print/templates/receipt.html?payment=${encodeURIComponent(paymentId)}`;
+      } else if (paymentId) {
+        window.open(`../print/templates/receipt.html?payment=${encodeURIComponent(paymentId)}`, '_blank');
+      }
+      await reload(api);
+    } catch (err) {
+      if (printWindow) printWindow.close();
+      toast(err.message || 'تعذر تسجيل الدفعة وسند القبض', true);
+      saveBtn.disabled = false;
+      saveBtn.textContent = '💳 تسجيل الدفعة وإصدار سند القبض';
+    }
+  };
 }
 
 async function openBehaviorLogModal(api, student) {

@@ -45,7 +45,7 @@ def test_change_password_success(client, db):
 
 
 def test_change_password_invalid_current(client, db):
-    make_user(db, "wrong_pwd_user", "supervisor", password="CorrectPassword123!")
+    make_user(db, "wrong_pwd_user", "teacher", password="CorrectPassword123!")
     db.commit()
 
     login_res = client.post("/api/v1/auth/login", json={"username": "wrong_pwd_user", "password": "CorrectPassword123!"})
@@ -61,6 +61,25 @@ def test_change_password_invalid_current(client, db):
     )
     assert change_res.status_code == 400
     assert change_res.json()["error"]["code"] == "invalid_credentials"
+
+
+def test_change_password_supervisor_forbidden(client, db):
+    make_user(db, "sup_pwd_test", "supervisor", password="CorrectPassword123!")
+    db.commit()
+
+    login_res = client.post("/api/v1/auth/login", json={"username": "sup_pwd_test", "password": "CorrectPassword123!"})
+    token = login_res.json()["token"]
+
+    change_res = client.post(
+        "/api/v1/auth/change-password",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "current_password": "CorrectPassword123!",
+            "new_password": "NewSecurePassword456!",
+        },
+    )
+    assert change_res.status_code == 403
+    assert change_res.json()["error"]["code"] == "forbidden"
 
 
 def test_change_password_short_or_mismatch(client, db):

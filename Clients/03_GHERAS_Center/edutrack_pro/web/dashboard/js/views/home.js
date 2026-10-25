@@ -285,7 +285,7 @@ export async function render(container, api) {
 
   const isSupervisor = me && me.role === 'supervisor';
   const perms = me?.permissions || {};
-  const showFinance = !isSupervisor || Boolean(perms.finance);
+  const showFinance = !isSupervisor && Boolean(perms.finance);
   const showStudents = !isSupervisor || Boolean(perms.students);
   const showAttendance = !isSupervisor || Boolean(perms.attendance || perms.daily_evaluation);
 

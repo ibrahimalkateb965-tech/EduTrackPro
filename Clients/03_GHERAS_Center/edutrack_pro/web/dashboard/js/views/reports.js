@@ -108,8 +108,8 @@ export async function render(container, api) {
   try { rooms = toList(await api.fetchAll('rooms')); } catch (error) { toast(error.message, true); }
   try { audit = toList(await api.fetchAll('audit-log')); } catch (error) { toast(error.message, true); }
 
-  const isFinanceAllowed = !api.currentUser || api.currentUser.role === 'manager' || api.currentUser.permissions?.finance;
-  const financeDocs = ['receipt', 'admin_report', 'monthly_report', 'student_receipt', 'statistics_report'];
+  const isFinanceAllowed = !api.currentUser || api.currentUser.role === 'manager';
+  const financeDocs = ['admin_report', 'monthly_report', 'student_receipt', 'statistics_report'];
   const allowedDocs = DOCS.filter(doc => isFinanceAllowed || !financeDocs.includes(doc.file));
 
   const header = el('div', { class: 'view-header' },

@@ -8,7 +8,7 @@ const PERMISSIONS = [
   ['daily_evaluation', 'التقييم اليومي'],
   ['monthly_evaluation', 'التقييم الشهري'],
   ['students', 'الطلاب'],
-  ['finance', 'المالية']
+  ['finance', 'المالية (خاصة بالمدير فقط — غير متاحة للمشرفة)']
 ];
 
 let staff = [];
@@ -21,7 +21,7 @@ let tbody = null;
 let tabsContainer = null;
 
 function checkHasFinance(api) {
-  return !api.currentUser || api.currentUser.role === 'manager' || Boolean(api.currentUser?.permissions?.finance);
+  return !api.currentUser || api.currentUser.role === 'manager';
 }
 
 function checkIsManager(api) {
@@ -586,6 +586,9 @@ function openUserForm(api, member) {
     const data = Object.fromEntries(new FormData(form).entries());
     const permissions = {};
     PERMISSIONS.forEach(([key]) => { permissions[key] = Boolean(form.querySelector(`[name="${key}"]`)?.checked); });
+    if (data.role === 'supervisor') {
+      permissions.finance = false;
+    }
     const payload = {
       username: String(data.username).trim(),
       password: String(data.password),

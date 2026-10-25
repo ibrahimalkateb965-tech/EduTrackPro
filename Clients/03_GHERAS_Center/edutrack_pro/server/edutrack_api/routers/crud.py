@@ -111,7 +111,7 @@ def _clean_user_with_perms(conn, row: dict) -> dict:
 
 def _clean_staff(row: dict, user: dict) -> dict:
     result = dict(row)
-    if user.get("role") == "supervisor" and not user.get("permissions", {}).get("finance", False):
+    if user.get("role") == "supervisor":
         result["base_salary"] = None
     return result
 
@@ -132,7 +132,7 @@ def _repo(request: Request, conn, table: str) -> GenericRepository:
     return GenericRepository(conn, table, columns)
 
 
-def _allowed(user: dict, table: str, write: bool) -> None:
+def _allowed(user: dict, table: str, write: bool = False, action: str = "read") -> None:
     if user["role"] == "manager":
         return
 
@@ -159,14 +159,23 @@ def _allowed(user: dict, table: str, write: bool) -> None:
             if not perms.get("students", False) and not perms.get("attendance", False):
                 raise ApiError(403, "forbidden", "ليس لديك صلاحية الوصول إلى الموظفين والقاعات")
 
-        # Finance resources - Supervisor is strictly quarantined from financial transactions and balances
-        finance_tables = {
-            "payments", "receipts", "expenses", "expense_categories",
-            "payroll_runs", "staff_advances", "ledger_accounts", "ledger_entries",
-            "month_closures", "fee_plans", "installments"
+        # General Finance & Ledgers - Supervisor is strictly quarantined from overhead, expenses, and accounts
+        general_finance_tables = {
+            "expenses", "expense_categories", "payroll_runs", "staff_advances",
+            "ledger_accounts", "ledger_entries", "month_closures"
         }
-        if table in finance_tables and not perms.get("finance", False):
+        if table in general_finance_tables:
             raise ApiError(403, "forbidden", "ليس لديك صلاحية الوصول إلى البيانات والعمليات المالية (محظورة على المشرفة)")
+
+        # Student Fees & Receipts - Decoupled: accessible if supervisor has students or finance permission
+        student_fee_tables = {"payments", "receipts", "fee_plans", "installments"}
+        if table in student_fee_tables:
+            if not (perms.get("finance", False) or perms.get("students", False)):
+                raise ApiError(403, "forbidden", "ليس لديك صلاحية الوصول إلى رسوم وسندات الطلاب")
+            if action in {"update", "delete"}:
+                raise ApiError(403, "forbidden", "تعديل أو حذف الرسوم وسندات القبض مخصص للمدير العام فقط")
+            if action == "create" and table in {"receipts", "fee_plans", "installments"}:
+                raise ApiError(403, "forbidden", "إنشاء سجلات الخطط والأقساط والسندات المباشرة مخصص للمدير العام فقط")
 
         # Student resources & Behavioral logs
         student_tables = {"students", "guardians", "student_guardians", "dismissals", "student_behavioral_logs", "educational_tracks"}
@@ -194,6 +203,9 @@ def _allowed(user: dict, table: str, write: bool) -> None:
 
 def _permissions(conn, user_id, branch_id, values: dict) -> None:
     flags = {key: bool(values.get(key, False)) for key in ("attendance", "daily_evaluation", "monthly_evaluation", "students", "finance")}
+    u = conn.execute("SELECT role FROM users WHERE id = %s", (user_id,)).fetchone()
+    if u and u["role"] == "supervisor":
+        flags["finance"] = False
     conn.execute(
         "INSERT INTO user_permissions (branch_id, user_id, attendance, daily_evaluation, monthly_evaluation, students, finance) "
         "VALUES (%(branch_id)s, %(user_id)s, %(attendance)s, %(daily_evaluation)s, %(monthly_evaluation)s, %(students)s, %(finance)s) "
@@ -406,8 +418,8 @@ def _create_hook(conn, repo, table: str, data: dict, actor: dict) -> tuple[dict,
         )
         if has_finance_action:
             perms = actor.get("permissions") or {}
-            if actor.get("role") != "manager" and not perms.get("finance", False):
-                raise ApiError(403, "forbidden", "ليس لديك صلاحية تسجيل العمليات المالية")
+            if actor.get("role") != "manager" and not perms.get("finance", False) and not perms.get("students", False):
+                raise ApiError(403, "forbidden", "ليس لديك صلاحية تسجيل العمليات المالية أو شؤون الطلاب")
 
         # Allergies validation
         has_allergies = data.get("has_allergies")
@@ -549,6 +561,18 @@ def _update_hook(conn, repo, table: str, record_id: UUID, data: dict, actor: dic
                     has_bus = raw_has_bus.lower() in ("true", "1")
                 else:
                     has_bus = bool(raw_has_bus)
+
+                # G4 Lock: Non-managers cannot cancel bus subscription or lower fees/paid
+                if actor and actor.get("role") != "manager":
+                    if curr.get("has_bus_subscription") and not has_bus:
+                        raise ApiError(403, "forbidden", "إلغاء اشتراك الباص مخصص للمدير العام فقط")
+                    if "bus_fee" in data and data["bus_fee"] not in (None, ""):
+                        if _money(data["bus_fee"]) < _money(curr.get("bus_fee", 0)):
+                            raise ApiError(403, "forbidden", "تعديل أو تخفيض رسوم الباص مخصص للمدير العام فقط")
+                    if "bus_paid" in data and data["bus_paid"] not in (None, ""):
+                        if _money(data["bus_paid"]) < _money(curr.get("bus_paid", 0)):
+                            raise ApiError(403, "forbidden", "تخفيض المبلغ المسدد للباص مخصص للمدير العام فقط")
+
                 data["has_bus_subscription"] = has_bus
 
                 if not has_bus:
@@ -624,7 +648,7 @@ def _update_hook(conn, repo, table: str, record_id: UUID, data: dict, actor: dic
 def _register(path: str, table: str) -> None:
     def list_rows(request: Request, limit: int = 100, offset: int = 0, q: str | None = None,
                   user: dict = Depends(require_roles("manager", "supervisor")), conn=Depends(get_conn)):
-        _allowed(user, table, False)
+        _allowed(user, table, False, action="read")
         if not 1 <= limit <= 500 or offset < 0:
             raise ApiError(422, "validation_error", "قيم التصفح غير صحيحة")
         filters = {key: value for key, value in request.query_params.items() if key not in {"limit", "offset", "q"}}
@@ -649,7 +673,7 @@ def _register(path: str, table: str) -> None:
         return {"items": [_format_row(conn, row, table, user) for row in rows], "total": total, "limit": limit, "offset": offset}
 
     def get_row(record_id: UUID, request: Request, user: dict = Depends(require_roles("manager", "supervisor")), conn=Depends(get_conn)):
-        _allowed(user, table, False)
+        _allowed(user, table, False, action="read")
         row = _repo(request, conn, table).get(record_id)
         if not row:
             raise ApiError(404, "not_found", "السجل غير موجود")
@@ -663,7 +687,7 @@ def _register(path: str, table: str) -> None:
         return _format_row(conn, row, table, user)
 
     def create_row(body: dict, request: Request, user: dict = Depends(require_roles("manager", "supervisor")), conn=Depends(get_conn)):
-        _allowed(user, table, True)
+        _allowed(user, table, True, action="create")
         if table in ("assignments", "submissions"):
             raise ApiError(405, "method_not_allowed", f"لا يمكن إنشاء سجلات {table} عبر الواجهة العامة المباشرة")
         if table == "students":
@@ -675,7 +699,7 @@ def _register(path: str, table: str) -> None:
                 raise ApiError(403, "forbidden", "ليس لديك صلاحية التقييم اليومي")
             if eval_type in {"monthly", "weekly"} and not perms.get("monthly_evaluation", False):
                 raise ApiError(403, "forbidden", "ليس لديك صلاحية التقييم الشهري والنهائي")
-        if table == "staff" and user.get("role") == "supervisor" and not user.get("permissions", {}).get("finance", False):
+        if table == "staff" and user.get("role") == "supervisor":
             if "base_salary" in body:
                 raise ApiError(403, "forbidden", "ليس لديك صلاحية تحديد أو تعديل الراتب الأساسي")
         try:
@@ -686,7 +710,7 @@ def _register(path: str, table: str) -> None:
             raise map_db_error(exc) from exc
 
     def update_row(record_id: UUID, body: dict, request: Request, user: dict = Depends(require_roles("manager", "supervisor")), conn=Depends(get_conn)):
-        _allowed(user, table, True)
+        _allowed(user, table, True, action="update")
         if table in ("assignments", "submissions"):
             raise ApiError(405, "method_not_allowed", f"لا يمكن تعديل سجلات {table} عبر الواجهة العامة المباشرة")
         if table == "students":
@@ -701,7 +725,7 @@ def _register(path: str, table: str) -> None:
                 raise ApiError(403, "forbidden", "ليس لديك صلاحية التقييم اليومي")
             if eval_type in {"monthly", "weekly"} and not perms.get("monthly_evaluation", False):
                 raise ApiError(403, "forbidden", "ليس لديك صلاحية التقييم الشهري والنهائي")
-        if table == "staff" and user.get("role") == "supervisor" and not user.get("permissions", {}).get("finance", False):
+        if table == "staff" and user.get("role") == "supervisor":
             if "base_salary" in body:
                 raise ApiError(403, "forbidden", "ليس لديك صلاحية تحديد أو تعديل الراتب الأساسي")
         try:
@@ -714,7 +738,7 @@ def _register(path: str, table: str) -> None:
             raise map_db_error(exc) from exc
 
     def delete_row(record_id: UUID, request: Request, user: dict = Depends(require_roles("manager", "supervisor")), conn=Depends(get_conn)):
-        _allowed(user, table, True)
+        _allowed(user, table, True, action="delete")
         if table == "users" and record_id == user["id"]:
             raise ApiError(400, "bad_request", "لا يمكن للمستخدم حذف حسابه الحالي")
         if table == "staff" and user.get("staff_id") and record_id == user["staff_id"]:

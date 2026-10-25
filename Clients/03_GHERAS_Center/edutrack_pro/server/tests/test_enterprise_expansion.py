@@ -161,21 +161,27 @@ def test_supervisor_strict_financial_blackout(db, client, manager):
     )
     sup_headers = login(client, "sup_academic_only", "Password123!")
 
-    # Must be 403 Forbidden across all financial tables
-    assert client.get(f"{API}/payments", headers=sup_headers).status_code == 403
-    assert client.get(f"{API}/receipts", headers=sup_headers).status_code == 403
+    # Must be 403 Forbidden across general financial tables
     assert client.get(f"{API}/expenses", headers=sup_headers).status_code == 403
     assert client.get(f"{API}/expense-categories", headers=sup_headers).status_code == 403
     assert client.get(f"{API}/ledger-accounts", headers=sup_headers).status_code == 403
     assert client.get(f"{API}/ledger-entries", headers=sup_headers).status_code == 403
     assert client.get(f"{API}/payroll-runs", headers=sup_headers).status_code == 403
 
-    # Regression 1: supervisor with finance=False cannot enroll a student carrying an initial payment
-    assert client.post(
+    # Decoupled student fees: supervisor with students permission CAN read payments and receipts
+    assert client.get(f"{API}/payments", headers=sup_headers).status_code == 200
+    assert client.get(f"{API}/receipts", headers=sup_headers).status_code == 200
+    # But cannot modify or delete them
+    assert client.delete(f"{API}/payments/00000000-0000-0000-0000-000000000001", headers=sup_headers).status_code == 403
+    assert client.delete(f"{API}/receipts/00000000-0000-0000-0000-000000000001", headers=sup_headers).status_code == 403
+
+    # Decoupled: supervisor with students permission CAN enroll a student carrying fee/payment
+    enroll_res = client.post(
         f"{API}/students",
-        json={"name": "طالب محظور مالياً", "father_phone": "0577700001", "initial_payment_amount": 500},
+        json={"name": "طالب مسموح مالياً", "father_phone": "0577700001", "registration_fee": 500, "initial_payment_amount": 500},
         headers=sup_headers,
-    ).status_code == 403
+    )
+    assert enroll_res.status_code == 200
 
     # Regression 2: supervisor cannot bulk-enroll students into rooms
     room = client.post(f"{API}/rooms", json={"name": "قاعة الحظر", "group_name": "الصباح"}, headers=manager).json()

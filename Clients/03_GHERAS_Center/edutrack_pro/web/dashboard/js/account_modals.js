@@ -67,7 +67,6 @@ export function openPermissionsModal(api, user, onUpdated) {
   const permAttendance = el('input', { type: 'checkbox', checked: Boolean(perms.attendance) });
   const permDailyEval = el('input', { type: 'checkbox', checked: Boolean(perms.daily_evaluation) });
   const permMonthlyEval = el('input', { type: 'checkbox', checked: Boolean(perms.monthly_evaluation) });
-  const permFinance = el('input', { type: 'checkbox', checked: Boolean(perms.finance) });
 
   const modalSubmit = el('button', { class: 'button', type: 'submit' }, 'حفظ الصلاحيات');
   const modalForm = el('form', { class: 'form-grid' },
@@ -77,8 +76,7 @@ export function openPermissionsModal(api, user, onUpdated) {
         el('label', { style: 'display: flex; gap: 8px; align-items: center; font-weight: normal;' }, permStudents, '♟ إدارة وسجلات الطلاب'),
         el('label', { style: 'display: flex; gap: 8px; align-items: center; font-weight: normal;' }, permAttendance, '☑ تسجيل الحضور والغياب (طلاب وموظفين)'),
         el('label', { style: 'display: flex; gap: 8px; align-items: center; font-weight: normal;' }, permDailyEval, '★ إدخال التقييم اليومي للطلاب'),
-        el('label', { style: 'display: flex; gap: 8px; align-items: center; font-weight: normal;' }, permMonthlyEval, '▥ التقييم الشهري وتقارير الإنجاز'),
-        el('label', { style: 'display: flex; gap: 8px; align-items: center; font-weight: normal;' }, permFinance, '▤ العمليات المالية، الرسوم، المصروفات والحسابات')
+        el('label', { style: 'display: flex; gap: 8px; align-items: center; font-weight: normal;' }, permMonthlyEval, '▥ التقييم الشهري وتقارير الإنجاز')
       )
     ),
     el('div', { class: 'form-actions', style: 'grid-column: 1 / -1; margin-top: 14px;' }, modalSubmit)
@@ -96,7 +94,7 @@ export function openPermissionsModal(api, user, onUpdated) {
           attendance: permAttendance.checked,
           daily_evaluation: permDailyEval.checked,
           monthly_evaluation: permMonthlyEval.checked,
-          finance: permFinance.checked
+          finance: false
         }
       });
       toast('تم تحديث صلاحيات المشرف بنجاح');
@@ -191,7 +189,6 @@ export function openCreateSupervisorModal(api, onCreated) {
   const permAttendance = el('input', { type: 'checkbox', checked: true });
   const permDailyEval = el('input', { type: 'checkbox', checked: true });
   const permMonthlyEval = el('input', { type: 'checkbox', checked: false });
-  const permFinance = el('input', { type: 'checkbox', checked: false });
 
   const modalSubmit = el('button', { class: 'button', type: 'submit' }, 'تأكيد إنشاء الحساب');
   const modalForm = el('form', { class: 'form-grid' },
@@ -203,8 +200,7 @@ export function openCreateSupervisorModal(api, onCreated) {
         el('label', { style: 'display: flex; gap: 8px; align-items: center; font-weight: normal;' }, permStudents, '♟ إدارة وسجلات الطلاب'),
         el('label', { style: 'display: flex; gap: 8px; align-items: center; font-weight: normal;' }, permAttendance, '☑ تسجيل الحضور والغياب (طلاب وموظفين)'),
         el('label', { style: 'display: flex; gap: 8px; align-items: center; font-weight: normal;' }, permDailyEval, '★ إدخال التقييم اليومي للطلاب'),
-        el('label', { style: 'display: flex; gap: 8px; align-items: center; font-weight: normal;' }, permMonthlyEval, '▥ التقييم الشهري وتقارير الإنجاز'),
-        el('label', { style: 'display: flex; gap: 8px; align-items: center; font-weight: normal;' }, permFinance, '▤ العمليات المالية، الرسوم، المصروفات والحسابات')
+        el('label', { style: 'display: flex; gap: 8px; align-items: center; font-weight: normal;' }, permMonthlyEval, '▥ التقييم الشهري وتقارير الإنجاز')
       )
     ),
     el('div', { class: 'form-actions', style: 'grid-column: 1 / -1; margin-top: 14px;' }, modalSubmit)
@@ -229,7 +225,7 @@ export function openCreateSupervisorModal(api, onCreated) {
           attendance: permAttendance.checked,
           daily_evaluation: permDailyEval.checked,
           monthly_evaluation: permMonthlyEval.checked,
-          finance: permFinance.checked
+          finance: false
         }
       };
       await api.post('users', payload);

@@ -1,6 +1,5 @@
 import os
 import re
-import uuid
 from datetime import date, datetime
 from decimal import Decimal
 from pathlib import Path
@@ -61,6 +60,8 @@ def _resp(payload: dict, conn=None) -> dict:
 def _check_perm(user: dict, perm: str, message: str) -> None:
     if user.get("role") == "manager":
         return
+    if user.get("role") == "supervisor" and perm == "finance":
+        raise ApiError(403, "forbidden", message)
     perms = user.get("permissions", {})
     if not perms.get(perm, False):
         raise ApiError(403, "forbidden", message)
@@ -159,7 +160,10 @@ def receipt(
     conn=Depends(get_conn),
     user: dict = _ROLES,
 ) -> dict:
-    _check_perm(user, "finance", "طباعة سند القبض تتطلب صلاحية المالية")
+    if user.get("role") != "manager":
+        perms = user.get("permissions", {})
+        if not perms.get("finance", False) and not perms.get("students", False):
+            raise ApiError(403, "forbidden", "طباعة سند القبض تتطلب صلاحية إدارة الطلاب أو المالية")
     pid = payment_id or payment or id
     if not pid:
         raise ApiError(400, "validation_error", "رقم الدفعة أو السند مطلوب")
@@ -624,7 +628,7 @@ def lesson_log(
 
 @router.get("/print/statistics")
 def statistics(from_: str = Query(alias="from"), to: str = Query(), conn=Depends(get_conn), user: dict = _ROLES) -> dict:
-    has_finance = user.get("role") == "manager" or user.get("permissions", {}).get("finance", False)
+    has_finance = user.get("role") == "manager"
     total = conn.execute("SELECT count(*) count FROM students WHERE deleted_at IS NULL").fetchone()["count"]
     att = conn.execute(
         "SELECT count(*) FILTER(WHERE status IN ('حاضر','متأخر')) good, count(*) total FROM student_attendance WHERE date BETWEEN %s AND %s AND deleted_at IS NULL AND is_draft = FALSE",
@@ -712,21 +716,15 @@ async def print_pdf_download(token: str) -> Response:
 @router.get("/public/receipts/{payment_ref}/pdf")
 async def public_receipt_pdf(payment_ref: str, request: Request, conn=Depends(get_conn)) -> Response:
     """Public capability endpoint to view/download official receipt PDF without login."""
-    try:
-        uuid_obj = uuid.UUID(payment_ref)
-        canonical_uuid = str(uuid_obj)
-    except (ValueError, AttributeError):
-        raise ApiError(404, "not_found", "سند القبض غير موجود أو تم حذفه")
-
     item = conn.execute(
         """SELECT r.receipt_no, p.id AS payment_id, s.name AS student_name
            FROM payments p
            JOIN receipts r ON r.payment_id = p.id
            JOIN students s ON s.id = p.student_id
-           WHERE p.id::text = %s
+           WHERE (p.id::text = %s OR r.receipt_no::text = %s)
              AND p.deleted_at IS NULL AND r.deleted_at IS NULL AND s.deleted_at IS NULL
            LIMIT 1""",
-        (canonical_uuid,),
+        (payment_ref, payment_ref),
     ).fetchone()
     if not item:
         raise ApiError(404, "not_found", "سند القبض غير موجود أو تم حذفه")
@@ -740,6 +738,7 @@ async def public_receipt_pdf(payment_ref: str, request: Request, conn=Depends(ge
     cache_candidates = [
         cache_dir / f"receipt_{payment_id}.pdf",
         cache_dir / f"receipt_{receipt_no}.pdf",
+        cache_dir / f"receipt_{payment_ref}.pdf",
     ]
 
     for c in cache_candidates:

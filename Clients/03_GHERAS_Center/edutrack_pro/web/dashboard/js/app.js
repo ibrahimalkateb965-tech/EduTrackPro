@@ -40,7 +40,7 @@ function filterSidebarByPermissions(user) {
     if (route === 'students' && !perms.students) visible = false;
     if (route === 'attendance' && !perms.attendance && !perms.daily_evaluation) visible = false;
     if (route === 'communication' && !perms.students && !perms.attendance) visible = false;
-    if (route === 'finance' && !perms.finance) visible = false;
+    if (route === 'finance' && (user.role === 'supervisor' || !perms.finance)) visible = false;
     if (route === 'staff' && user.role !== 'manager') visible = false;
     if (route === 'rooms' && !perms.students && !perms.attendance) visible = false;
     if (route === 'reports' && user.role !== 'manager') visible = false;
@@ -101,7 +101,7 @@ async function handleRoute() {
       location.hash = '#/home';
       return;
     }
-    if (route === 'finance' && !perms.finance) {
+    if (route === 'finance' && (currentUser.role === 'supervisor' || !perms.finance)) {
       toast('ليس لديك صلاحية الوصول إلى الإدارة المالية', true);
       location.hash = '#/home';
       return;

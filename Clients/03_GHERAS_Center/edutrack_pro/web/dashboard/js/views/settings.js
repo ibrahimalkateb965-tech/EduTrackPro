@@ -34,19 +34,26 @@ export async function render(container, api) {
   const confirmPwdInput = el('input', { type: 'password', name: 'confirm_password', required: 'required', minlength: '8', autocomplete: 'new-password' });
   const savePwdBtn = el('button', { class: 'button', type: 'submit' }, 'حفظ كلمة المرور الجديدة');
 
-  const pwdForm = el('form', { class: 'card' },
-    el('h2', { style: 'margin-top:0; font-size:18px;' }, '🔐 تغيير كلمة المرور'),
-    el('p', { class: 'muted', style: 'margin-bottom:14px;' }, 'يجب ألا تقل كلمة المرور الجديدة عن 8 خانات'),
-    el('div', { class: 'form-grid' },
-      el('label', {}, 'كلمة المرور الحالية', currentPwdInput),
-      el('div', {}),
-      el('label', {}, 'كلمة المرور الجديدة', newPwdInput),
-      el('label', {}, 'تأكيد كلمة المرور الجديدة', confirmPwdInput)
-    ),
-    el('div', { class: 'form-actions' }, savePwdBtn)
-  );
+  const isSupervisor = me && me.role === 'supervisor';
 
-  pwdForm.addEventListener('submit', async event => {
+  const pwdForm = isSupervisor
+    ? el('div', { class: 'card', style: 'padding: 16px; border-right: 4px solid #0284c7; background: #f8fafc;' },
+        el('h2', { style: 'margin-top:0; font-size:16px;' }, '🔐 بيانات الحساب والأمان'),
+        el('p', { class: 'muted', style: 'margin:0;' }, 'تغيير كلمة المرور وإدارة الحسابات مخصصة حصرياً للمدير العام. في حال رغبتكم بتحديث كلمة المرور، يرجى مراجعة إدارة المركز.')
+      )
+    : el('form', { class: 'card' },
+        el('h2', { style: 'margin-top:0; font-size:18px;' }, '🔐 تغيير كلمة المرور'),
+        el('p', { class: 'muted', style: 'margin-bottom:14px;' }, 'يجب ألا تقل كلمة المرور الجديدة عن 8 خانات'),
+        el('div', { class: 'form-grid' },
+          el('label', {}, 'كلمة المرور الحالية', currentPwdInput),
+          el('div', {}),
+          el('label', {}, 'كلمة المرور الجديدة', newPwdInput),
+          el('label', {}, 'تأكيد كلمة المرور الجديدة', confirmPwdInput)
+        ),
+        el('div', { class: 'form-actions' }, savePwdBtn)
+      );
+
+  if (!isSupervisor) pwdForm.addEventListener('submit', async event => {
     event.preventDefault();
     const currentPassword = currentPwdInput.value;
     const newPassword = newPwdInput.value;
@@ -272,7 +279,6 @@ export async function render(container, api) {
           if (p.attendance) activeTags.push('الحضور');
           if (p.daily_evaluation) activeTags.push('تقييم يومي');
           if (p.monthly_evaluation) activeTags.push('تقييم شهري');
-          if (p.finance) activeTags.push('المالية');
 
           if (activeTags.length) {
             activeTags.forEach(tag => {

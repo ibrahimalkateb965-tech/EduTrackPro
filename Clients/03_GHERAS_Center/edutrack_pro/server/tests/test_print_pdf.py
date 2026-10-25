@@ -122,6 +122,7 @@ def test_pdf_rejects_invalid_token(client, db):
 
 def test_pdf_enforces_the_template_permission(client, db, manager):
     data = _seed_basic_data(db)
+    # Supervisor with students=True, finance=False
     client.post(
         "/api/v1/users",
         json={
@@ -133,9 +134,31 @@ def test_pdf_enforces_the_template_permission(client, db, manager):
         headers=manager,
     )
     sup = login(client, "sup_pdf_nofin", "Password123!")
-    res = client.post(f"/api/v1/print/pdf/receipt?payment={data['payment_id']}", headers=sup)
-    assert res.status_code == 403
-    assert res.json()["error"]["message"] == "طباعة سند القبض تتطلب صلاحية المالية"
+
+    # 1. Financial admin_report PDF is forbidden for supervisor without finance permission
+    res_admin = client.post("/api/v1/print/pdf/admin_report?from=2026-09-01&to=2026-09-30", headers=sup)
+    assert res_admin.status_code == 403
+    assert res_admin.json()["error"]["message"] == "طباعة التقرير الإداري تتطلب صلاحية المالية"
+
+    # 2. Receipt PDF IS ALLOWED for supervisor with students permission (decoupled)
+    res_receipt = client.post(f"/api/v1/print/pdf/receipt?payment={data['payment_id']}", headers=sup)
+    assert res_receipt.status_code == 200
+
+    # 3. Supervisor without students AND without finance permission is forbidden from receipt PDF
+    client.post(
+        "/api/v1/users",
+        json={
+            "username": "sup_pdf_nostudents_nofin",
+            "password": "Password123!",
+            "role": "supervisor",
+            "permissions": {"students": False, "attendance": True, "finance": False},
+        },
+        headers=manager,
+    )
+    sup_nostudents = login(client, "sup_pdf_nostudents_nofin", "Password123!")
+    res_blocked = client.post(f"/api/v1/print/pdf/receipt?payment={data['payment_id']}", headers=sup_nostudents)
+    assert res_blocked.status_code == 403
+    assert res_blocked.json()["error"]["message"] == "طباعة سند القبض تتطلب صلاحية إدارة الطلاب أو المالية"
 
 
 def test_pdf_passes_through_not_found(client, db, manager):

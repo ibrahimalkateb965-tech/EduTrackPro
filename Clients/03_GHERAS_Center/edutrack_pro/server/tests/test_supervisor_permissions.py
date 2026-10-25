@@ -276,17 +276,20 @@ def test_supervisor_finance_guard_strict(client, manager):
     )
     sup_headers = login(client, "sup_nofinance", "Password123!")
 
-    # 403 on financial CRUD resources
-    assert client.get("/api/v1/payments", headers=sup_headers).status_code == 403
+    # 403 on general financial CRUD resources
     assert client.get("/api/v1/expenses", headers=sup_headers).status_code == 403
     assert client.get("/api/v1/ledger-accounts", headers=sup_headers).status_code == 403
     assert client.get("/api/v1/payroll-runs", headers=sup_headers).status_code == 403
 
+    # Decoupled student fee collection: read allowed, delete forbidden (403)
+    assert client.get("/api/v1/payments", headers=sup_headers).status_code == 200
+    assert client.delete("/api/v1/payments/00000000-0000-0000-0000-000000000001", headers=sup_headers).status_code == 403
+
     # 403 on financial report
     assert client.get("/api/v1/reports/finance", headers=sup_headers).status_code == 403
 
-    # 403 on financial print endpoints
-    assert client.get("/api/v1/print/receipt?payment_id=00000000-0000-0000-0000-000000000001", headers=sup_headers).status_code == 403
+    # Receipt printing is decoupled (allowed for supervisor with students permission; 404 for missing record, not 403)
+    assert client.get("/api/v1/print/receipt?payment_id=00000000-0000-0000-0000-000000000001", headers=sup_headers).status_code == 404
     assert client.get("/api/v1/print/student-receipt/00000000-0000-0000-0000-000000000001", headers=sup_headers).status_code == 403
     assert client.get("/api/v1/print/admin-report?from=2026-09-01&to=2026-09-30", headers=sup_headers).status_code == 403
     assert client.get("/api/v1/print/monthly-report?month=2026-09", headers=sup_headers).status_code == 403
@@ -386,16 +389,20 @@ def test_manager_patches_supervisor_permissions(client, manager):
     user_id = res.json()["id"]
 
     sup_headers = login(client, "sup_promote", "Password123!")
-    assert client.get("/api/v1/payments", headers=sup_headers).status_code == 403
+    # Under decoupled design, supervisor with students=True can read payments (200)
+    assert client.get("/api/v1/payments", headers=sup_headers).status_code == 200
+    # But general finance like expenses is strictly 403
+    assert client.get("/api/v1/expenses", headers=sup_headers).status_code == 403
 
-    # Manager promotes supervisor to have finance
+    # Manager tries to grant finance; the server forces it off for supervisors
     patch_res = client.patch(
         f"/api/v1/users/{user_id}",
         json={"permissions": {"students": True, "finance": True}},
         headers=manager,
     )
     assert patch_res.status_code == 200, patch_res.text
-    assert patch_res.json()["permissions"]["finance"] is True
+    assert patch_res.json()["permissions"]["finance"] is False
 
-    # Now supervisor can query payments
+    # Payments read is 200, but general finance like expenses remains strictly 403 (role-based quarantine)
     assert client.get("/api/v1/payments", headers=sup_headers).status_code == 200
+    assert client.get("/api/v1/expenses", headers=sup_headers).status_code == 403
