@@ -1,4 +1,4 @@
-import { el, toast, modal, createDatePicker } from '../ui.js';
+import { el, toast, modal, createDatePicker, fmtSAR, fmtDate } from '../ui.js';
 import { openCreateStudentModal, openCreateGuardianModal } from '../account_modals.js';
 
 const DEFAULT_GROUPS = ['الصباح', 'المساء', 'الإنجليزي', 'القدرات'];
@@ -312,83 +312,431 @@ function studentRow(student, api) {
   );
 }
 
-function openQuickPaymentModal(api, student) {
+async function openQuickPaymentModal(api, student) {
+  const container = el('div', { style: 'min-width:320px; max-width:640px;' },
+    el('div', { style: 'text-align:center; padding:36px 16px; color:#64748b; font-size:14px;' },
+      el('div', { style: 'display:inline-block; margin-bottom:10px; font-size:26px;' }, '⏳'),
+      el('div', { style: 'font-weight:600;' }, 'جاري تحميل بيانات الرسوم والأقساط للطالب...')
+    )
+  );
+
+  const dialog = modal(`سند قبض وتحصيل الرسوم — ${student.name}`, container);
+
+  let profile = null;
+  try {
+    profile = await api.fetch('reports/student/' + student.id);
+  } catch (err) {
+    container.replaceChildren(
+      el('div', { style: 'padding:16px; background:#fee2e2; border-radius:8px; color:#991b1b; font-size:13px; text-align:center;' },
+        'تعذر تحميل بيانات الرسوم: ' + (err.message || 'خطأ في الاتصال'),
+        el('div', { style: 'margin-top:12px;' },
+          el('button', { class: 'button', type: 'button', onclick: dialog.close }, 'إغلاق')
+        )
+      )
+    );
+    return;
+  }
+
   const todayStr = new Date().toISOString().slice(0, 10);
-  const amountInput = el('input', {
+  const stData = profile.student || student;
+  const balance = profile.balance || { total_planned: 0, total_paid: 0, outstanding: 0 };
+  const tuitionPlanned = Number(balance.total_planned || 0);
+  const tuitionPaid = Number(balance.total_paid || 0);
+  const tuitionOutstanding = Math.max(0, Number(balance.outstanding !== undefined ? balance.outstanding : (tuitionPlanned - tuitionPaid)));
+
+  const hasBus = Boolean(stData.has_bus_subscription);
+  const busFee = hasBus ? Number(stData.bus_fee || 0) : 0;
+  const busPaid = hasBus ? Number(stData.bus_paid || 0) : 0;
+  const busRemaining = hasBus ? Math.max(0, Number(stData.bus_remaining !== undefined ? stData.bus_remaining : (busFee - busPaid))) : 0;
+
+  const totalOutstanding = tuitionOutstanding + busRemaining;
+
+  const rawInstallments = profile.installments || [];
+  const installments = rawInstallments.map(inst => {
+    const amt = Number(inst.amount || 0);
+    const paid = Number(inst.paid_amount || 0);
+    const rem = Math.max(0, amt - paid);
+    return { ...inst, amountNum: amt, paidNum: paid, remainingNum: rem };
+  });
+  const unpaidInstallments = installments.filter(inst => inst.remainingNum > 0);
+
+  // 1. Summary Cards
+  const summaryGrid = el('div', {
+    style: 'display:grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap:10px; margin-bottom:14px;'
+  },
+    // Tuition Card
+    el('div', {
+      style: `padding:10px 12px; border-radius:8px; border:1px solid ${tuitionOutstanding > 0 ? '#fed7aa' : '#bbf7d0'}; background:${tuitionOutstanding > 0 ? '#fff7ed' : '#f0fdf4'};`
+    },
+      el('div', { style: 'font-size:12px; font-weight:700; color:#475569; display:flex; justify-content:space-between; align-items:center;' },
+        el('span', {}, '🎓 الرسوم الدراسية'),
+        tuitionOutstanding <= 0 ? el('span', { style: 'color:#15803d; font-size:11px;' }, '✓ مسدد بالكامل') : null
+      ),
+      el('div', { style: 'font-size:18px; font-weight:800; color:' + (tuitionOutstanding > 0 ? '#c2410c' : '#15803d') + '; margin:4px 0;' },
+        fmtSAR(tuitionOutstanding)
+      ),
+      el('div', { style: 'font-size:11px; color:#64748b;' },
+        `المسدد: ${fmtSAR(tuitionPaid)} / الإجمالي: ${fmtSAR(tuitionPlanned)}`
+      )
+    ),
+
+    // Bus Card
+    el('div', {
+      style: `padding:10px 12px; border-radius:8px; border:1px solid ${hasBus ? (busRemaining > 0 ? '#fed7aa' : '#bbf7d0') : '#e2e8f0'}; background:${hasBus ? (busRemaining > 0 ? '#fff7ed' : '#f0fdf4') : '#f8fafc'};`
+    },
+      el('div', { style: 'font-size:12px; font-weight:700; color:#475569; display:flex; justify-content:space-between; align-items:center;' },
+        el('span', {}, '🚌 رسوم الباص والنقل'),
+        hasBus ? (busRemaining <= 0 ? el('span', { style: 'color:#15803d; font-size:11px;' }, '✓ مسدد بالكامل') : null) : el('span', { style: 'color:#94a3b8; font-size:11px;' }, 'غير مشترك')
+      ),
+      el('div', { style: 'font-size:18px; font-weight:800; color:' + (hasBus ? (busRemaining > 0 ? '#c2410c' : '#15803d') : '#94a3b8') + '; margin:4px 0;' },
+        hasBus ? fmtSAR(busRemaining) : '0.00 ر.س'
+      ),
+      el('div', { style: 'font-size:11px; color:#64748b;' },
+        hasBus ? `المسدد: ${fmtSAR(busPaid)} / الإجمالي: ${fmtSAR(busFee)}` : 'الطالب غير مشترك بخدمة النقل'
+      )
+    ),
+
+    // Total Remaining Card
+    el('div', {
+      style: `padding:10px 12px; border-radius:8px; border:1px solid ${totalOutstanding > 0 ? '#fca5a5' : '#bbf7d0'}; background:${totalOutstanding > 0 ? '#fef2f2' : '#f0fdf4'};`
+    },
+      el('div', { style: 'font-size:12px; font-weight:700; color:#475569;' }, '💰 إجمالي المتبقي الكلي'),
+      el('div', { style: 'font-size:18px; font-weight:800; color:' + (totalOutstanding > 0 ? '#b91c1c' : '#15803d') + '; margin:4px 0;' },
+        fmtSAR(totalOutstanding)
+      ),
+      el('div', { style: 'font-size:11px; color:#64748b;' },
+        totalOutstanding > 0 ? 'مجموع المتبقي للدراسة والباص' : 'تم سداد جميع الرسوم المقررة'
+      )
+    )
+  );
+
+  // 2. Installments Table
+  let installmentsSection = null;
+  if (installments.length > 0) {
+    const tableRows = installments.map(inst => {
+      const isPaid = inst.remainingNum <= 0;
+      const isPartial = inst.paidNum > 0 && inst.remainingNum > 0;
+      const badgeStyle = isPaid
+        ? 'background:#dcfce7; color:#15803d;'
+        : (isPartial ? 'background:#fef3c7; color:#b45309;' : 'background:#fee2e2; color:#b91c1c;');
+      const statusText = isPaid ? 'مسدد' : (isPartial ? 'سداد جزئي' : 'مستحق');
+
+      const selectBtn = !isPaid ? el('button', {
+        class: 'button button-outline',
+        type: 'button',
+        style: 'padding:2px 8px; font-size:11px; font-weight:600; color:#047857; border-color:#10b981; background:#ffffff;',
+        onclick: () => selectInstallment(inst)
+      }, 'سداد هذا القسط') : el('span', { style: 'color:#94a3b8; font-size:11px;' }, '✓');
+
+      return el('tr', { style: 'border-bottom:1px solid #f1f5f9; font-size:12px;' },
+        el('td', { style: 'padding:6px 8px; font-weight:600;' }, `القسط ${inst.seq_no}`),
+        el('td', { style: 'padding:6px 8px; color:#64748b;' }, fmtDate(inst.due_date)),
+        el('td', { style: 'padding:6px 8px;' }, fmtSAR(inst.amountNum)),
+        el('td', { style: 'padding:6px 8px; font-weight:700; color:' + (inst.remainingNum > 0 ? '#c2410c' : '#15803d') + ';' }, fmtSAR(inst.remainingNum)),
+        el('td', { style: 'padding:6px 8px;' },
+          el('span', { style: `display:inline-block; padding:2px 6px; border-radius:4px; font-size:10px; font-weight:700; ${badgeStyle}` }, statusText)
+        ),
+        el('td', { style: 'padding:6px 8px; text-align:center;' }, selectBtn)
+      );
+    });
+
+    installmentsSection = el('div', {
+      style: 'margin-bottom:14px; border:1px solid #e2e8f0; border-radius:8px; overflow:hidden; background:#ffffff;'
+    },
+      el('div', { style: 'background:#f8fafc; padding:6px 12px; font-size:12px; font-weight:700; color:#334155; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center;' },
+        el('span', {}, '📋 جدول الأقساط الدراسية المقررة'),
+        el('span', { style: 'font-size:11px; font-weight:500; color:#64748b;' }, `عدد الأقساط: ${installments.length}`)
+      ),
+      el('div', { style: 'max-height:130px; overflow-y:auto;' },
+        el('table', { style: 'width:100%; text-align:right; border-collapse:collapse;' },
+          el('thead', { style: 'background:#f1f5f9; font-size:11px; color:#475569;' },
+            el('tr', {},
+              el('th', { style: 'padding:6px 8px;' }, 'القسط'),
+              el('th', { style: 'padding:6px 8px;' }, 'الاستحقاق'),
+              el('th', { style: 'padding:6px 8px;' }, 'المبلغ'),
+              el('th', { style: 'padding:6px 8px;' }, 'المتبقي'),
+              el('th', { style: 'padding:6px 8px;' }, 'الحالة'),
+              el('th', { style: 'padding:6px 8px; text-align:center;' }, 'إجراء')
+            )
+          ),
+          el('tbody', {}, ...tableRows)
+        )
+      )
+    );
+  }
+
+  // 3. Form Controls
+  const purposeOptions = [
+    el('option', { value: 'tuition' }, '🎓 سداد رسوم دراسية / أقساط')
+  ];
+  if (hasBus) {
+    purposeOptions.push(el('option', { value: 'bus' }, `🚌 سداد رسوم الباص والنقل (متبقي: ${fmtSAR(busRemaining)})`));
+    purposeOptions.push(el('option', { value: 'combined' }, '🔄 سداد مشترك (رسوم دراسية + باص)'));
+  }
+
+  const purposeSelect = el('select', {
+    style: 'width:100%; padding:8px 10px; border-radius:8px; border:1px solid #cbd5e1; font-weight:600; background:#fff; font-size:13px;'
+  }, ...purposeOptions);
+
+  const installmentSelect = el('select', {
+    style: 'width:100%; padding:8px 10px; border-radius:8px; border:1px solid #cbd5e1; font-size:13px; background:#fff;'
+  },
+    el('option', { value: '' }, 'توزيع تلقائي على أقرب قسط مستحق'),
+    ...unpaidInstallments.map(inst =>
+      el('option', { value: inst.id }, `القسط ${inst.seq_no} — استحقاق ${fmtDate(inst.due_date)} (متبقي: ${fmtSAR(inst.remainingNum)})`)
+    )
+  );
+
+  const installmentRow = el('div', { style: 'margin-bottom:10px;' },
+    el('label', { style: 'display:block; font-size:12px; font-weight:700; margin-bottom:4px; color:#334155;' }, 'تحديد القسط المستهدف'),
+    installmentSelect
+  );
+
+  // Single Amount Input (Tuition or Bus)
+  const singleAmountLabel = el('label', { style: 'display:block; font-size:12px; font-weight:700; margin-bottom:4px; color:#334155;' }, 'المبلغ المسدد (ر.س) *');
+  const singleAmountInput = el('input', {
     type: 'number',
     step: '0.01',
     min: '0.01',
     placeholder: 'مثال: 500',
     required: 'required',
-    style: 'width:100%; padding:8px; border-radius:8px; border:1px solid #cbd5e1;'
+    style: 'width:100%; padding:8px; border-radius:8px; border:1px solid #cbd5e1; font-size:14px; font-weight:600;'
   });
+  const singleAmountRow = el('div', { style: 'margin-bottom:10px;' },
+    singleAmountLabel,
+    singleAmountInput
+  );
+
+  // Combined Amount Inputs
+  const combinedTuitionInput = el('input', {
+    type: 'number',
+    step: '0.01',
+    min: '0.00',
+    placeholder: '0.00',
+    style: 'width:100%; padding:8px; border-radius:8px; border:1px solid #cbd5e1; font-size:13px; font-weight:600;'
+  });
+  const combinedBusInput = el('input', {
+    type: 'number',
+    step: '0.01',
+    min: '0.00',
+    placeholder: '0.00',
+    style: 'width:100%; padding:8px; border-radius:8px; border:1px solid #cbd5e1; font-size:13px; font-weight:600;'
+  });
+  const combinedTotalPreview = el('div', {
+    style: 'padding:8px 12px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; font-weight:700; color:#047857; font-size:14px;'
+  }, '0.00 ر.س');
+
+  const combinedRow = el('div', { style: 'display:none; margin-bottom:10px; background:#f8fafc; padding:10px; border-radius:8px; border:1px solid #e2e8f0;' },
+    el('div', { style: 'display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-bottom:8px;' },
+      el('div', {},
+        el('label', { style: 'display:block; font-size:11px; font-weight:700; margin-bottom:4px; color:#334155;' }, 'مبلغ الرسوم الدراسية (ر.س)'),
+        combinedTuitionInput
+      ),
+      el('div', {},
+        el('label', { style: 'display:block; font-size:11px; font-weight:700; margin-bottom:4px; color:#334155;' }, 'مبلغ رسوم الباص (ر.س)'),
+        combinedBusInput
+      )
+    ),
+    el('div', { style: 'display:flex; justify-content:space-between; align-items:center;' },
+      el('span', { style: 'font-size:12px; font-weight:700; color:#475569;' }, 'الإجمالي الكلي للدفعة:'),
+      combinedTotalPreview
+    )
+  );
+
   const methodSelect = el('select', {
-    style: 'width:100%; padding:8px; border-radius:8px; border:1px solid #cbd5e1;'
+    style: 'width:100%; padding:8px 10px; border-radius:8px; border:1px solid #cbd5e1; font-size:13px; background:#fff;'
   },
     el('option', { value: 'كاش' }, 'كاش'),
     el('option', { value: 'مدى' }, 'مدى / بطاقة'),
     el('option', { value: 'تحويل بنكي' }, 'تحويل بنكي')
   );
+
   const dateInput = el('input', {
     type: 'date',
     value: todayStr,
-    style: 'width:100%; padding:8px; border-radius:8px; border:1px solid #cbd5e1;'
+    style: 'width:100%; padding:8px; border-radius:8px; border:1px solid #cbd5e1; font-size:13px;'
   });
+
   const noteInput = el('input', {
     type: 'text',
     value: 'سداد رسوم دراسية',
-    style: 'width:100%; padding:8px; border-radius:8px; border:1px solid #cbd5e1;'
+    style: 'width:100%; padding:8px; border-radius:8px; border:1px solid #cbd5e1; font-size:13px;'
   });
 
   const saveBtn = el('button', {
     class: 'button',
     type: 'button',
-    style: 'width:100%; padding:10px; font-weight:700; margin-top:12px; background:#047857;'
+    style: 'width:100%; padding:10px; font-weight:700; margin-top:14px; background:#047857; font-size:14px;'
   }, '💳 تسجيل الدفعة وإصدار سند القبض');
 
+  // Form State Synchronization Logic
+  function updateCombinedTotal() {
+    const t = parseFloat(combinedTuitionInput.value) || 0;
+    const b = parseFloat(combinedBusInput.value) || 0;
+    const total = t + b;
+    combinedTotalPreview.textContent = fmtSAR(total);
+  }
+
+  combinedTuitionInput.addEventListener('input', updateCombinedTotal);
+  combinedBusInput.addEventListener('input', updateCombinedTotal);
+
+  function applyPurposeUI() {
+    const purpose = purposeSelect.value;
+    if (purpose === 'tuition') {
+      installmentRow.style.display = unpaidInstallments.length > 0 ? 'block' : 'none';
+      singleAmountRow.style.display = 'block';
+      combinedRow.style.display = 'none';
+      singleAmountLabel.textContent = 'المبلغ المسدد للدراسة (ر.س) *';
+
+      // Default amount
+      if (installmentSelect.value) {
+        const found = unpaidInstallments.find(x => x.id === installmentSelect.value);
+        if (found) singleAmountInput.value = found.remainingNum > 0 ? found.remainingNum.toFixed(2) : '';
+      } else if (unpaidInstallments.length > 0) {
+        singleAmountInput.value = unpaidInstallments[0].remainingNum.toFixed(2);
+      } else if (tuitionOutstanding > 0) {
+        singleAmountInput.value = tuitionOutstanding.toFixed(2);
+      } else {
+        singleAmountInput.value = '';
+      }
+      noteInput.value = 'سداد رسوم دراسية';
+    } else if (purpose === 'bus') {
+      installmentRow.style.display = 'none';
+      singleAmountRow.style.display = 'block';
+      combinedRow.style.display = 'none';
+      singleAmountLabel.textContent = 'المبلغ المسدد للباص والنقل (ر.س) *';
+      singleAmountInput.value = busRemaining > 0 ? busRemaining.toFixed(2) : '';
+      noteInput.value = 'سداد رسوم اشتراك الباص';
+    } else if (purpose === 'combined') {
+      installmentRow.style.display = unpaidInstallments.length > 0 ? 'block' : 'none';
+      singleAmountRow.style.display = 'none';
+      combinedRow.style.display = 'block';
+
+      // Prefill combined values
+      const defaultTuition = unpaidInstallments.length > 0 ? unpaidInstallments[0].remainingNum : tuitionOutstanding;
+      combinedTuitionInput.value = defaultTuition > 0 ? defaultTuition.toFixed(2) : '0.00';
+      combinedBusInput.value = busRemaining > 0 ? busRemaining.toFixed(2) : '0.00';
+      updateCombinedTotal();
+      noteInput.value = 'سداد رسوم دراسية واشتراك باص';
+    }
+  }
+
+  purposeSelect.addEventListener('change', applyPurposeUI);
+
+  installmentSelect.addEventListener('change', () => {
+    if (purposeSelect.value === 'tuition' && installmentSelect.value) {
+      const found = unpaidInstallments.find(x => x.id === installmentSelect.value);
+      if (found) {
+        singleAmountInput.value = found.remainingNum.toFixed(2);
+        noteInput.value = `سداد القسط ${found.seq_no} — رسوم دراسية`;
+      }
+    }
+  });
+
+  function selectInstallment(inst) {
+    purposeSelect.value = 'tuition';
+    applyPurposeUI();
+    installmentSelect.value = inst.id;
+    singleAmountInput.value = inst.remainingNum.toFixed(2);
+    noteInput.value = `سداد القسط ${inst.seq_no} — رسوم دراسية`;
+    singleAmountInput.focus();
+  }
+
+  // Initial trigger
+  if (tuitionOutstanding <= 0 && busRemaining > 0 && hasBus) {
+    purposeSelect.value = 'bus';
+  }
+  applyPurposeUI();
+
+  // Content assemble
   const content = el('div', {},
-    el('p', { style: 'font-size:13px; color:#64748b; margin-top:0;' },
-      'تحصيل رسوم وإصدار سند قبض للطالب: ',
-      el('strong', {}, student.name || '—')
-    ),
-    el('div', { style: 'margin-bottom:8px;' },
-      el('label', { style: 'display:block; font-size:12px; font-weight:700; margin-bottom:4px;' }, 'المبلغ المسدد (ر.س) *'),
-      amountInput
-    ),
-    el('div', { style: 'margin-bottom:8px;' },
-      el('label', { style: 'display:block; font-size:12px; font-weight:700; margin-bottom:4px;' }, 'طريقة السداد'),
-      methodSelect
-    ),
-    el('div', { style: 'margin-bottom:8px;' },
-      el('label', { style: 'display:block; font-size:12px; font-weight:700; margin-bottom:4px;' }, 'تاريخ السداد'),
-      dateInput
-    ),
-    el('div', { style: 'margin-bottom:8px;' },
-      el('label', { style: 'display:block; font-size:12px; font-weight:700; margin-bottom:4px;' }, 'البيان / ملاحظات'),
-      noteInput
+    summaryGrid,
+    installmentsSection,
+    el('div', { style: 'background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:12px; margin-bottom:12px;' },
+      el('div', { style: 'margin-bottom:10px;' },
+        el('label', { style: 'display:block; font-size:12px; font-weight:700; margin-bottom:4px; color:#334155;' }, 'تحديد وجهة السداد'),
+        purposeSelect
+      ),
+      installmentRow,
+      singleAmountRow,
+      combinedRow,
+      el('div', { style: 'display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-bottom:10px;' },
+        el('div', {},
+          el('label', { style: 'display:block; font-size:12px; font-weight:700; margin-bottom:4px; color:#334155;' }, 'طريقة السداد'),
+          methodSelect
+        ),
+        el('div', {},
+          el('label', { style: 'display:block; font-size:12px; font-weight:700; margin-bottom:4px; color:#334155;' }, 'تاريخ السداد'),
+          dateInput
+        )
+      ),
+      el('div', { style: 'margin-bottom:4px;' },
+        el('label', { style: 'display:block; font-size:12px; font-weight:700; margin-bottom:4px; color:#334155;' }, 'البيان / ملاحظات السند'),
+        noteInput
+      )
     ),
     saveBtn
   );
 
-  const dialog = modal(`سند قبض — ${student.name}`, content);
+  container.replaceChildren(content);
 
+  // Submit Handler
   saveBtn.onclick = async () => {
-    const val = parseFloat(amountInput.value);
-    if (!val || val <= 0) {
-      toast('يرجى إدخال مبلغ صحيح', true);
+    const purpose = purposeSelect.value;
+    let totalVal = 0;
+    let busVal = 0;
+    let targetInstallmentId = null;
+
+    if (purpose === 'tuition') {
+      totalVal = parseFloat(singleAmountInput.value) || 0;
+      busVal = 0;
+      targetInstallmentId = installmentSelect.value || null;
+    } else if (purpose === 'bus') {
+      totalVal = parseFloat(singleAmountInput.value) || 0;
+      busVal = totalVal;
+      targetInstallmentId = null;
+    } else if (purpose === 'combined') {
+      const t = parseFloat(combinedTuitionInput.value) || 0;
+      const b = parseFloat(combinedBusInput.value) || 0;
+      totalVal = t + b;
+      busVal = b;
+      targetInstallmentId = installmentSelect.value || null;
+    }
+
+    if (totalVal <= 0) {
+      toast('يرجى إدخال مبلغ سداد صحيح أكبر من الصفر', true);
       return;
     }
+
+    if (busVal > 0) {
+      if (!hasBus) {
+        toast('الطالب غير مشترك في خدمة الباص', true);
+        return;
+      }
+      if (busVal > (busRemaining + 0.01)) {
+        toast(`المبلغ المسدد للباص (${fmtSAR(busVal)}) أكبر من المتبقي (${fmtSAR(busRemaining)})`, true);
+        return;
+      }
+    }
+
     saveBtn.disabled = true;
     saveBtn.textContent = 'جاري تسجيل الدفعة وإصدار السند...';
     const printWindow = window.open('about:blank', '_blank');
+
     try {
-      const res = await api.post('payments', {
+      const payload = {
         student_id: student.id,
-        amount: val,
+        amount: totalVal,
+        bus_amount: busVal,
         method: methodSelect.value,
         paid_on: dateInput.value || todayStr,
         note: noteInput.value.trim() || 'سداد رسوم'
-      });
+      };
+      if (targetInstallmentId) {
+        payload.installment_id = targetInstallmentId;
+      }
+
+      const res = await api.post('payments', payload);
       toast('تم تسجيل الدفعة بنجاح! جاري فتح سند القبض...');
       if (dialog && dialog.close) dialog.close();
       const paymentId = res.id;

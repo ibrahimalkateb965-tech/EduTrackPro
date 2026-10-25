@@ -533,6 +533,17 @@ def _create_hook(conn, repo, table: str, data: dict, actor: dict) -> tuple[dict,
     elif table == "fee_plans":
         row["installments"] = generate_installments(conn, row)
     elif table == "payments":
+        bus_amount = _money(row.get("bus_amount") or 0)
+        if bus_amount < 0 or bus_amount > _money(row["amount"]):
+            raise ApiError(400, "validation_error", "مبلغ سداد الباص غير صالح أو يتجاوز المبلغ الإجمالي")
+        if bus_amount > 0:
+            st = conn.execute("SELECT bus_fee, bus_paid, has_bus_subscription FROM students WHERE id = %s FOR UPDATE", (row["student_id"],)).fetchone()
+            if not st or not st.get("has_bus_subscription"):
+                raise ApiError(400, "validation_error", "الطالب غير مشترك في خدمة الباص")
+            new_bus_paid = _money(st["bus_paid"]) + bus_amount
+            if new_bus_paid > _money(st["bus_fee"]):
+                raise ApiError(400, "validation_error", "المبلغ المسدد للباص يتجاوز المتبقي من رسوم الباص")
+            conn.execute("UPDATE students SET bus_paid = %s WHERE id = %s", (new_bus_paid, row["student_id"]))
         touched = allocate_payment(conn, row, row.get("installment_id"))
         row["installments_touched"] = touched
         row["receipt"] = issue_receipt(conn, row["id"], issued_by=actor.get("id"))

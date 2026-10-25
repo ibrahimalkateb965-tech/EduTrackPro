@@ -140,7 +140,8 @@ def student(student_id: str, conn=Depends(get_conn), user: dict = _ROLES) -> dic
     has_finance = user["role"] in {"manager", "supervisor"}
     balance=conn.execute("SELECT total_planned,total_paid,balance outstanding FROM v_student_balance WHERE student_id=%s",(student_id,)).fetchone() if has_finance else None
     payments=conn.execute("SELECT * FROM payments WHERE student_id=%s AND deleted_at IS NULL ORDER BY paid_on DESC",(student_id,)).fetchall() if has_finance else []
-    return {"student":row_to_json(item),"attendance_summary":row_to_json(counts),"evaluations":[row_to_json(x) for x in conn.execute("SELECT * FROM evaluations WHERE student_id=%s AND deleted_at IS NULL ORDER BY date DESC",(student_id,)).fetchall()],"skill_progress":[row_to_json(x) for x in conn.execute("SELECT * FROM skill_progress WHERE student_id=%s AND deleted_at IS NULL ORDER BY date DESC",(student_id,)).fetchall()],"balance":row_to_json(balance) if balance else {"total_planned":0,"total_paid":0,"outstanding":0},"payments":[row_to_json(x) for x in payments]}
+    installments=conn.execute("SELECT i.* FROM installments i JOIN fee_plans f ON f.id=i.fee_plan_id WHERE f.student_id=%s AND f.deleted_at IS NULL AND i.deleted_at IS NULL ORDER BY i.seq_no, i.due_date",(student_id,)).fetchall() if has_finance else []
+    return {"student":row_to_json(item),"attendance_summary":row_to_json(counts),"evaluations":[row_to_json(x) for x in conn.execute("SELECT * FROM evaluations WHERE student_id=%s AND deleted_at IS NULL ORDER BY date DESC",(student_id,)).fetchall()],"skill_progress":[row_to_json(x) for x in conn.execute("SELECT * FROM skill_progress WHERE student_id=%s AND deleted_at IS NULL ORDER BY date DESC",(student_id,)).fetchall()],"balance":row_to_json(balance) if balance else {"total_planned":0,"total_paid":0,"outstanding":0},"payments":[row_to_json(x) for x in payments],"installments":[row_to_json(x) for x in installments]}
 
 
 @router.get("/audit-log")

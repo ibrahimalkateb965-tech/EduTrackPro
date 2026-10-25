@@ -289,3 +289,29 @@ def test_print_engine_targets_web_on_desktop_and_native_on_mobile():
     engine = (WEB_ROOT / "print" / "print_engine.js").read_text(encoding="utf-8")
     assert "https://wa.me/" in engine
 
+
+def test_direct_bus_payment_and_report_installments(client, db, manager):
+    res = _register(
+        client, manager, registration_fee=600, initial_payment_amount=200, **PLAN_TERMS,
+        has_bus_subscription=True, bus_fee=400, bus_paid=100,
+    )
+    assert res.status_code == 200, res.text
+    sid = res.json()["id"]
+
+    # Check student report includes installments
+    rep = client.get(f"/api/v1/reports/student/{sid}", headers=manager).json()
+    assert "installments" in rep
+    assert len(rep["installments"]) > 0
+
+    # Record bus payment directly via POST /payments
+    pay_res = client.post(
+        "/api/v1/payments",
+        json={"student_id": sid, "amount": 150, "bus_amount": 150, "method": "كاش", "paid_on": "2026-10-25"},
+        headers=manager,
+    )
+    assert pay_res.status_code == 200, pay_res.text
+    st = client.get(f"/api/v1/students/{sid}", headers=manager).json()
+    assert float(st["bus_paid"]) == 250.0
+    assert float(st["bus_remaining"]) == 150.0
+
+
