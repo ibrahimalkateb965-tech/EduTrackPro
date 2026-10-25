@@ -11,8 +11,8 @@
 > **Target Client**: `Clients/03_GHERAS_Center` (EduTrack Pro — Smart Educational Center)  
 > **Master Orchestrator**: `Claude Code CLI` (Opus Max / Sonnet 5)  
 > **Handoff Source**: `Antigravity IDE` (Interactive Cockpit & Visual Inspector)  
-> **Timestamp**: 2026-09-16T12:55:00+03:00  
-> **Last updated:** 2026-10-16 20:45 (+03:00) — Claude Code CLI, session "REA adoption" (strategic-clear): REA MCP registered in Claude Code only; Brain SOP + fleet capability added (§23). HEAD `dc9c9ec` on `main` [ahead 1], push pending. Previous: session 22 `/learn` (§22).
+> **Timestamp**: 2026-10-25T23:35:00+03:00  
+> **Last updated:** 2026-10-25 23:35 (+03:00) — Antigravity IDE (Gemini 3.8 Flash High): APK Security Audit (REA) + 4 pre-release security hardenings completed & certified [APPROVED]. Clean Architecture Layers 1-4 synced. HEAD `a6288e7` on `main` [synced with origin].
 > **Repository scope:** `Autovemtech` is the umbrella repository for every Autovem pillar and project (clients, AI systems, apps, tools). Gheras/EduTrack is one active client, not the repository's scope.
 > **VCS:** git at workspace root, branch `main`.
 
@@ -1052,3 +1052,21 @@ All 6 blocking defects (K1–K6) identified in Claude Code CLI's audit report ha
 - **X2 (role guards)**: Restricted `PATCH /attendance/excuses/{id}` strictly to `guardian` role (`_GUARDIAN`); required `permissions.attendance` for supervisors on `POST /attendance/excuses`; added comprehensive 403 test assertions.
 - **X3 (absence notification on post-approval draft edit)**: In `server/edutrack_api/routers/attendance.py`, updated absence notification condition to `if not row["is_draft"] and status == "غائب"`, correctly detecting edits to already-approved rows and notifying the guardian (with `action_url` dedupe); added test assertion in `test_attendance_draft_approval.py`.
 - **Docs updated**: Appended audit text to `PLAN_AUDIT.md` and gate row to `GATE_STATUS.md`. Ready for Claude Code CLI S3-R1 re-audit and X4 baseline comparison.
+
+---
+
+## 28. Session 2026-10-25 — APK Security Audit (REA) & 4 Pre-Release Hardenings [APPROVED]
+
+- **APK Forensic Security Audit**: Analyzed `Clients/03_GHERAS_Center/edutrack_pro/gheras_edutrack_pro_debug.apk` (21.52 MB, SHA256 `0307cca1992bc1ca94643a9b8525cdc82dcb6ee714f688f098839ebdf99009d8`). Zero hardcoded secrets, zero leaked tokens/passwords, hardware-backed AES-256 encrypted session store, APK Signature Scheme v2/v3 verified. Audit report generated at `Clients/03_GHERAS_Center/edutrack_pro/docs/reports/SECURITY_AUDIT_APK.md`.
+- **4 Applied Security Hardenings**:
+  1. `build.gradle.kts`: Enabled R8 minification (`isMinifyEnabled = true`) for release builds and created comprehensive `proguard-rules.pro` covering Kotlinx Serialization, Room DB, Retrofit/DTOs, WorkManager, and AndroidX Security.
+  2. `backup_rules.xml` & `data_extraction_rules.xml`: Excluded Room database (`gheras_edutrack.db`) from cloud/device backups.
+  3. `AndroidManifest.xml`: Declared runtime permission `<uses-permission android:name="android.permission.POST_NOTIFICATIONS" />` for Android 13+ (API 33+).
+  4. `AuthInterceptor.kt`: Implemented host whitelist guard (`isKnownInternalHost`) restricting bearer token transmission to `gheras.autovem.tech` and local dev hosts.
+- **VCS**: Committed as `a6288e7` on `main`, pushed to `origin/main`. Working tree clean.
+
+### Next choices
+- **(a)** Milestone M5 (التقارير الشهرية وإحصائيات الطلاب - Monthly Reports & Dashboards): Design spec, backend endpoints, and mobile/web views.
+- **(b)** Milestone M6 (حضور وانصراف الكادر بالبصمة الجغرافية - Geofenced Staff Attendance): Geofencing verification, attendance punch API, and manager review.
+- **(c)** Build & test release APK (`gradlew assembleRelease`) with R8 and verify ProGuard mapping.
+
