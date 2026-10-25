@@ -99,6 +99,7 @@ When the user provides a brief or conversational prompt, immediately resolve and
 | **"iOS" / "TestFlight" / "build ipa"** | `REMOTE_IOS_DEV_PLAYBOOK.md` | Execute fast loop on Linux container; push to GitHub Actions `macos-15` for `.ipa`. |
 | **"مخطط" / "flowchart" / "architecture"** | `tools/flowchart_studio/` | Open studio via `open_flowchart_studio.bat`. Use valid Mermaid syntax and Dark Neon Candy palette. |
 | **"وكيل جديد" / "MCP" / "n8n"** | `.agents/skills/`, `tools/google_ads_mcp/` | Follow YAML frontmatter standard; ensure zero-leak stdio for FastMCP (`google-ads` server registered). |
+| **"لوكا" / "Loka" / "الخطاف 32" / "برمجة جراحية"** | `.agents/skills/loka-orchestrator/` (Hook 32) | تفعيل حوكمة Loka، التوجيه الذاتي (ACE/V10/V11/V12)، قفل SPEC.md، وتنفيذ التعديل الجراحي الأدنى. |
 
 ---
 
