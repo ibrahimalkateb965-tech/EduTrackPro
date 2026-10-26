@@ -43,7 +43,7 @@ function filterSidebarByPermissions(user) {
     if (route === 'finance' && (user.role === 'supervisor' || !perms.finance)) visible = false;
     if (route === 'staff' && user.role !== 'manager') visible = false;
     if (route === 'rooms' && !perms.students && !perms.attendance) visible = false;
-    if (route === 'reports' && user.role !== 'manager') visible = false;
+    if (route === 'reports' && user.role !== 'manager' && !perms.monthly_evaluation) visible = false;
     link.style.display = visible ? '' : 'none';
   });
 }
