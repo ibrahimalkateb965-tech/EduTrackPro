@@ -12,7 +12,7 @@
 > **Master Orchestrator**: `Claude Code CLI` (Opus Max / Sonnet 5)  
 > **Handoff Source**: `Antigravity IDE` (Interactive Cockpit & Visual Inspector)  
 > **Timestamp**: 2026-10-26T08:15:00+03:00  
-> **Last updated:** 2026-10-26 23:00 — Claude Code CLI, session 38. M6 fix order (B1, B2, M3) **[APPROVED]** (356/10, 0 new reds), uncommitted on `main` (HEAD `9844e1f`). Choices (a)-(c) in §37.  
+> **Last updated:** 2026-10-26 23:30 — Claude Code CLI, session 39. M6 Android review **CHANGES REQUESTED** (Android 233/2 known reds); fix order written, not dispatched. HEAD `8213884` = origin/main. Choices (a)-(c) in §38.  
 > **Previous update:** 2026-10-26 08:15 (+03:00) — Antigravity IDE (Gemini 3.8 Flash High): Milestone M5 Quality Gate Audit certified [APPROVED] by Claude Code CLI (Session 32, R11 patch commit `665e9a9` fast-forwarded and pushed to origin/main). GATE_STATUS and Brain notes synchronized. HEAD `665e9a9` on `main` [synced with origin].
 > **Repository scope:** `Autovemtech` is the umbrella repository for every Autovem pillar and project (clients, AI systems, apps, tools). Gheras/EduTrack is one active client, not the repository's scope.
 > **VCS:** git at workspace root, branch `main`.
@@ -1187,3 +1187,14 @@ Execute Milestone M5 test suites and issue official `[APPROVED]` seal from Claud
 - **Deploy precondition:** prod users (teacher/supervisor/manager) with `staff_id IS NULL` now get 422 STAFF_NOT_LINKED; count and link them on `gheras_edutrack` before deploying; Android/web must render the 422.
 - Uncommitted on F: main: 3 server files + AGENTS.md, CLAUDE.md, fleet_config.json, CURRENT_STATE.md (awaiting Ibrahim's commit go-ahead).
 - **Next choices:** (a) commit + push the fix; (b) M6 Android review + `testDebugUnitTest`; (c) Ibrahim decides M1 grace/default shift and M7 scope.
+
+## 38. Session 2026-10-26 (39) — M6 Android review + `testDebugUnitTest` (choice b) (Claude Code CLI): **CHANGES REQUESTED**
+
+- Android `testDebugUnitTest` on `8213884`: 233 tests / 2 failed = known reds only (`AuthInterceptorTest` baseline, `SupervisorGateViewModelTest` flaky); `Migration8To9Test` + `Migration9To10Test` green. No unit tests exist for the staff attendance VMs.
+- **B1 (blocker): no real location.** `StaffGeoAttendanceScreen.kt:224-250` ships "mock" buttons that call `updateLocation(center)`; no `ACCESS_FINE_LOCATION` in the manifest, no location provider. UI state defaults to the geofence center (`StaffGeoAttendanceViewModel.kt` currentLat/Lng), so check-in works from anywhere. Geofencing is not enforced in practice.
+- **M1:** `RootNavHost.kt:1019/1035` passes `user.id` as `staffId`; Room rows carry `staff.id`, so history list + month stats are always empty and the supervisor self-edit guard (M11) never fires (server still enforces). Session has no staff_id; needs it from `/me` or my-status.
+- **M2:** M6 VMs show `err.message` ("HTTP 422") instead of `ErrorMapper.map(e).userMessage`; `STAFF_NOT_LINKED` (deploy precondition, §37) is not rendered. `refreshMyStatus` failure is silently ignored.
+- **Minor:** `StaffShiftDto.id` non-null but server returns `id: null` when no active shift (seeded, so edge only); `my-status` geofence omits `max_accuracy_meters` (client falls back to 50); client dates use device TZ, server uses Riyadh.
+- Fix order written: `fleet_orders/ORDER_GHERAS_M6_ANDROID_FIXES.md` (3 batches, 10 files: server my-status adds `staff_id` + `max_accuracy_meters`; Android staff_id from my-status, ErrorMapper, Riyadh dates, no punch without a real non-mock fix + 5 VM tests; real GPS via `LocationManagerCompat`, mock buttons removed). Not dispatched.
+- Untracked `mobile/android/app/schemas/.../GherasDatabase/10.json` (Room export from the Gradle run) left out of git, as in session 31.
+- **Next choices:** (a) dispatch the fix order to OpenCode `opencode/glm-5.3-flash`, then re-gate (pytest + `testDebugUnitTest` + diff review); (b) Ibrahim decides M1 grace policy + M7 scope first; (c) M5 monthly print template.
