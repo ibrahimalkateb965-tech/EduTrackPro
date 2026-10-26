@@ -2,7 +2,6 @@
 
 from datetime import date, datetime, timedelta, timezone
 import os
-from pathlib import Path
 from uuid import uuid4
 import psycopg
 from psycopg.rows import dict_row
@@ -20,8 +19,6 @@ RIYADH_TZ = timezone(timedelta(hours=3))
 @pytest.fixture
 def db_conn():
     uri = os.environ.get("DATABASE_URL")
-    if not uri and os.path.exists("/tmp/m4gate/uri.txt"):
-        uri = Path("/tmp/m4gate/uri.txt").read_text().strip()
     if not uri:
         uri = "postgresql://postgres:@localhost:5432/postgres"
 

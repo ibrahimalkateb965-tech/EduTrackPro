@@ -12,7 +12,7 @@
 > **Master Orchestrator**: `Claude Code CLI` (Opus Max / Sonnet 5)  
 > **Handoff Source**: `Antigravity IDE` (Interactive Cockpit & Visual Inspector)  
 > **Timestamp**: 2026-10-26T08:15:00+03:00  
-> **Last updated:** 2026-10-26 (session 36) — Claude Code CLI: F: `main` reconciled with origin (reset to `4eac639` + carry-over commit), Waves 5-8 [APPROVED] recorded in §33. Choices (d) gate M6 + M7, (e) M5 monthly print template.
+> **Last updated:** 2026-10-26 22:37 — Claude Code CLI, session 37 "M6 harness fix + M6/M7 gate review (partial)" (strategic-clear). HEAD `e88b301` on `main` (in sync with origin). M6 server: 2 blockers found, verdict pending. Choices (a)-(c) in §35.  
 > **Previous update:** 2026-10-26 08:15 (+03:00) — Antigravity IDE (Gemini 3.8 Flash High): Milestone M5 Quality Gate Audit certified [APPROVED] by Claude Code CLI (Session 32, R11 patch commit `665e9a9` fast-forwarded and pushed to origin/main). GATE_STATUS and Brain notes synchronized. HEAD `665e9a9` on `main` [synced with origin].
 > **Repository scope:** `Autovemtech` is the umbrella repository for every Autovem pillar and project (clients, AI systems, apps, tools). Gheras/EduTrack is one active client, not the repository's scope.
 > **VCS:** git at workspace root, branch `main`.
@@ -1132,3 +1132,37 @@ Execute Milestone M5 test suites and issue official `[APPROVED]` seal from Claud
 - **Next choices:** (c) reconcile F: `main` with origin; (d) gate M6 + M7 (no gate record; 2 `staff_geo_attendance_migration` reds came in with M6); (e) M5 monthly print template (PDF link fix).
 
 - **Session 36 (2026-10-26, Claude Code CLI): F: `main` reconciled with origin.** 10 of 12 local-only commits (M1, M2 + K/J fixes) were already on origin under other hashes. The F backlog commit `8987122` held only stale pre-refactor copies of 9 code files (crud.py pre-W5, students.js pre-W6, ...) plus 34 files identical to origin, so it was dropped. F: `main` was reset to origin/main `4eac639` (old head kept as local branch `backup/main-pre-reconcile` = `e28ba8e`); carried over: AGENTS.md Rule 1 "BiDi Isolation Without Visible Tags" and this §33. NOT carried over: `server/tests/test_payroll_delta.py` (F-only spec test, 9/12 red on `4eac639`: expects payroll deduction guards (422 on CRUD deduction, 403 for supervisors, atomic rollback) that no code implements; kept on `backup/main-pre-reconcile` for a future payroll feature). `.gitignore` needed nothing (origin already ignores `Odoo`). Note: §31-32 (sessions 31-32 notes) were never committed on either side; their content lives in Brain `Account_State` Resume blocks.
+
+---
+
+## 34. Session 2026-10-26 (36) — F: main reconcile + M6/M7 gate START (Claude Code CLI): no verdict
+
+- Reconcile done (see §33 last bullet): F: `main` = origin/main `e88b301`, pushed by Ibrahim's order. Old head on local branch `backup/main-pre-reconcile` (`e28ba8e`, holds orphan `test_payroll_delta.py`).
+- M6/M7 gate scope: `fe80c38` ("complete Milestones M5, M6, and M7") holds all three; M5 already [APPROVED] (§30, R11/R12). M6 = staff geofenced attendance: server `repositories/staff_attendance_repo.py`, `routers/staff_attendance.py`, `db/postgres/021_staff_geo_attendance.sql`, `tests/test_staff_geo_attendance*.py`; Android `StaffAttendance{Entity,Dao,Api,Dto}`, `StaffAttendanceRepository`, `StaffGeoAttendanceScreen/ViewModel`, `SupervisorStaffAttendanceScreen/ViewModel`, `Migration8To9Test`/`Migration9To10Test`. M7 = unified guardian portal: exact file list NOT yet confirmed (candidates: `routers/me.py` +35, `GuardianHomeScreen.kt`, nav `RootNavHost/Routes/BottomNavBar`). Review must be on current head `e88b301` (later commits e.g. `e6edb58` security may have touched M6 code).
+- Evidence so far: M6 server tests in isolation on `e88b301` = 9 passed / 1 failed. The red `test_staff_geo_attendance_migration.py::test_migration_021_idempotent` is a **test-harness defect**: line 31 `MIGRATION_PATH.read_text()` has no `encoding="utf-8"` → cp1252 `UnicodeDecodeError` on Windows (sibling migration tests pass `encoding="utf-8"`); line 20 also hardcodes a `/tmp/m4gate/uri.txt` fallback. The 2nd baseline `staff_geo_attendance_migration` red appears only in the full suite (ordering / shared DB suspected). Runner: scratchpad `.../C--Users-Kt/21cdcd27-.../scratchpad/w58/pg_boot.py <edutrack_pro> <outdir>` + pytest with `TEST_DATABASE_URL`, `PGTZ='<+03>-03'`.
+- Not done: line-by-line review of M6/M7 server + Android code; full server suite; Android `testDebugUnitTest`.
+- Uncommitted on disk: this file (§34 + header). Brain repo: Account_State + daily note changes uncommitted.
+- **Next choices:**
+  - **(a)** Continue the M6+M7 gate: confirm the M7 file list, review M6/M7 server + Android code on `e88b301`, run full server suite + Android `testDebugUnitTest`, issue the verdict.
+  - **(b)** First fix the M6 migration test harness (`encoding="utf-8"` at line 31, drop the `/tmp/m4gate` fallback at line 20), then continue the gate as in (a).
+  - **(c)** M5 monthly print template (PDF link fix), gate M6+M7 later.
+
+---
+
+## 35. Session 2026-10-26 (37) — M6 test-harness fix (choice b) + M6/M7 gate review, partial (Claude Code CLI): verdict pending, CHANGES REQUESTED expected
+
+- **Harness fix (choice b):** `server/tests/test_staff_geo_attendance_migration.py` reads 021 with `encoding="utf-8"`; the `/tmp/m4gate/uri.txt` fallback is removed there and in `test_staff_geo_attendance.py` (plus its now-unused `Path` import). Test code only, no app code.
+- **M7 scope confirmed:** spec P01 (`fleet_orders/16_GHERAS_HANDOFF_FEATURES_HOOK31.md:40`) = child switcher, today's lesson, items needing attention, pickup CTA, progress report, school announcements. `fe80c38` only adds the monthly-report card to `GuardianHomeScreen.kt` (+13) and guardian `GET /me/monthly-reports` (M5). Switcher/pickup/homework cards pre-date M7. **Not found:** today's lesson, attention items, announcements. M7 is largely unimplemented despite the commit message.
+- **M6 server review (`staff_attendance_repo.py`, `routers/staff_attendance.py` on `e88b301`, untouched since `fe80c38`):**
+  - **B1 (blocker)** `resolve_staff_id_for_user` lines 58-64: a user with no `staff_id` is bound to the FIRST staff row of the branch (`SELECT id FROM staff WHERE branch_id=%s LIMIT 1`). Every unlinked teacher/supervisor/manager punches as that same person (2nd user gets 409), and anti-self-approval (M11) compares the wrong identity. Must reject (422 "account not linked to a staff record") instead of guessing.
+  - **B2 (blocker)** Same function auto-INSERTs a `staff` row and UPDATEs `users.staff_id`; `get_conn` commits on success, so even `GET /my-status` / `GET /my-history` write to the DB.
+  - **M1 (major)** Grace period: spec says none unless an approved setting exists; migration 021 seeds `geofence_grace_period_minutes=15`, `staff_shifts.grace_period_minutes DEFAULT 15`, and a default 07:30-14:00 shift; the repo also falls back to a hard-coded 07:30-14:00 shift when none exists. Needs Ibrahim's decision (open question §104 of the handoff).
+  - **M2 (major)** Missing check-out never becomes `ناقص`; history summary has no incomplete count. No staff correction-request flow (spec: corrections need reason + approval, admin view lists correction requests); only direct supervisor override exists.
+  - **M3 (major)** Override that changes `check_in_time`/`check_out_time` does not recompute `late_minutes`/`early_leave_minutes`/`work_duration_minutes`; audit `new` omits the new times. `status` is free text (DB CHECK turns a bad value into 500, not 422).
+  - **m (minor)** Concurrent check-in → unique `(staff_id,date)` violation = 500 not 409; router `my-history` default month uses naive `datetime.now()` (server TZ, not Riyadh) and `month` is not validated; supervisor override has no supervisor-permission check and no branch filter; tests are repo-level only (no HTTP role tests), and the check-in test depends on the wall clock.
+- **Not done (context cap):** M6 Android review (`StaffGeoAttendance*`, `SupervisorStaffAttendance*`, `StaffAttendanceRepository`), Android `testDebugUnitTest`, formal verdict.
+- **Full server suite after the harness fix:** started in background (runner scratchpad `F--AI-PROJECTS-Autovemtech/fdd2010b-.../scratchpad/m67/run_full.sh fix`, output `run_fix/full.txt`); at the freeze it was at 26 % and unfinished, so no count is recorded. Rerun it next session (one run at a time, ~5 GB RAM).
+- **Next choices:**
+  - **(a)** Finish the M6+M7 gate: rerun the full server suite, review the M6 Android code + run `testDebugUnitTest`, then issue the formal verdict (expected CHANGES REQUESTED on B1/B2/M1-M3 and M7 scope).
+  - **(b)** Issue CHANGES REQUESTED now on the server findings above and write a fix order for B1/B2/M3 (TDD), Android review later.
+  - **(c)** Ibrahim decides the grace-period / default-shift policy (M1) and whether M7 (P01) is built as a new milestone, before any fix work.

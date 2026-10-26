@@ -16,8 +16,6 @@ MIGRATION_PATH = (
 @pytest.fixture
 def db_conn():
     uri = os.environ.get("DATABASE_URL")
-    if not uri and os.path.exists("/tmp/m4gate/uri.txt"):
-        uri = Path("/tmp/m4gate/uri.txt").read_text().strip()
     if not uri:
         uri = "postgresql://postgres:@localhost:5432/postgres"
 
@@ -28,7 +26,7 @@ def db_conn():
 
 
 def test_migration_021_idempotent(db_conn):
-    sql = MIGRATION_PATH.read_text()
+    sql = MIGRATION_PATH.read_text(encoding="utf-8")
     db_conn.execute(sql)
     db_conn.rollback()
 
