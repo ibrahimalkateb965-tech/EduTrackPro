@@ -12,7 +12,8 @@
 > **Master Orchestrator**: `Claude Code CLI` (Opus Max / Sonnet 5)  
 > **Handoff Source**: `Antigravity IDE` (Interactive Cockpit & Visual Inspector)  
 > **Timestamp**: 2026-10-26T08:15:00+03:00  
-> **Last updated:** 2026-10-26 08:15 (+03:00) — Antigravity IDE (Gemini 3.8 Flash High): Milestone M5 Quality Gate Audit certified [APPROVED] by Claude Code CLI (Session 32, R11 patch commit `665e9a9` fast-forwarded and pushed to origin/main). GATE_STATUS and Brain notes synchronized. HEAD `665e9a9` on `main` [synced with origin].
+> **Last updated:** 2026-10-26 (session 36) — Claude Code CLI: F: `main` reconciled with origin (reset to `4eac639` + carry-over commit), Waves 5-8 [APPROVED] recorded in §33. Choices (d) gate M6 + M7, (e) M5 monthly print template.
+> **Previous update:** 2026-10-26 08:15 (+03:00) — Antigravity IDE (Gemini 3.8 Flash High): Milestone M5 Quality Gate Audit certified [APPROVED] by Claude Code CLI (Session 32, R11 patch commit `665e9a9` fast-forwarded and pushed to origin/main). GATE_STATUS and Brain notes synchronized. HEAD `665e9a9` on `main` [synced with origin].
 > **Repository scope:** `Autovemtech` is the umbrella repository for every Autovem pillar and project (clients, AI systems, apps, tools). Gheras/EduTrack is one active client, not the repository's scope.
 > **VCS:** git at workspace root, branch `main`.
 
@@ -1115,3 +1116,19 @@ Execute Milestone M5 test suites and issue official `[APPROVED]` seal from Claud
 - **(b)** Resolve F: drive checkout divergence (pull origin/main, isolate Odoo secrets into `.env`, sanitize signature and partner CSV).
 - **(c)** Assemble production release APK (`gradlew assembleRelease`) with R8 ProGuard map verification.
 
+---
+
+## 33. Session 2026-10-26 (34-35) — Waves 5-8 layering refactor gate (Claude Code CLI): [APPROVED] on 93139b1 (session 35)
+
+- Waves 5-8 = origin/main commits `562e748` (W5 PaymentService/Repository), `e28eb2f` (W6 students.js split into 3 submodules), `301d9e9` (W7 StudentService/Repository), `93139b1` (W8 AttendanceService/Repository). Their "[APPROVED by Claude Code]" subject tags have no gate record; treat them as ungated.
+- Review so far: W5 and W7 are faithful moves. Deltas: student lookups add `deleted_at IS NULL` (+ `FOR UPDATE` in W5), W5 adds a `student_id` required guard (400), `bus_paid` increment uses COALESCE. W8: all SQL and error strings match between removed and added code (mechanical check); `approve_attendance_row` only overwrites status/excuse_id when an excuse exists (safe). Not yet read: W8 service save/approve/staff/evaluation paths line by line; W6 JS split not reviewed.
+- Tests: full server suite on pre-wave `b6663a3` started in background (worktree `pre`); post-wave `93139b1` run not started. Runner: `run_full.sh pre|post` in scratchpad `21cdcd27-38a1-425d-8154-3a54410dd06d/scratchpad/w58` (output `run_<label>/full.txt`, `reds.txt`). Run one at a time (RAM ~5 GB free).
+- Local branches `w58-base` (b6663a3) and `w58-head` (93139b1) added for a scoped ultrareview (15 files, ~5.4k lines). The no-arg /ultrareview on `main` failed: 26k lines > 8k limit.
+- **Next choices:**
+  - **(a)** Finish the Waves 5-8 gate: rerun pre + post full suites, diff reds, review W6 JS and the rest of W8, issue the verdict.
+  - **(b)** Run `/code-review ultra w58-base` from the `w58/post` worktree first, then fold its findings into (a).
+  - **(c)** Reconcile F: `main` with origin (ahead 11, behind 73) before any further gate.
+- **Session 35 verdict: Waves 5-8 [APPROVED]** on `93139b1` (choice a). Full server suite: pre-wave `b6663a3` 338 passed / 12 failed, post-wave `93139b1` 339 passed / 12 failed; reds identical (0 new); the extra green is `test_registration_with_card_payment_method`. W6 JS split is faithful: same `?v=3.5` module URLs, old module state now passed as params (`studentsList`, `onReload`, `onGroupAdded`), every caller wires its reload callback, no external importers, `node --check` clean. W8 rest: router keeps all role and permission guards; service + repo SQL match line by line. Only delta: teacher scope is resolved in the router before payload validation (no behavior change). GATE_STATUS (WSL clone) not updated from here.
+- **Next choices:** (c) reconcile F: `main` with origin; (d) gate M6 + M7 (no gate record; 2 `staff_geo_attendance_migration` reds came in with M6); (e) M5 monthly print template (PDF link fix).
+
+- **Session 36 (2026-10-26, Claude Code CLI): F: `main` reconciled with origin.** 10 of 12 local-only commits (M1, M2 + K/J fixes) were already on origin under other hashes. The F backlog commit `8987122` held only stale pre-refactor copies of 9 code files (crud.py pre-W5, students.js pre-W6, ...) plus 34 files identical to origin, so it was dropped. F: `main` was reset to origin/main `4eac639` (old head kept as local branch `backup/main-pre-reconcile` = `e28ba8e`); carried over: AGENTS.md Rule 1 "BiDi Isolation Without Visible Tags" and this §33. NOT carried over: `server/tests/test_payroll_delta.py` (F-only spec test, 9/12 red on `4eac639`: expects payroll deduction guards (422 on CRUD deduction, 403 for supervisors, atomic rollback) that no code implements; kept on `backup/main-pre-reconcile` for a future payroll feature). `.gitignore` needed nothing (origin already ignores `Odoo`). Note: §31-32 (sessions 31-32 notes) were never committed on either side; their content lives in Brain `Account_State` Resume blocks.
