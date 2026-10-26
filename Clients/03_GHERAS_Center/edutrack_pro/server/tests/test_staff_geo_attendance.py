@@ -7,11 +7,13 @@ import psycopg
 from psycopg.rows import dict_row
 import pytest
 from fastapi.testclient import TestClient
+from pydantic import ValidationError
 
 from edutrack_api.auth import issue_token
 from edutrack_api.config import get_settings
 from edutrack_api.main import create_app
 from edutrack_api.repositories import staff_attendance_repo
+from edutrack_api.routers.staff_attendance import AttendanceOverrideIn
 
 RIYADH_TZ = timezone(timedelta(hours=3))
 
@@ -224,3 +226,212 @@ def test_supervisor_manual_override_and_anti_self_approval(db_conn):
             override_reason="تعديل حضور ذاتي",
         )
     assert getattr(exc_self.value, "code", "") == "ANTI_SELF_APPROVAL" or "ANTI_SELF_APPROVAL" in str(exc_self.value)
+
+
+def test_unlinked_user_rejected_not_bound(db_conn):
+    branch_id = "00000000-0000-0000-0000-000000000001"
+    user_id = db_conn.execute("""
+        INSERT INTO users (branch_id, username, password_hash, role, is_active)
+        VALUES (%s, %s, 'fakehash', 'teacher', true)
+        RETURNING id
+    """, (branch_id, f"unlinked_{uuid4().hex[:6]}")).fetchone()["id"]
+
+    user = {"id": user_id, "role": "teacher", "branch_id": branch_id, "staff_id": None}
+    staff_before = db_conn.execute("SELECT COUNT(*) AS c FROM staff").fetchone()["c"]
+
+    with pytest.raises(Exception) as exc:
+        staff_attendance_repo.check_in_staff(
+            conn=db_conn,
+            user=user,
+            latitude=24.7136,
+            longitude=46.6753,
+            accuracy=10.0,
+        )
+    assert getattr(exc.value, "code", "") == "STAFF_NOT_LINKED"
+
+    staff_after = db_conn.execute("SELECT COUNT(*) AS c FROM staff").fetchone()["c"]
+    assert staff_after == staff_before
+    assert db_conn.execute(
+        "SELECT staff_id FROM users WHERE id = %s", (user_id,)
+    ).fetchone()["staff_id"] is None
+
+
+def test_status_reads_do_not_write(db_conn):
+    branch_id = "00000000-0000-0000-0000-000000000001"
+    user_id = db_conn.execute("""
+        INSERT INTO users (branch_id, username, password_hash, role, is_active)
+        VALUES (%s, %s, 'fakehash', 'teacher', true)
+        RETURNING id
+    """, (branch_id, f"unlinked_status_{uuid4().hex[:6]}")).fetchone()["id"]
+
+    user = {"id": user_id, "role": "teacher", "branch_id": branch_id, "staff_id": None}
+    staff_before = db_conn.execute("SELECT COUNT(*) AS c FROM staff").fetchone()["c"]
+
+    with pytest.raises(Exception) as exc:
+        staff_attendance_repo.get_my_today_status(db_conn, user)
+    assert getattr(exc.value, "code", "") == "STAFF_NOT_LINKED"
+
+    staff_after = db_conn.execute("SELECT COUNT(*) AS c FROM staff").fetchone()["c"]
+    assert staff_after == staff_before
+
+
+def test_manager_without_staff_can_override(db_conn):
+    branch_id = "00000000-0000-0000-0000-000000000001"
+    mgr_user_id = db_conn.execute("""
+        INSERT INTO users (branch_id, username, password_hash, role, is_active)
+        VALUES (%s, %s, 'fakehash', 'manager', true)
+        RETURNING id
+    """, (branch_id, f"mgr_{uuid4().hex[:6]}")).fetchone()["id"]
+
+    tch_staff = db_conn.execute("""
+        INSERT INTO staff (branch_id, name, role_title, status)
+        VALUES (%s, 'معلمة تجربة', 'معلمة', 'active')
+        RETURNING id
+    """, (branch_id,)).fetchone()["id"]
+
+    att_row = db_conn.execute("""
+        INSERT INTO staff_attendance (branch_id, staff_id, date, status, check_in_time)
+        VALUES (%s, %s, %s, 'غائب', NOW())
+        RETURNING id
+    """, (branch_id, tch_staff, date.today())).fetchone()
+
+    updated = staff_attendance_repo.override_staff_attendance(
+        conn=db_conn,
+        approver_user={"id": mgr_user_id, "staff_id": None, "role": "manager"},
+        attendance_id=att_row["id"],
+        status="مستأذن",
+        override_reason="عذر إداري معتمد من المديرة",
+    )
+    assert updated["status"] == "مستأذن"
+    assert updated["is_manual_override"] is True
+
+
+def test_override_recomputes_minutes(db_conn):
+    branch_id = "00000000-0000-0000-0000-000000000001"
+    mgr_user_id = db_conn.execute("""
+        INSERT INTO users (branch_id, username, password_hash, role, is_active)
+        VALUES (%s, %s, 'fakehash', 'manager', true)
+        RETURNING id
+    """, (branch_id, f"mgr_min_{uuid4().hex[:6]}")).fetchone()["id"]
+
+    tch_staff = db_conn.execute("""
+        INSERT INTO staff (branch_id, name, role_title, status)
+        VALUES (%s, 'معلمة إعادة الحساب', 'معلمة', 'active')
+        RETURNING id
+    """, (branch_id,)).fetchone()["id"]
+
+    today = date.today()
+    shift = staff_attendance_repo.get_staff_shift_for_date(db_conn, tch_staff, today)
+    shift_start_dt = datetime.combine(today, shift["start_time"], tzinfo=RIYADH_TZ)
+    shift_end_dt = datetime.combine(today, shift["end_time"], tzinfo=RIYADH_TZ)
+
+    att_row = db_conn.execute("""
+        INSERT INTO staff_attendance (branch_id, staff_id, date, status, check_in_time)
+        VALUES (%s, %s, %s, 'حاضر', %s)
+        RETURNING id
+    """, (branch_id, tch_staff, today, shift_start_dt)).fetchone()
+
+    new_check_in = shift_start_dt + timedelta(minutes=40)
+    new_check_out = shift_end_dt - timedelta(minutes=60)
+
+    updated = staff_attendance_repo.override_staff_attendance(
+        conn=db_conn,
+        approver_user={"id": mgr_user_id, "staff_id": None, "role": "manager"},
+        attendance_id=att_row["id"],
+        status="متأخر",
+        override_reason="تصحيح توقيت الحضور والانصراف",
+        check_in_time=new_check_in,
+        check_out_time=new_check_out,
+    )
+
+    assert updated["late_minutes"] == 40
+    assert updated["early_leave_minutes"] == 60
+    assert updated["work_duration_minutes"] == int((new_check_out - new_check_in).total_seconds() / 60)
+
+
+def test_override_rejects_inverted_times(db_conn):
+    branch_id = "00000000-0000-0000-0000-000000000001"
+    mgr_user_id = db_conn.execute("""
+        INSERT INTO users (branch_id, username, password_hash, role, is_active)
+        VALUES (%s, %s, 'fakehash', 'manager', true)
+        RETURNING id
+    """, (branch_id, f"mgr_inv_{uuid4().hex[:6]}")).fetchone()["id"]
+
+    tch_staff = db_conn.execute("""
+        INSERT INTO staff (branch_id, name, role_title, status)
+        VALUES (%s, 'معلمة توقيت معكوس', 'معلمة', 'active')
+        RETURNING id
+    """, (branch_id,)).fetchone()["id"]
+
+    today = date.today()
+    shift = staff_attendance_repo.get_staff_shift_for_date(db_conn, tch_staff, today)
+    shift_start_dt = datetime.combine(today, shift["start_time"], tzinfo=RIYADH_TZ)
+    shift_end_dt = datetime.combine(today, shift["end_time"], tzinfo=RIYADH_TZ)
+
+    att_row = db_conn.execute("""
+        INSERT INTO staff_attendance (branch_id, staff_id, date, status, check_in_time)
+        VALUES (%s, %s, %s, 'حاضر', %s)
+        RETURNING id
+    """, (branch_id, tch_staff, today, shift_start_dt)).fetchone()
+
+    with pytest.raises(Exception) as exc:
+        staff_attendance_repo.override_staff_attendance(
+            conn=db_conn,
+            approver_user={"id": mgr_user_id, "staff_id": None, "role": "manager"},
+            attendance_id=att_row["id"],
+            status="حاضر",
+            override_reason="تصحيح غير صالح الزمن",
+            check_in_time=shift_end_dt,
+            check_out_time=shift_start_dt,
+        )
+    assert getattr(exc.value, "code", "") == "INVALID_TIME_RANGE"
+
+
+def test_override_audit_includes_times(db_conn):
+    branch_id = "00000000-0000-0000-0000-000000000001"
+    mgr_user_id = db_conn.execute("""
+        INSERT INTO users (branch_id, username, password_hash, role, is_active)
+        VALUES (%s, %s, 'fakehash', 'manager', true)
+        RETURNING id
+    """, (branch_id, f"mgr_audit_{uuid4().hex[:6]}")).fetchone()["id"]
+
+    tch_staff = db_conn.execute("""
+        INSERT INTO staff (branch_id, name, role_title, status)
+        VALUES (%s, 'معلمة تدقيق', 'معلمة', 'active')
+        RETURNING id
+    """, (branch_id,)).fetchone()["id"]
+
+    att_row = db_conn.execute("""
+        INSERT INTO staff_attendance (branch_id, staff_id, date, status, check_in_time)
+        VALUES (%s, %s, %s, 'غائب', NOW())
+        RETURNING id
+    """, (branch_id, tch_staff, date.today())).fetchone()
+
+    updated = staff_attendance_repo.override_staff_attendance(
+        conn=db_conn,
+        approver_user={"id": mgr_user_id, "staff_id": None, "role": "manager"},
+        attendance_id=att_row["id"],
+        status="متأخر",
+        override_reason="تصحيح موثق بالتوقيتات",
+        check_in_time=datetime.combine(date.today(), datetime.now(RIYADH_TZ).time(), tzinfo=RIYADH_TZ),
+    )
+
+    audit_row = db_conn.execute("""
+        SELECT details_json FROM audit_log
+        WHERE action = 'staff_attendance_manual_override' AND entity_id = %s
+        ORDER BY at DESC
+        LIMIT 1
+    """, (updated["id"],)).fetchone()
+
+    details = audit_row["details_json"]
+    assert details["old"]["check_in_time"] is not None
+    assert details["new"]["check_in_time"] is not None
+
+
+def test_override_status_literal_rejected():
+    with pytest.raises(ValidationError):
+        AttendanceOverrideIn(
+            attendance_id=uuid4(),
+            status="bogus",
+            override_reason="حالة غير موجودة في القائمة",
+        )

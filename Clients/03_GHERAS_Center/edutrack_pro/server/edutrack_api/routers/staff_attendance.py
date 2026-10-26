@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import date as dt_date, datetime
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends
@@ -29,9 +29,15 @@ class GeoPunchIn(BaseModel):
     accuracy: float = Field(ge=0.0)
 
 
+AttendanceStatus = Literal[
+    "حاضر", "غائب", "متأخر", "مستأذن", "انصراف مبكر", "ناقص",
+    "present", "late", "absent", "excused", "early_leave", "incomplete",
+]
+
+
 class AttendanceOverrideIn(BaseModel):
     attendance_id: UUID
-    status: str = Field(min_length=1, max_length=50)
+    status: AttendanceStatus
     override_reason: str = Field(min_length=3)
     check_in_time: datetime | None = None
     check_out_time: datetime | None = None
@@ -131,8 +137,8 @@ def override_staff_attendance(
         attendance_id=payload.attendance_id,
         status=payload.status,
         override_reason=payload.override_reason,
-        check_in_time=payload.check_in_time,
-        check_out_time=payload.check_out_time,
+        check_in_time=payload.check_in_time and staff_attendance_repo._as_riyadh(payload.check_in_time),
+        check_out_time=payload.check_out_time and staff_attendance_repo._as_riyadh(payload.check_out_time),
         deduction=payload.deduction,
         note=payload.note,
     )

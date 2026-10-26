@@ -50,32 +50,11 @@ def get_geofence_settings(conn) -> dict[str, Any]:
 
 
 def resolve_staff_id_for_user(conn, user: dict) -> UUID:
-    """Find or bind staff_id for user."""
+    """Return the staff_id linked to the user, or reject unlinked accounts."""
     staff_id = user.get("staff_id")
-    if staff_id:
-        return UUID(str(staff_id))
-
-    # Fallback: check if user has a staff record with matching branch or email
-    st = conn.execute(
-        "SELECT id FROM staff WHERE branch_id = %s LIMIT 1",
-        (user.get("branch_id") or "00000000-0000-0000-0000-000000000001",),
-    ).fetchone()
-    if st:
-        return st["id"]
-
-    # Create linked staff member if none exists
-    new_staff_id = conn.execute("""
-        INSERT INTO staff (branch_id, name, role_title, status)
-        VALUES (%s, %s, %s, 'active')
-        RETURNING id
-    """, (
-        user.get("branch_id") or "00000000-0000-0000-0000-000000000001",
-        user.get("name") or user.get("username") or "موظف",
-        user.get("role") or "teacher",
-    )).fetchone()["id"]
-
-    conn.execute("UPDATE users SET staff_id = %s WHERE id = %s", (new_staff_id, user["id"]))
-    return new_staff_id
+    if not staff_id:
+        raise ApiError(422, "STAFF_NOT_LINKED", "حسابك غير مرتبط بسجل موظف. يرجى مراجعة الإدارة")
+    return UUID(str(staff_id))
 
 
 def get_staff_shift_for_date(conn, staff_id: UUID, query_date: dt_date) -> dict[str, Any]:
@@ -112,6 +91,44 @@ def get_staff_shift_for_date(conn, staff_id: UUID, query_date: dt_date) -> dict[
         "start_time": dt_time(7, 30),
         "end_time": dt_time(14, 0),
         "grace_period_minutes": 15,
+    }
+
+
+def _as_riyadh(value: datetime) -> datetime:
+    """Normalize a datetime to Riyadh; naive values are assumed Riyadh-local."""
+    return value.astimezone(RIYADH_TZ) if value.tzinfo else value.replace(tzinfo=RIYADH_TZ)
+
+
+def compute_attendance_minutes(
+    shift: dict,
+    att_date: dt_date,
+    check_in: datetime,
+    check_out: datetime | None,
+    default_grace: int,
+) -> dict[str, Any]:
+    """Single source of truth for late/early-leave/work minutes across check-in, check-out and override."""
+    grace = shift.get("grace_period_minutes", default_grace)
+    shift_start_dt = datetime.combine(att_date, shift["start_time"], tzinfo=RIYADH_TZ)
+    shift_end_dt = datetime.combine(att_date, shift["end_time"], tzinfo=RIYADH_TZ)
+
+    check_in_dt = _as_riyadh(check_in)
+
+    late_minutes = 0
+    if check_in_dt > shift_start_dt + timedelta(minutes=grace):
+        late_minutes = max(0, int((check_in_dt - shift_start_dt).total_seconds() / 60))
+
+    early_leave_minutes = 0
+    work_duration_minutes: int | None = None
+    if check_out is not None:
+        check_out_dt = _as_riyadh(check_out)
+        if check_out_dt < shift_end_dt:
+            early_leave_minutes = max(0, int((shift_end_dt - check_out_dt).total_seconds() / 60))
+        work_duration_minutes = max(0, int((check_out_dt - check_in_dt).total_seconds() / 60))
+
+    return {
+        "late_minutes": late_minutes,
+        "early_leave_minutes": early_leave_minutes,
+        "work_duration_minutes": work_duration_minutes,
     }
 
 
@@ -162,20 +179,11 @@ def check_in_staff(
     if existing and existing["check_in_time"] is not None:
         raise ApiError(409, "ALREADY_CHECKED_IN", "تم تسجيل الحضور لهذا اليوم مسبقاً")
 
-    # 5. Shift and Lateness calculation
+    # 5. Shift and Lateness calculation (single source of truth: compute_attendance_minutes)
     shift = get_staff_shift_for_date(conn, staff_id, today)
-    shift_start = shift["start_time"]
-    grace = shift.get("grace_period_minutes", settings["grace_period_minutes"])
-
-    shift_start_dt = datetime.combine(today, shift_start, tzinfo=RIYADH_TZ)
-    grace_cutoff_dt = shift_start_dt + timedelta(minutes=grace)
-
-    late_minutes = 0
-    if now_dt > grace_cutoff_dt:
-        status = "متأخر"
-        late_minutes = max(0, int((now_dt - shift_start_dt).total_seconds() / 60))
-    else:
-        status = "حاضر"
+    minutes = compute_attendance_minutes(shift, today, now_dt, None, settings["grace_period_minutes"])
+    late_minutes = minutes["late_minutes"]
+    status = "متأخر" if late_minutes > 0 else "حاضر"
 
     if existing:
         row = conn.execute("""
@@ -277,20 +285,17 @@ def check_out_staff(
     if existing["check_out_time"] is not None:
         raise ApiError(409, "ALREADY_CHECKED_OUT", "تم تسجيل الانصراف مسبقاً لهذا اليوم")
 
-    # 5. Shift & Early leave calculation
+    # 5. Shift & Early leave calculation (single source of truth: compute_attendance_minutes)
     shift = get_staff_shift_for_date(conn, staff_id, today)
-    shift_end = shift["end_time"]
-    shift_end_dt = datetime.combine(today, shift_end, tzinfo=RIYADH_TZ)
+    minutes = compute_attendance_minutes(
+        shift, today, existing["check_in_time"], now_dt, settings["grace_period_minutes"]
+    )
+    early_leave_minutes = minutes["early_leave_minutes"]
+    work_duration = minutes["work_duration_minutes"]
 
-    early_leave_minutes = 0
     status = existing["status"]
-    if now_dt < shift_end_dt:
-        early_leave_minutes = max(0, int((shift_end_dt - now_dt).total_seconds() / 60))
-        if status in ("حاضر", "present"):
-            status = "انصراف مبكر"
-
-    check_in_time = existing["check_in_time"]
-    work_duration = max(0, int((now_dt - check_in_time).total_seconds() / 60))
+    if early_leave_minutes > 0 and status in ("حاضر", "present"):
+        status = "انصراف مبكر"
 
     row = conn.execute("""
         UPDATE staff_attendance
@@ -434,22 +439,48 @@ def override_staff_attendance(
     if not target:
         raise ApiError(404, "NOT_FOUND", "سجل الحضور غير موجود")
 
-    approver_staff_id = resolve_staff_id_for_user(conn, approver_user)
-    target_staff_id = target["staff_id"]
-
-    # Rule M11: anti-self-approval
-    if approver_staff_id == target_staff_id:
+    # Rule M11: anti-self-approval. The approver may be a manager with no staff record,
+    # so no resolve here: staff_id=None simply means the approver cannot be the target.
+    approver_staff_id = approver_user.get("staff_id")
+    if approver_staff_id is not None and UUID(str(approver_staff_id)) == target["staff_id"]:
         raise ApiError(
             403,
             "ANTI_SELF_APPROVAL",
             "لا يمكن للمشرفة أو المديرة تعديل أو اعتماد سجل حضورها الشخصي",
         )
 
+    effective_check_in = check_in_time or target["check_in_time"]
+    effective_check_out = check_out_time or target["check_out_time"]
+    if (
+        effective_check_in is not None
+        and effective_check_out is not None
+        and _as_riyadh(effective_check_out) < _as_riyadh(effective_check_in)
+    ):
+        raise ApiError(422, "INVALID_TIME_RANGE", "وقت الانصراف لا يمكن أن يسبق وقت الحضور")
+
+    if effective_check_in is not None:
+        shift = get_staff_shift_for_date(conn, target["staff_id"], target["date"])
+        minutes = compute_attendance_minutes(
+            shift,
+            target["date"],
+            effective_check_in,
+            effective_check_out,
+            get_geofence_settings(conn)["grace_period_minutes"],
+        )
+    else:
+        minutes = {"late_minutes": 0, "early_leave_minutes": 0, "work_duration_minutes": None}
+    late_minutes = minutes["late_minutes"]
+    early_leave_minutes = minutes["early_leave_minutes"]
+    work_duration_minutes = minutes["work_duration_minutes"] or 0
+
     now_dt = datetime.now(RIYADH_TZ)
     old_values = {
         "status": target["status"],
         "check_in_time": str(target["check_in_time"]) if target["check_in_time"] else None,
         "check_out_time": str(target["check_out_time"]) if target["check_out_time"] else None,
+        "late_minutes": target["late_minutes"],
+        "early_leave_minutes": target["early_leave_minutes"],
+        "work_duration_minutes": target["work_duration_minutes"],
         "deduction": float(target.get("deduction") or 0.0),
     }
 
@@ -462,6 +493,9 @@ def override_staff_attendance(
             override_at = %s,
             check_in_time = COALESCE(%s, check_in_time),
             check_out_time = COALESCE(%s, check_out_time),
+            late_minutes = %s,
+            early_leave_minutes = %s,
+            work_duration_minutes = %s,
             deduction = %s,
             note = COALESCE(%s, note),
             updated_at = NOW()
@@ -469,7 +503,9 @@ def override_staff_attendance(
         RETURNING *
     """, (
         status, approver_user["id"], override_reason, now_dt,
-        check_in_time, check_out_time, deduction, note, attendance_id
+        check_in_time, check_out_time,
+        late_minutes, early_leave_minutes, work_duration_minutes,
+        deduction, note, attendance_id
     )).fetchone()
 
     write_audit(
@@ -482,6 +518,11 @@ def override_staff_attendance(
             "old": old_values,
             "new": {
                 "status": status,
+                "check_in_time": str(effective_check_in) if effective_check_in else None,
+                "check_out_time": str(effective_check_out) if effective_check_out else None,
+                "late_minutes": late_minutes,
+                "early_leave_minutes": early_leave_minutes,
+                "work_duration_minutes": work_duration_minutes,
                 "reason": override_reason,
                 "deduction": deduction,
             },

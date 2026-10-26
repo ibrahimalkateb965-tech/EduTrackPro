@@ -42,7 +42,7 @@ Claude Code CLI orchestrates the 4 dedicated local Google AI Pro accounts (`D:\F
 | **Worker 3** | `ibrahimalkateb9220@gmail.com` | 2M Context Ingestion, Docs, Accessibility Parity, Research | Win: `& "D:\FleetProfiles\agy3.bat" "<prompt>"`<br>WSL: `/mnt/d/FleetProfiles/agy3.sh "<prompt>"` |
 | **Worker 4** | `ayahowiedy123@gmail.com` | Secondary Parallelism, Fast Refactoring, Dynamic Failover Pool | Win: `& "D:\FleetProfiles\agy4.bat" "<prompt>"`<br>WSL: `/mnt/d/FleetProfiles/agy4.sh "<prompt>"` |
 | **Auto Failover** | Round-Robin across 1-4 | Cascades automatically if a worker exhausts quota or hits 429 | Win: `& "D:\FleetProfiles\agy-fleet.ps1" -Prompt "<prompt>"`<br>WSL: `/mnt/d/FleetProfiles/agy-fleet.sh "<prompt>"` |
-| **Worker Zen** | OpenCode Go (`GLM 5.3 Flash`) | DB Migrations, Schemas, CLI Plumbing, Gradle Builds | `opencode run --auto -m opencode-go/glm-5.3-flash "<prompt>"` |
+| **Worker Zen** | OpenCode Go (`GLM 5.3 Flash`) | DB Migrations, Schemas, CLI Plumbing, Gradle Builds | `opencode run --auto -m opencode/glm-5.3-flash "<prompt>"` |
 
 **Rules of Engagement:**
 1. **Zero Manual Copy-Paste:** Claude Code issues commands directly in terminal using the invocation strings above.

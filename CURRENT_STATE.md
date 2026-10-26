@@ -12,7 +12,7 @@
 > **Master Orchestrator**: `Claude Code CLI` (Opus Max / Sonnet 5)  
 > **Handoff Source**: `Antigravity IDE` (Interactive Cockpit & Visual Inspector)  
 > **Timestamp**: 2026-10-26T08:15:00+03:00  
-> **Last updated:** 2026-10-26 22:37 — Claude Code CLI, session 37 "M6 harness fix + M6/M7 gate review (partial)" (strategic-clear). HEAD `e88b301` on `main` (in sync with origin). M6 server: 2 blockers found, verdict pending. Choices (a)-(c) in §35.  
+> **Last updated:** 2026-10-26 23:00 — Claude Code CLI, session 38. M6 fix order (B1, B2, M3) **[APPROVED]** (356/10, 0 new reds), uncommitted on `main` (HEAD `9844e1f`). Choices (a)-(c) in §37.  
 > **Previous update:** 2026-10-26 08:15 (+03:00) — Antigravity IDE (Gemini 3.8 Flash High): Milestone M5 Quality Gate Audit certified [APPROVED] by Claude Code CLI (Session 32, R11 patch commit `665e9a9` fast-forwarded and pushed to origin/main). GATE_STATUS and Brain notes synchronized. HEAD `665e9a9` on `main` [synced with origin].
 > **Repository scope:** `Autovemtech` is the umbrella repository for every Autovem pillar and project (clients, AI systems, apps, tools). Gheras/EduTrack is one active client, not the repository's scope.
 > **VCS:** git at workspace root, branch `main`.
@@ -1166,3 +1166,24 @@ Execute Milestone M5 test suites and issue official `[APPROVED]` seal from Claud
   - **(a)** Finish the M6+M7 gate: rerun the full server suite, review the M6 Android code + run `testDebugUnitTest`, then issue the formal verdict (expected CHANGES REQUESTED on B1/B2/M1-M3 and M7 scope).
   - **(b)** Issue CHANGES REQUESTED now on the server findings above and write a fix order for B1/B2/M3 (TDD), Android review later.
   - **(c)** Ibrahim decides the grace-period / default-shift policy (M1) and whether M7 (P01) is built as a new milestone, before any fix work.
+
+## 36. Session 2026-10-26 (38) — M6 gate verdict (choice b): **CHANGES REQUESTED** (Claude Code CLI)
+
+- **Verdict: CHANGES REQUESTED** on M6 server (`9844e1f`). Grounds: B1 + B2 (blockers) and M3 (major) from §35, re-checked in code this session (`staff_attendance_repo.py` lines 52-78 and `override_staff_attendance`; router `AttendanceOverrideIn.status` is free `str`).
+- **Fix order:** `fleet_orders/ORDER_GHERAS_M6_STAFF_ATTENDANCE_FIXES.md` (gitignored). One batch, 3 files (repo, router, `tests/test_staff_geo_attendance.py`), TDD with 7 named tests. Content: `resolve_staff_id_for_user` becomes a pure read that raises 422 `STAFF_NOT_LINKED` (no `LIMIT 1` guess, no INSERT/UPDATE); override uses `approver_user["staff_id"]` directly so managers without a staff row can approve; a shared `compute_attendance_minutes` helper recomputes late/early/work minutes on override; 422 `INVALID_TIME_RANGE`; audit old/new carry times + minutes; `status` becomes a `Literal` of the 12 CHECK values; naive datetimes normalised to Riyadh.
+- **Held out (not in the order):** M1 grace/default-shift policy (Ibrahim to decide), M2 incomplete status + correction-request flow, minors (concurrent check-in 500, `my-history` TZ/month validation, supervisor branch filter), M6 Android review, M7 (P01 largely unbuilt).
+- **Not dispatched yet.** No code changed this session.
+- **Suite evidence note:** a background run from another session (scratchpad `21cdcd27...`) finished with 349 passed / 10 failed. Its output does not name the commit or DB, so it is not counted as gate evidence; 10 reds is consistent with baseline 12 minus the 2 M6 migration reds fixed in `9844e1f`.
+- **Next choices:**
+  - **(a)** Dispatch the order to a worker (Worker 2 or OpenCode), then Claude reviews the diff, runs the full suite and re-gates M6 server.
+  - **(b)** Ibrahim decides M1 (grace period / default shift) and M7 scope first, and the order is extended before dispatch.
+  - **(c)** Claude implements the order directly (3 files, TDD) instead of delegating.
+
+## 37. Session 2026-10-26 (38, cont.) — M6 fix order executed + re-gate (Claude Code CLI): fix scope **[APPROVED]**, M6 milestone still open
+
+- Worker: OpenCode `opencode/glm-5.3-flash` (`opencode-go/...` id was wrong; fixed in CLAUDE.md, AGENTS.md, fleet_config.json). Report `fleet_orders/task-M6-fix-report.md`. Touched only the 3 ordered files; Claude de-duplicated the router Riyadh helper (uses `staff_attendance_repo._as_riyadh`).
+- Full server suite (fresh PG, runner `fdd2010b.../m67/run_full.sh m6fix`): **356 passed / 10 failed**; reds = baseline 12 minus the 2 M6 migration reds (0 new). `test_staff_geo_attendance.py` 12/12 (5 old + 7 new).
+- **Verdict: [APPROVED] for the fix-order scope (B1, B2, M3).** M6 as a milestone stays open: M1 policy, M2 incomplete/correction flow, minors, M6 Android review, M7 scope.
+- **Deploy precondition:** prod users (teacher/supervisor/manager) with `staff_id IS NULL` now get 422 STAFF_NOT_LINKED; count and link them on `gheras_edutrack` before deploying; Android/web must render the 422.
+- Uncommitted on F: main: 3 server files + AGENTS.md, CLAUDE.md, fleet_config.json, CURRENT_STATE.md (awaiting Ibrahim's commit go-ahead).
+- **Next choices:** (a) commit + push the fix; (b) M6 Android review + `testDebugUnitTest`; (c) Ibrahim decides M1 grace/default shift and M7 scope.

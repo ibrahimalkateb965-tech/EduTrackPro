@@ -117,7 +117,7 @@ Autovemtech operates an autonomous multi-CLI fleet governed by [fleet_config.jso
 ┌──────────────────────────────────────┐  ┌─────────────────────────────────────────────────────────────┐
 │     CODEX CLI / CHATGPT DESKTOP      │  │                 OPENCODE CLI (PAID GO EXECUTOR)             │
 │           (GPT-6.1 Soul)             │  │ ┌─────────────────────────────────────────────────────────┐ │
-│ Algorithmic Logic • Complex Refactor │  │ │ Worker A: GLM 5.3 Flash (opencode-go/glm-5.3-flash)     │ │
+│ Algorithmic Logic • Complex Refactor │  │ │ Worker A: GLM 5.3 Flash (opencode/glm-5.3-flash)        │ │
 │ Deep Optimizations • Data Parsers    │  │ │ Fast Terminal, Builds, Scaffolding, DB & Backend Logic  │ │
 └──────────────────────────────────────┘  │ └─────────────────────────────────────────────────────────┘ │
                    │                      └─────────────────────────────────────────────────────────────┘
@@ -150,15 +150,15 @@ Autovemtech operates an autonomous multi-CLI fleet governed by [fleet_config.jso
 | :--- | :--- | :--- | :--- |
 | **Claude Code CLI** | `claude` | Opus Max / Sonnet 5 (Frontier Coding Tier) | Master Orchestrator, Staff Architect, **Sole Testing Authority**, Quality Gatekeeper. |
 | **Codex CLI / Desktop** | `codex` / ChatGPT Desktop | GPT-6.1 Soul / gpt-6.1-soul | Algorithmic logic, complex math engines, heavy refactoring, data pipelines. |
-| **OpenCode CLI (Worker A)** | `opencode` (Flash) | `-m opencode-go/glm-5.3-flash` (or newest code tier) | **Primary Paid Fast Executor**: Shell commands, CLI build tasks, database migrations, DAOs, repositories, backend endpoints (NO TESTING; **MAX 1 instance of GLM concurrently**). |
+| **OpenCode CLI (Worker A)** | `opencode` (Flash) | `-m opencode/glm-5.3-flash` (or newest code tier) | **Primary Paid Fast Executor**: Shell commands, CLI build tasks, database migrations, DAOs, repositories, backend endpoints (NO TESTING; **MAX 1 instance of GLM concurrently**). |
 | **Cline CLI (Worker B)** | `cline` (Flash) | `glm-5.3-flash (medium)` | **Parallel UI & Scaffolding**: Runs concurrently with Worker A. Rapid terminal tasks, defaults to Act mode with Auto-approve. ($0.00) |
 | **Antigravity CLI (`agcli`)** | `agcli` | Gemini 3.8 Flash High (or newest Gemini code tier) | **Autonomous Terminal Executor**: Headless generation of UI components, Jetpack Compose, Web views, and domain logic. |
 | **Antigravity IDE** | Editor Workbench | Gemini 3.8 Flash High | **Interactive Human-AI Cockpit**: High-level strategy, consultation, visual inspection, monitoring real-time outputs, and manually refining/optimizing commands with the user *before* routing them to the CLI fleet. **Never target Antigravity IDE with automated CLI delegate prompts.** |
 
 ### Dual-Harness Concurrency Invariants
 > [!IMPORTANT]
-> **OpenCode & Cline Parallel Execution Rule**: Worker A (`opencode` with `opencode-go/glm-5.3-flash`) and Worker B (`cline` with `glm-5.3-flash`) operate in separate harnesses.
-> However, **NEVER spawn more than ONE instance of `opencode-go/glm-5.3-flash` simultaneously** in OpenCode CLI to prevent provider concurrency lockouts (HTTP 429).
+> **OpenCode & Cline Parallel Execution Rule**: Worker A (`opencode` with `opencode/glm-5.3-flash`) and Worker B (`cline` with `glm-5.3-flash`) operate in separate harnesses.
+> However, **NEVER spawn more than ONE instance of `opencode/glm-5.3-flash` simultaneously** in OpenCode CLI to prevent provider concurrency lockouts (HTTP 429).
 > Worker B in Cline operates in parallel without collision, providing rapid execution redundancy.
 
 ### Mandatory Testing & Verification Monopoly & Hybrid Web QA Pipeline ([C-96])
