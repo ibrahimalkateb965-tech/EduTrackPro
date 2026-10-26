@@ -306,6 +306,7 @@ def upsert_monthly_report(
             %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
             CASE WHEN %s = 'submit' THEN now() ELSE NULL END
         )
+        ON CONFLICT (student_id, month) WHERE deleted_at IS NULL DO NOTHING
         RETURNING id
     """
     row = conn.execute(
@@ -325,6 +326,13 @@ def upsert_monthly_report(
             action,
         ),
     ).fetchone()
+
+    if row is None:
+        # A concurrent writer created the report after our lookup; retry as an update.
+        return upsert_monthly_report(
+            conn, branch_id, student_id, room_id, month, teacher_user_id, attendance_stats,
+            subject_ratings, strengths, improvements, recommendations, action,
+        )
 
     return get_monthly_report_by_id(conn, row["id"])  # type: ignore
 

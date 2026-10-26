@@ -159,10 +159,8 @@ def upsert_monthly_report(
 
     branch_id = st["branch_id"]
 
-    # Auto-compute stats if not supplied
-    stats = payload.attendance_stats
-    if not stats or stats.get("total_days", 0) == 0:
-        stats = monthly_reports_repo.compute_student_attendance_stats(conn, payload.student_id, payload.month)
+    # Stats always come from the attendance table; client-sent values are ignored
+    stats = monthly_reports_repo.compute_student_attendance_stats(conn, payload.student_id, payload.month)
 
     # Sanitize ratings
     cleaned_ratings = [r.model_dump() for r in payload.subject_ratings]

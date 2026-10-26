@@ -396,3 +396,44 @@ def test_pdf_endpoint_rejects_student_role(client, db):
 
     res = client.get(f"/api/v1/monthly-reports/{report_id}/pdf", headers=_auth_header(student_user_id, "student"))
     assert res.status_code == 403
+
+
+def test_teacher_supplied_attendance_stats_are_ignored(client, db):
+    """Attendance stats always come from the attendance table, never from the request body."""
+    ctx = _seed_staff_fixture(db)
+    t_headers = _auth_header(ctx["teacher_id"], "teacher")
+    forged = {"total_days": 30, "present": 30, "absent": 0, "late": 0, "excused": 0, "attendance_pct": 100}
+    payload = {
+        "student_id": str(ctx["student_id"]),
+        "room_id": str(ctx["room_id"]),
+        "month": "2026-10",
+        "attendance_stats": forged,
+        "action": "submit",
+    }
+    res = client.post("/api/v1/monthly-reports", json=payload, headers=t_headers)
+    assert res.status_code == 200
+    assert res.json()["attendance_stats"]["total_days"] == 4
+
+
+def test_create_race_falls_back_to_update(db, monkeypatch):
+    """A second writer that misses the first writer's insert updates the row instead of hitting the unique index."""
+    from edutrack_api.repositories import monthly_reports_repo
+
+    ctx = _seed_staff_fixture(db)
+    first = monthly_reports_repo.upsert_monthly_report(
+        db, ctx["branch_id"], ctx["student_id"], ctx["room_id"], "2026-10", ctx["teacher_id"], {}, [], strengths="first"
+    )
+
+    real_lookup = monthly_reports_repo.get_monthly_report_by_student_month
+    calls = {"n": 0}
+
+    def stale_lookup(conn, student_id, month):
+        calls["n"] += 1
+        return None if calls["n"] == 1 else real_lookup(conn, student_id, month)
+
+    monkeypatch.setattr(monthly_reports_repo, "get_monthly_report_by_student_month", stale_lookup)
+    second = monthly_reports_repo.upsert_monthly_report(
+        db, ctx["branch_id"], ctx["student_id"], ctx["room_id"], "2026-10", ctx["teacher_id"], {}, [], strengths="second"
+    )
+    assert second["id"] == first["id"]
+    assert second["strengths"] == "second"
