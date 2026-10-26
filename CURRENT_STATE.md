@@ -11,8 +11,8 @@
 > **Target Client**: `Clients/03_GHERAS_Center` (EduTrack Pro — Smart Educational Center)  
 > **Master Orchestrator**: `Claude Code CLI` (Opus Max / Sonnet 5)  
 > **Handoff Source**: `Antigravity IDE` (Interactive Cockpit & Visual Inspector)  
-> **Timestamp**: 2026-10-26T05:30:00+03:00  
-> **Last updated:** 2026-10-26 05:30 (+03:00) — Antigravity IDE (Gemini 3.8 Flash High): Hook 31 Web Dashboard M5 Monthly Reports Portal & Supervisor Approval View integrated. HEAD `51f5e0b` on `main` [synced with origin].
+> **Timestamp**: 2026-10-26T08:15:00+03:00  
+> **Last updated:** 2026-10-26 08:15 (+03:00) — Antigravity IDE (Gemini 3.8 Flash High): Milestone M5 Quality Gate Audit certified [APPROVED] by Claude Code CLI (Session 32, R11 patch commit `665e9a9` fast-forwarded and pushed to origin/main). GATE_STATUS and Brain notes synchronized. HEAD `665e9a9` on `main` [synced with origin].
 > **Repository scope:** `Autovemtech` is the umbrella repository for every Autovem pillar and project (clients, AI systems, apps, tools). Gheras/EduTrack is one active client, not the repository's scope.
 > **VCS:** git at workspace root, branch `main`.
 
@@ -1084,4 +1084,34 @@ All 6 blocking defects (K1–K6) identified in Claude Code CLI's audit report ha
 
 ### Next Step: Claude Code CLI Gate Audit
 Execute Milestone M5 test suites and issue official `[APPROVED]` seal from Claude Code CLI interactive window.
+
+---
+
+## 30. Session 2026-10-26 — Milestone M5 Gate Audit Certified [APPROVED]
+
+- **Reviewer Patch R11 (`665e9a9`)**:
+  - **B1**: Publishing a monthly report now strictly requires prior approval (`status = 'approved'`).
+  - **B2**: `monthly_evaluation` permission is strictly validated on server router and web view (`reports.js`).
+  - **M1**: Review allowed only from `pending_approval`.
+  - **M2**: Atomic status update (`UPDATE ... WHERE status = <expected> RETURNING id`) prevents concurrent double notifications to guardians.
+  - **M3**: `/{id}/pdf` endpoint access restricted by role (prevents student role draft leaks).
+  - **Guardian Leak Closed**: `/me/monthly-reports/{id}` uses scoped guardian query (no `reviewer_name` or `revision_notes` leak; foreign student returns 404).
+  - **Tests**: 6 regression tests added; M5 server suites **33/33 green**. Full server suite **345 passed / 12 baseline reds** (0 M5 regressions). Android: `Migration8To9Test` 1/1 green; full suite 233/1 (only pre-existing `AuthInterceptorTest` baseline).
+- **Milestone M5 Verdict**: Officially certified **[APPROVED]** by Claude Code CLI sole testing authority.
+- **Carried Non-Blocking Minors**:
+  - Teacher-supplied attendance stats are trusted.
+  - Concurrent report create may return 500 on unique constraint collision.
+  - Web PDF link points to `student_report` template instead of standalone Chromium export.
+- **Status of M6 & M7**:
+  - Commit `fe80c38` self-tagged M6 and M7, but they have **NEVER been audited or gated** by Claude Code CLI.
+  - 2 server tests in `test_staff_geo_attendance_migration.py` (`test_migration_021_idempotent` and `test_geofence_settings_seeded`) are open reds arrived with M6.
+- **Open Environment Backlog**:
+  - The F: drive main checkout is 70 commits behind origin/main (with 11 unmerged local commits on top of 9ba794d).
+  - `Odoo/` directory held back on F: because `Odoo/Odoo Mcp API Key.md` contains a live plaintext bearer token (also `eng_Ibra_sign.jpg` and partner CSV).
+- **VCS**: Commit `665e9a9` fast-forwarded and pushed to `origin/main`. Working tree clean.
+
+### Next choices
+- **(a)** Milestone M6 (حضور وانصراف الكادر الإداري بالبصمة الجغرافية - Geofenced Staff Attendance): Fix the 2 migration test failures, verify Haversine calculation, and prepare M6 gate audit.
+- **(b)** Resolve F: drive checkout divergence (pull origin/main, isolate Odoo secrets into `.env`, sanitize signature and partner CSV).
+- **(c)** Assemble production release APK (`gradlew assembleRelease`) with R8 ProGuard map verification.
 
