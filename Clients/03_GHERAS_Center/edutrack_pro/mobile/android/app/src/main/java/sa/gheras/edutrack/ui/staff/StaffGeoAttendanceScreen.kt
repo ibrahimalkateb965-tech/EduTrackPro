@@ -1,5 +1,12 @@
 package sa.gheras.edutrack.ui.staff
 
+import android.Manifest
+import android.content.Context
+import android.content.pm.PackageManager
+import android.location.LocationManager
+import android.os.CancellationSignal
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -19,7 +26,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Warning
@@ -40,17 +46,24 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
+import androidx.core.location.LocationCompat
+import androidx.core.location.LocationManagerCompat
 import sa.gheras.edutrack.data.entity.StaffAttendanceEntity
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -62,6 +75,80 @@ fun StaffGeoAttendanceScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
+
+    val context = LocalContext.current
+    val locationManager = remember {
+        context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
+    }
+    val currentSignal = remember { mutableStateOf<CancellationSignal?>(null) }
+    var locationProviderDisabled by remember { mutableStateOf(false) }
+
+    fun readCurrentLocation() {
+        val provider = when {
+            locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER) -> LocationManager.GPS_PROVIDER
+            locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER) -> LocationManager.NETWORK_PROVIDER
+            else -> {
+                locationProviderDisabled = true
+                return
+            }
+        }
+        locationProviderDisabled = false
+        currentSignal.value?.cancel()
+        val signal = CancellationSignal()
+        currentSignal.value = signal
+        try {
+            LocationManagerCompat.getCurrentLocation(
+                locationManager,
+                provider,
+                signal,
+                ContextCompat.getMainExecutor(context)
+            ) { loc ->
+                if (loc != null) {
+                    viewModel.updateLocation(
+                        loc.latitude,
+                        loc.longitude,
+                        loc.accuracy.toDouble(),
+                        LocationCompat.isMock(loc)
+                    )
+                }
+            }
+        } catch (_: SecurityException) {
+            viewModel.onLocationPermissionDenied()
+        }
+    }
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { grants ->
+        if (grants.values.none { it }) {
+            viewModel.onLocationPermissionDenied()
+        } else {
+            readCurrentLocation()
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        val fineGranted = ContextCompat.checkSelfPermission(
+            context, Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+        val coarseGranted = ContextCompat.checkSelfPermission(
+            context, Manifest.permission.ACCESS_COARSE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+        if (fineGranted || coarseGranted) {
+            readCurrentLocation()
+        } else {
+            permissionLauncher.launch(
+                arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                )
+            )
+        }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose { currentSignal.value?.cancel() }
+    }
 
     LaunchedEffect(state.userMessage, state.errorMessage) {
         state.userMessage?.let {
@@ -186,65 +273,142 @@ fun StaffGeoAttendanceScreen(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
                     colors = CardDefaults.cardColors(
-                        containerColor = if (state.isInsideGeofence) Color(0xFFE8F5E9) else Color(0xFFFFEBEE)
+                        containerColor = when {
+                            state.isMockLocation || state.locationPermissionDenied -> Color(0xFFFFEBEE)
+                            !state.hasLocationFix -> MaterialTheme.colorScheme.surfaceVariant
+                            state.isInsideGeofence -> Color(0xFFE8F5E9)
+                            else -> Color(0xFFFFEBEE)
+                        }
                     )
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Icon(
-                                imageVector = if (state.isInsideGeofence) Icons.Default.CheckCircle else Icons.Default.Warning,
-                                contentDescription = null,
-                                tint = if (state.isInsideGeofence) Color(0xFF2E7D32) else Color(0xFFC62828)
-                            )
+                        when {
+                            state.isMockLocation -> {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Warning,
+                                        contentDescription = null,
+                                        tint = Color(0xFFC62828)
+                                    )
+                                    Text(
+                                        text = "تم رصد موقع وهمي",
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFFC62828)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "يرجى إيقاف تطبيقات تزييف الموقع ثم الضغط على «تحديث موقعي».",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = Color(0xFFC62828)
+                                )
+                            }
+                            state.locationPermissionDenied -> {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Warning,
+                                        contentDescription = null,
+                                        tint = Color(0xFFC62828)
+                                    )
+                                    Text(
+                                        text = "يجب السماح بالوصول إلى الموقع لتسجيل الحضور",
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFFC62828)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "يرجى منح إذن الموقع للتطبيق ثم الضغط على «تحديث موقعي».",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = Color(0xFFC62828)
+                                )
+                            }
+                            !state.hasLocationFix -> {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.MyLocation,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Text(
+                                        text = "جاري تحديد موقعك…",
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "يرجى الانتظار حتى يظهر موقعك الحالي.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            else -> {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = if (state.isInsideGeofence) Icons.Default.CheckCircle else Icons.Default.Warning,
+                                        contentDescription = null,
+                                        tint = if (state.isInsideGeofence) Color(0xFF2E7D32) else Color(0xFFC62828)
+                                    )
+                                    Text(
+                                        text = if (state.isInsideGeofence) "داخل نطاق مركز غراس" else "خارج النطاق الجغرافي للمركز",
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (state.isInsideGeofence) Color(0xFF2E7D32) else Color(0xFFC62828)
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                Text(
+                                    text = "المسافة من المركز: ${state.distanceMeters.toInt()}م (النطاق المسموح: ${state.geofenceRadiusMeters.toInt()}م)",
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                                Text(
+                                    text = "دقة إشارة GPS: ${state.currentAccuracy.toInt()}م (الحد المقبول: ${state.maxAccuracyMeters.toInt()}م)",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = if (state.isAccuracyAcceptable) Color(0xFF2E7D32) else Color(0xFFC62828)
+                                )
+                            }
+                        }
+
+                        if (locationProviderDisabled) {
+                            Spacer(modifier = Modifier.height(8.dp))
                             Text(
-                                text = if (state.isInsideGeofence) "داخل نطاق مركز غراس" else "خارج النطاق الجغرافي للمركز",
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = if (state.isInsideGeofence) Color(0xFF2E7D32) else Color(0xFFC62828)
+                                text = "خدمة الموقع مغلقة. يرجى تشغيل GPS/الموقع من إعدادات الجهاز ثم الضغط على «تحديث موقعي».",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color(0xFFC62828)
                             )
                         }
 
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        Text(
-                            text = "المسافة من المركز: ${state.distanceMeters.toInt()}م (النطاق المسموح: ${state.geofenceRadiusMeters.toInt()}م)",
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                        Text(
-                            text = "دقة إشارة GPS: ${state.currentAccuracy.toInt()}م (الحد المقبول: ${state.maxAccuracyMeters.toInt()}م)",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = if (state.isAccuracyAcceptable) Color(0xFF2E7D32) else Color(0xFFC62828)
-                        )
-
                         Spacer(modifier = Modifier.height(10.dp))
 
-                        // Quick Mock Buttons for verification & field testing
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        OutlinedButton(
+                            onClick = { readCurrentLocation() },
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            OutlinedButton(
-                                onClick = { viewModel.updateLocation(24.7136, 46.6753, 10.0) },
-                                modifier = Modifier.weight(1f),
-                                contentPadding = androidx.compose.foundation.layout.PaddingValues(4.dp)
-                            ) {
-                                Icon(Icons.Default.MyLocation, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("في المركز (0م)", style = MaterialTheme.typography.labelSmall)
-                            }
-
-                            OutlinedButton(
-                                onClick = { viewModel.updateLocation(24.7200, 46.6800, 15.0) },
-                                modifier = Modifier.weight(1f),
-                                contentPadding = androidx.compose.foundation.layout.PaddingValues(4.dp)
-                            ) {
-                                Icon(Icons.Default.LocationOn, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("خارج النطاق (800م)", style = MaterialTheme.typography.labelSmall)
-                            }
+                            Icon(
+                                Icons.Default.MyLocation,
+                                contentDescription = "تحديث موقعي",
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("تحديث موقعي", style = MaterialTheme.typography.labelMedium)
                         }
                     }
                 }
@@ -259,7 +423,7 @@ fun StaffGeoAttendanceScreen(
                     if (!state.isPunchedIn) {
                         Button(
                             onClick = { viewModel.punchCheckIn() },
-                            enabled = !state.isActionInProgress,
+                            enabled = !state.isActionInProgress && state.hasLocationFix && !state.isMockLocation,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(52.dp),
@@ -277,7 +441,7 @@ fun StaffGeoAttendanceScreen(
                     } else if (!state.isPunchedOut) {
                         Button(
                             onClick = { viewModel.punchCheckOut() },
-                            enabled = !state.isActionInProgress,
+                            enabled = !state.isActionInProgress && state.hasLocationFix && !state.isMockLocation,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(52.dp),

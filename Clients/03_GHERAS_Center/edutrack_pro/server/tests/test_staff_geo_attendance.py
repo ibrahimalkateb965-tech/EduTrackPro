@@ -275,6 +275,34 @@ def test_status_reads_do_not_write(db_conn):
     assert staff_after == staff_before
 
 
+def test_my_today_status_exposes_staff_id_and_max_accuracy(db_conn):
+    branch_id = "00000000-0000-0000-0000-000000000001"
+    user_id = db_conn.execute("""
+        INSERT INTO users (branch_id, username, password_hash, role, is_active)
+        VALUES (%s, %s, 'fakehash', 'teacher', true)
+        RETURNING id
+    """, (branch_id, f"status_linked_{uuid4().hex[:6]}")).fetchone()["id"]
+
+    staff_id = db_conn.execute("""
+        INSERT INTO staff (branch_id, name, role_title, status)
+        VALUES (%s, 'معلمة الحالة', 'معلمة', 'active')
+        RETURNING id
+    """, (branch_id,)).fetchone()["id"]
+
+    db_conn.execute("UPDATE users SET staff_id = %s WHERE id = %s", (staff_id, user_id))
+
+    db_conn.execute("""
+        INSERT INTO system_settings (key, value) VALUES ('geofence_max_accuracy_meters', %s)
+        ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
+    """, ("35",))
+
+    user = {"id": user_id, "role": "teacher", "branch_id": branch_id, "staff_id": staff_id}
+    status = staff_attendance_repo.get_my_today_status(db_conn, user)
+
+    assert status["staff_id"] == str(staff_id)
+    assert status["geofence"]["max_accuracy_meters"] == 35.0
+
+
 def test_manager_without_staff_can_override(db_conn):
     branch_id = "00000000-0000-0000-0000-000000000001"
     mgr_user_id = db_conn.execute("""

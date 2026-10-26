@@ -44,4 +44,15 @@ class ErrorMapperTest {
         assertTrue(err is AppError.Server)
         assertEquals("تعذّر الاتصال بالخادم — حاول لاحقًا", err.userMessage)
     }
+
+    @Test
+    fun testMap_http422_nestedServerError_returnsServerMessage() {
+        val body = ("{\"error\":{\"code\":\"STAFF_NOT_LINKED\"," +
+            "\"message\":\"حسابك غير مرتبط بسجل موظف. يرجى مراجعة الإدارة\"}}")
+            .toResponseBody("application/json".toMediaType())
+        val response = Response.error<Unit>(422, body)
+        val err = ErrorMapper.map(HttpException(response))
+        assertTrue(err is AppError.Validation)
+        assertEquals("حسابك غير مرتبط بسجل موظف. يرجى مراجعة الإدارة", err.userMessage)
+    }
 }

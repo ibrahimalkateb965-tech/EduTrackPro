@@ -65,7 +65,7 @@ data class StaffAttendanceRecordDto(
 
 @Serializable
 data class StaffShiftDto(
-    val id: String,
+    val id: String? = null,
     @SerialName("branch_id")
     val branchId: String? = null,
     val name: String,
@@ -100,6 +100,8 @@ data class GeofenceConfigDto(
 @Serializable
 data class StaffStatusResponseDto(
     val date: String? = null,
+    @SerialName("staff_id")
+    val staffId: String? = null,
     val shift: StaffShiftDto? = null,
     val geofence: GeofenceConfigDto = GeofenceConfigDto(),
     val attendance: StaffAttendanceRecordDto? = null

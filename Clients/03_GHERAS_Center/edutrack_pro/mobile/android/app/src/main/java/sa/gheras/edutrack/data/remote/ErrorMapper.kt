@@ -1,8 +1,9 @@
 package sa.gheras.edutrack.data.remote
 
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import retrofit2.HttpException
-import sa.gheras.edutrack.data.remote.dto.ApiErrorBody
 import java.io.IOException
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
@@ -45,10 +46,22 @@ object ErrorMapper {
     private fun extractServerMessage(exception: HttpException): String? {
         return try {
             val errorBody = exception.response()?.errorBody()?.string() ?: return null
-            val apiError = json.decodeFromString<ApiErrorBody>(errorBody)
-            apiError.message ?: apiError.detail ?: apiError.error
+            val root = parseErrorBody(errorBody) ?: return null
+            val nestedError = root["error"] as? JsonObject
+            if (nestedError != null) {
+                (nestedError["message"] as? JsonPrimitive)?.content
+            } else {
+                (root["message"] as? JsonPrimitive)?.content
+                    ?: (root["detail"] as? JsonPrimitive)?.content
+                    ?: (root["error"] as? JsonPrimitive)?.content
+            }
         } catch (e: Exception) {
             null
         }
+    }
+
+    private fun parseErrorBody(body: String): JsonObject? {
+        val element = json.parseToJsonElement(body)
+        return element as? JsonObject
     }
 }

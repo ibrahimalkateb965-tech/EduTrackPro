@@ -345,11 +345,13 @@ def get_my_today_status(conn, user: dict) -> dict[str, Any]:
 
     return {
         "date": str(today),
+        "staff_id": str(staff_id),
         "shift": shift,
         "geofence": {
             "center_lat": settings["center_lat"],
             "center_lng": settings["center_lng"],
             "radius_meters": settings["radius_meters"],
+            "max_accuracy_meters": settings["max_accuracy_meters"],
         },
         "attendance": dict(row) if row else None,
     }

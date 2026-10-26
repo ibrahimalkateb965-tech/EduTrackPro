@@ -1,6 +1,5 @@
 package sa.gheras.edutrack.data.remote.dto
 
-import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -11,10 +10,3 @@ data class Envelope<T>(
     val offset: Int = 0
 )
 
-@Serializable
-data class ApiErrorBody(
-    val detail: String? = null,
-    val error: String? = null,
-    val message: String? = null,
-    val code: String? = null
-)

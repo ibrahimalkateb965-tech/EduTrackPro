@@ -73,8 +73,8 @@ class StaffAttendanceRepository(
             response.attendance?.let {
                 staffAttendanceDao.upsertOne(it.toEntity())
             }
-            response.shift?.let {
-                staffAttendanceDao.upsertShifts(listOf(it.toEntity()))
+            response.shift?.let { shift ->
+                shift.id?.let { id -> staffAttendanceDao.upsertShifts(listOf(shift.toEntity(id))) }
             }
             response
         }
@@ -149,7 +149,7 @@ class StaffAttendanceRepository(
         )
     }
 
-    private fun StaffShiftDto.toEntity(): StaffShiftEntity {
+    private fun StaffShiftDto.toEntity(id: String): StaffShiftEntity {
         return StaffShiftEntity(
             id = id,
             branchId = branchId,

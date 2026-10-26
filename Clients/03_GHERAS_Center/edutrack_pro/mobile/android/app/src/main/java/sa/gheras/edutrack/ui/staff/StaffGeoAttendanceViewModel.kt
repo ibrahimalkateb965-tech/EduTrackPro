@@ -2,14 +2,20 @@ package sa.gheras.edutrack.ui.staff
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import sa.gheras.edutrack.data.entity.StaffAttendanceEntity
+import sa.gheras.edutrack.data.remote.ErrorMapper
 import sa.gheras.edutrack.data.repo.StaffAttendanceRepository
 import java.time.LocalDate
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import kotlin.math.atan2
 import kotlin.math.cos
@@ -31,16 +37,19 @@ data class StaffGeoAttendanceUiState(
     val centerLng: Double = 46.6753,
     val currentLat: Double = 24.7136,
     val currentLng: Double = 46.6753,
-    val currentAccuracy: Double = 12.0,
+    val hasLocationFix: Boolean = false,
+    val isMockLocation: Boolean = false,
+    val locationPermissionDenied: Boolean = false,
+    val currentAccuracy: Double = 0.0,
     val distanceMeters: Double = 0.0,
-    val isInsideGeofence: Boolean = true,
-    val isAccuracyAcceptable: Boolean = true,
+    val isInsideGeofence: Boolean = false,
+    val isAccuracyAcceptable: Boolean = false,
     val maxAccuracyMeters: Double = 50.0,
     val geofenceRadiusMeters: Double = 200.0,
     val activeShiftName: String? = null,
     val activeShiftTimes: String? = null,
     // History
-    val historyMonth: String = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy-MM")),
+    val historyMonth: String = LocalDate.now(ZoneId.of("Asia/Riyadh")).format(DateTimeFormatter.ofPattern("yyyy-MM")),
     val historyRecords: List<StaffAttendanceEntity> = emptyList(),
     val totalDays: Int = 0,
     val presentDays: Int = 0,
@@ -52,13 +61,16 @@ data class StaffGeoAttendanceUiState(
     val errorMessage: String? = null
 )
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class StaffGeoAttendanceViewModel(
-    private val staffId: String,
     private val staffAttendanceRepository: StaffAttendanceRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(StaffGeoAttendanceUiState())
     val uiState: StateFlow<StaffGeoAttendanceUiState> = _uiState.asStateFlow()
+
+    private val staffIdFlow = MutableStateFlow<String?>(null)
+    private val todayDateFlow = MutableStateFlow<String?>(null)
 
     init {
         observeLocalAttendance()
@@ -66,9 +78,12 @@ class StaffGeoAttendanceViewModel(
     }
 
     private fun observeLocalAttendance() {
-        val todayStr = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE)
         viewModelScope.launch {
-            staffAttendanceRepository.observeTodayAttendance(staffId, todayStr).collect { att ->
+            combine(staffIdFlow.filterNotNull(), todayDateFlow.filterNotNull()) { staffId, date ->
+                staffId to date
+            }.flatMapLatest { (staffId, date) ->
+                staffAttendanceRepository.observeTodayAttendance(staffId, date)
+            }.collect { att ->
                 if (att != null) {
                     _uiState.update { current ->
                         current.copy(
@@ -86,7 +101,9 @@ class StaffGeoAttendanceViewModel(
         }
 
         viewModelScope.launch {
-            staffAttendanceRepository.observeMyAttendanceForMonth(staffId, _uiState.value.historyMonth).collect { records ->
+            staffIdFlow.filterNotNull().flatMapLatest { staffId ->
+                staffAttendanceRepository.observeMyAttendanceForMonth(staffId, _uiState.value.historyMonth)
+            }.collect { records ->
                 val present = records.count { it.status in listOf("حاضر", "present") }
                 val late = records.count { it.status in listOf("متأخر", "late") || it.lateMinutes > 0 }
                 val hours = records.sumOf { it.workDurationMinutes } / 60.0
@@ -106,40 +123,52 @@ class StaffGeoAttendanceViewModel(
     fun refreshAll() {
         _uiState.update { it.copy(isLoading = true, errorMessage = null) }
         viewModelScope.launch {
-            // 1. Refresh today status from API
-            val statusRes = staffAttendanceRepository.refreshMyStatus()
-            statusRes.onSuccess { res ->
-                val geo = res.geofence
-                val shift = res.shift
-                val att = res.attendance
-                val dist = calculateDistance(_uiState.value.currentLat, _uiState.value.currentLng, geo.centerLat, geo.centerLng)
-                _uiState.update { current ->
-                    current.copy(
-                        centerLat = geo.centerLat,
-                        centerLng = geo.centerLng,
-                        geofenceRadiusMeters = geo.radiusMeters,
-                        maxAccuracyMeters = geo.maxAccuracyMeters,
-                        distanceMeters = dist,
-                        isInsideGeofence = dist <= geo.radiusMeters,
-                        isAccuracyAcceptable = current.currentAccuracy <= geo.maxAccuracyMeters,
-                        activeShiftName = shift?.name ?: "الدوام الرسمي",
-                        activeShiftTimes = if (shift != null) "${shift.startTime} - ${shift.endTime}" else "07:30 - 13:30",
-                        isPunchedIn = att?.checkInTime != null,
-                        isPunchedOut = att?.checkOutTime != null,
-                        checkInTime = att?.checkInTime,
-                        checkOutTime = att?.checkOutTime,
-                        todayStatus = att?.status
-                    )
-                }
-            }
+            staffAttendanceRepository.refreshMyStatus()
+                .onSuccess { res ->
+                    staffIdFlow.value = res.staffId
+                    todayDateFlow.value = res.date
+                    val geo = res.geofence
+                    val shift = res.shift
+                    val att = res.attendance
+                    _uiState.update { current ->
+                        val hasFix = current.hasLocationFix
+                        val dist = if (hasFix) {
+                            calculateDistance(current.currentLat, current.currentLng, geo.centerLat, geo.centerLng)
+                        } else {
+                            current.distanceMeters
+                        }
+                        current.copy(
+                            centerLat = geo.centerLat,
+                            centerLng = geo.centerLng,
+                            geofenceRadiusMeters = geo.radiusMeters,
+                            maxAccuracyMeters = geo.maxAccuracyMeters,
+                            distanceMeters = dist,
+                            isInsideGeofence = hasFix && dist <= geo.radiusMeters,
+                            isAccuracyAcceptable = hasFix && current.currentAccuracy <= geo.maxAccuracyMeters,
+                            activeShiftName = shift?.name ?: "الدوام الرسمي",
+                            activeShiftTimes = if (shift != null) "${shift.startTime} - ${shift.endTime}" else "07:30 - 13:30",
+                            isPunchedIn = att?.checkInTime != null,
+                            isPunchedOut = att?.checkOutTime != null,
+                            checkInTime = att?.checkInTime,
+                            checkOutTime = att?.checkOutTime,
+                            todayStatus = att?.status
+                        )
+                    }
 
-            // 2. Refresh monthly history
-            staffAttendanceRepository.refreshMyHistory(_uiState.value.historyMonth)
-            _uiState.update { it.copy(isLoading = false) }
+                    // 2. Refresh monthly history
+                    staffAttendanceRepository.refreshMyHistory(_uiState.value.historyMonth)
+                    _uiState.update { it.copy(isLoading = false) }
+                }
+                .onFailure { err ->
+                    _uiState.update {
+                        it.copy(isLoading = false, errorMessage = ErrorMapper.map(err).userMessage)
+                    }
+                    return@launch
+                }
         }
     }
 
-    fun updateLocation(lat: Double, lng: Double, accuracy: Double) {
+    fun updateLocation(lat: Double, lng: Double, accuracy: Double, isMock: Boolean = false) {
         val dist = calculateDistance(lat, lng, _uiState.value.centerLat, _uiState.value.centerLng)
         val inside = dist <= _uiState.value.geofenceRadiusMeters
         val accurate = accuracy <= _uiState.value.maxAccuracyMeters
@@ -148,6 +177,8 @@ class StaffGeoAttendanceViewModel(
                 currentLat = lat,
                 currentLng = lng,
                 currentAccuracy = accuracy,
+                hasLocationFix = true,
+                isMockLocation = isMock,
                 distanceMeters = dist,
                 isInsideGeofence = inside,
                 isAccuracyAcceptable = accurate
@@ -155,19 +186,40 @@ class StaffGeoAttendanceViewModel(
         }
     }
 
-    fun punchCheckIn() {
+    fun onLocationPermissionDenied() {
+        _uiState.update { it.copy(locationPermissionDenied = true) }
+    }
+
+    private fun guardPunch(): Boolean {
+        if (!_uiState.value.hasLocationFix) {
+            _uiState.update {
+                it.copy(errorMessage = "جاري تحديد موقعك… يرجى الانتظار حتى يظهر موقعك الحالي.")
+            }
+            return false
+        }
+        if (_uiState.value.isMockLocation) {
+            _uiState.update {
+                it.copy(errorMessage = "تم رصد موقع وهمي. يرجى إيقاف تطبيقات تزييف الموقع ثم المحاولة.")
+            }
+            return false
+        }
         if (!_uiState.value.isInsideGeofence) {
             _uiState.update {
                 it.copy(errorMessage = "أنت خارج نطاق مركز غراس الجغرافي (${it.distanceMeters.toInt()}م من المركز). يجب أن تكون داخل نطاق ${it.geofenceRadiusMeters.toInt()}م.")
             }
-            return
+            return false
         }
         if (!_uiState.value.isAccuracyAcceptable) {
             _uiState.update {
                 it.copy(errorMessage = "دقة نظام GPS غير كافية (${it.currentAccuracy.toInt()}م). الحد المقبول ${it.maxAccuracyMeters.toInt()}م. يرجى التوجه لمكان مكشوف.")
             }
-            return
+            return false
         }
+        return true
+    }
+
+    fun punchCheckIn() {
+        if (!guardPunch()) return
 
         _uiState.update { it.copy(isActionInProgress = true, errorMessage = null, userMessage = null) }
         viewModelScope.launch {
@@ -191,7 +243,7 @@ class StaffGeoAttendanceViewModel(
                 _uiState.update {
                     it.copy(
                         isActionInProgress = false,
-                        errorMessage = err.message ?: "تعذر تسجيل الحضور. يرجى المحاولة مرة أخرى."
+                        errorMessage = ErrorMapper.map(err).userMessage
                     )
                 }
             }
@@ -199,12 +251,7 @@ class StaffGeoAttendanceViewModel(
     }
 
     fun punchCheckOut() {
-        if (!_uiState.value.isInsideGeofence) {
-            _uiState.update {
-                it.copy(errorMessage = "أنت خارج نطاق المركز (${it.distanceMeters.toInt()}م). يجب أن تكون ضمن النطاق لتسجيل الانصراف.")
-            }
-            return
-        }
+        if (!guardPunch()) return
 
         _uiState.update { it.copy(isActionInProgress = true, errorMessage = null, userMessage = null) }
         viewModelScope.launch {
@@ -228,7 +275,7 @@ class StaffGeoAttendanceViewModel(
                 _uiState.update {
                     it.copy(
                         isActionInProgress = false,
-                        errorMessage = err.message ?: "تعذر تسجيل الانصراف. يرجى المحاولة مرة أخرى."
+                        errorMessage = ErrorMapper.map(err).userMessage
                     )
                 }
             }

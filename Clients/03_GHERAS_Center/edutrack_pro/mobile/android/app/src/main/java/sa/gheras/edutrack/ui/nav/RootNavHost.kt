@@ -1016,11 +1016,9 @@ fun RootNavHost(
                 }
 
                 composable<StaffGeoAttendanceRoute> {
-                    val staffId = container.sessionStore.user?.id ?: ""
                     val vm: sa.gheras.edutrack.ui.staff.StaffGeoAttendanceViewModel = viewModel(
                         factory = viewModelFactory {
                             sa.gheras.edutrack.ui.staff.StaffGeoAttendanceViewModel(
-                                staffId = staffId,
                                 staffAttendanceRepository = container.staffAttendanceRepository
                             )
                         }
@@ -1032,11 +1030,9 @@ fun RootNavHost(
                 }
 
                 composable<SupervisorStaffAttendanceRoute> {
-                    val staffId = container.sessionStore.user?.id
                     val vm: sa.gheras.edutrack.ui.supervisor.attendance.SupervisorStaffAttendanceViewModel = viewModel(
                         factory = viewModelFactory {
                             sa.gheras.edutrack.ui.supervisor.attendance.SupervisorStaffAttendanceViewModel(
-                                currentStaffId = staffId,
                                 staffAttendanceRepository = container.staffAttendanceRepository
                             )
                         }

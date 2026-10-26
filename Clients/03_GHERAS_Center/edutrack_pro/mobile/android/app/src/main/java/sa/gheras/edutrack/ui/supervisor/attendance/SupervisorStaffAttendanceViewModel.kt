@@ -7,15 +7,17 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import sa.gheras.edutrack.data.remote.ErrorMapper
 import sa.gheras.edutrack.data.remote.dto.StaffAttendanceRecordDto
 import sa.gheras.edutrack.data.remote.dto.SupervisorOverrideRequest
 import sa.gheras.edutrack.data.repo.StaffAttendanceRepository
 import java.time.LocalDate
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 data class SupervisorStaffAttendanceUiState(
-    val selectedDate: String = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE),
-    val selectedMonth: String = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy-MM")),
+    val selectedDate: String = LocalDate.now(ZoneId.of("Asia/Riyadh")).format(DateTimeFormatter.ISO_LOCAL_DATE),
+    val selectedMonth: String = LocalDate.now(ZoneId.of("Asia/Riyadh")).format(DateTimeFormatter.ofPattern("yyyy-MM")),
     val records: List<StaffAttendanceRecordDto> = emptyList(),
     val totalCount: Int = 0,
     val presentCount: Int = 0,
@@ -32,15 +34,23 @@ data class SupervisorStaffAttendanceUiState(
 )
 
 class SupervisorStaffAttendanceViewModel(
-    private val currentStaffId: String?,
     private val staffAttendanceRepository: StaffAttendanceRepository
 ) : ViewModel() {
+
+    private var currentStaffId: String? = null
 
     private val _uiState = MutableStateFlow(SupervisorStaffAttendanceUiState())
     val uiState: StateFlow<SupervisorStaffAttendanceUiState> = _uiState.asStateFlow()
 
     init {
-        loadAttendance()
+        viewModelScope.launch {
+            // The staff id lives on the server, not in the session. A manager
+            // without a staff row gets 422 STAFF_NOT_LINKED: keep null, no error.
+            staffAttendanceRepository.refreshMyStatus().onSuccess { res ->
+                currentStaffId = res.staffId
+            }
+            loadAttendance()
+        }
     }
 
     fun setDate(date: String) {
@@ -73,7 +83,7 @@ class SupervisorStaffAttendanceViewModel(
                 _uiState.update {
                     it.copy(
                         isLoading = false,
-                        errorMessage = err.message ?: "تعذر جلب سجلات حضور الكادر."
+                        errorMessage = ErrorMapper.map(err).userMessage
                     )
                 }
             }
@@ -147,7 +157,7 @@ class SupervisorStaffAttendanceViewModel(
                 _uiState.update {
                     it.copy(
                         isOverriding = false,
-                        errorMessage = err.message ?: "فشل حفظ التعديل اليدوي."
+                        errorMessage = ErrorMapper.map(err).userMessage
                     )
                 }
             }
