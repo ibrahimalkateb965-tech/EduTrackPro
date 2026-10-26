@@ -11,8 +11,8 @@
 > **Target Client**: `Clients/03_GHERAS_Center` (EduTrack Pro — Smart Educational Center)  
 > **Master Orchestrator**: `Claude Code CLI` (Opus Max / Sonnet 5)  
 > **Handoff Source**: `Antigravity IDE` (Interactive Cockpit & Visual Inspector)  
-> **Timestamp**: 2026-10-25T23:35:00+03:00  
-> **Last updated:** 2026-10-25 23:35 (+03:00) — Antigravity IDE (Gemini 3.8 Flash High): APK Security Audit (REA) + 4 pre-release security hardenings completed & certified [APPROVED]. Clean Architecture Layers 1-4 synced. HEAD `a6288e7` on `main` [synced with origin].
+> **Timestamp**: 2026-10-26T05:30:00+03:00  
+> **Last updated:** 2026-10-26 05:30 (+03:00) — Antigravity IDE (Gemini 3.8 Flash High): Hook 31 Web Dashboard M5 Monthly Reports Portal & Supervisor Approval View integrated. HEAD `51f5e0b` on `main` [synced with origin].
 > **Repository scope:** `Autovemtech` is the umbrella repository for every Autovem pillar and project (clients, AI systems, apps, tools). Gheras/EduTrack is one active client, not the repository's scope.
 > **VCS:** git at workspace root, branch `main`.
 
@@ -1069,4 +1069,19 @@ All 6 blocking defects (K1–K6) identified in Claude Code CLI's audit report ha
 - **(a)** Milestone M5 (التقارير الشهرية وإحصائيات الطلاب - Monthly Reports & Dashboards): Design spec, backend endpoints, and mobile/web views.
 - **(b)** Milestone M6 (حضور وانصراف الكادر بالبصمة الجغرافية - Geofenced Staff Attendance): Geofencing verification, attendance punch API, and manager review.
 - **(c)** Build & test release APK (`gradlew assembleRelease`) with R8 and verify ProGuard mapping.
+
+---
+
+## 29. Session 2026-10-26 — Web Dashboard Milestone M5 Integration & Supervisor Portal [Hook 31]
+
+- **Interactive Monthly Reports Management Portal**: Upgraded `Clients/03_GHERAS_Center/edutrack_pro/web/dashboard/js/views/reports.js` with full Milestone M5 feature parity:
+  1. **Dual Tab System**: Clean separation between Tab 1 (Official Print Documents & Audit Log) and Tab 2 (Interactive Student Monthly Reports Portal M5).
+  2. **Supervisor Oversight & Actions**: Integrated report review modal displaying auto-aggregated attendance stats (present, absent, excused, late, commitment %), 5-level subject ratings matrix (Outstanding, Mastered, Good, Needs Followup, Needs Support), qualitative notes (strengths, improvements, recommendations), and revision notes.
+  3. **One-Click Decisions**: Direct API bindings for `approve`, `request_revision` (with mandatory guided notes modal), `publish` to parents with automated notification broadcasting, and classroom `batch-publish`.
+  4. **Dynamic KPIs & Filter Bar**: Instant status counters (all, pending_approval, approved, published), month selector, classroom dropdown, status filter, and live text search.
+  5. **Supervisor Permission Alignment**: Updated `app.js` routing logic to grant supervisors with `perms.monthly_evaluation` access to the reports module.
+- **VCS**: Committed as `51f5e0b` on `main`, pushed to `origin/main`. Working tree clean.
+
+### Next Step: Claude Code CLI Gate Audit
+Execute Milestone M5 test suites and issue official `[APPROVED]` seal from Claude Code CLI interactive window.
 
