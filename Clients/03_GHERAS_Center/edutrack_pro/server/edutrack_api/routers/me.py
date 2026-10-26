@@ -407,11 +407,9 @@ def get_my_monthly_report(
 ) -> dict:
     _only(scope, "guardian", "student")
     from edutrack_api.repositories import monthly_reports_repo
-    report = monthly_reports_repo.get_monthly_report_by_id(conn, report_id)
-    if not report or report["status"] != "published":
+    report = monthly_reports_repo.get_guardian_monthly_report_by_id(conn, report_id, list(scope.student_ids))
+    if not report:
         raise ApiError(404, "not_found", "التقرير غير متاح أو قيد الاعتماد")
-    if scope.student_ids is not None and report["student_id"] not in scope.student_ids:
-        raise ApiError(403, "forbidden", "الطالب لا ينتمي لسجل أبنائك")
     return row_to_json(report)
 
 

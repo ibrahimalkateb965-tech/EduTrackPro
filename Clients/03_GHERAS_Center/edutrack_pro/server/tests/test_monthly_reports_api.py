@@ -50,6 +50,10 @@ def _seed_staff_fixture(db):
     supervisor_id = db.execute(
         "INSERT INTO users (username, role, password_hash) VALUES ('supervisor_m5_api', 'supervisor', 'hash') RETURNING id"
     ).fetchone()["id"]
+    db.execute(
+        "INSERT INTO user_permissions (branch_id, user_id, monthly_evaluation) VALUES (%s, %s, TRUE)",
+        (branch_id, supervisor_id),
+    )
 
     # Student in room_id
     student_id = db.execute(
@@ -251,3 +255,144 @@ def test_batch_publish_api(client, db):
     published_items = res_batch.json()
     assert len(published_items) == 1
     assert published_items[0]["status"] == "published"
+
+
+def _submit_report(client, ctx, t_headers) -> str:
+    payload = {
+        "student_id": str(ctx["student_id"]),
+        "room_id": str(ctx["room_id"]),
+        "month": "2026-10",
+        "action": "submit",
+    }
+    res = client.post("/api/v1/monthly-reports", json=payload, headers=t_headers)
+    assert res.status_code == 200
+    return res.json()["id"]
+
+
+def _guardian_notification_count(db, guardian_user_id) -> int:
+    return db.execute(
+        "SELECT count(*) AS n FROM notifications WHERE user_id = %s AND target_type = 'monthly_report'",
+        (guardian_user_id,),
+    ).fetchone()["n"]
+
+
+def test_publish_requires_approval(client, db):
+    """B1: a pending report cannot be published (single or batch) and guardians are not notified."""
+    ctx = _seed_staff_fixture(db)
+    t_headers = _auth_header(ctx["teacher_id"], "teacher")
+    s_headers = _auth_header(ctx["supervisor_id"], "supervisor")
+    report_id = _submit_report(client, ctx, t_headers)
+
+    res = client.post(f"/api/v1/monthly-reports/{report_id}/publish", headers=s_headers)
+    assert res.status_code == 422
+
+    res_batch = client.post(
+        "/api/v1/monthly-reports/batch-publish",
+        json={"room_id": str(ctx["room_id"]), "month": "2026-10"},
+        headers=s_headers,
+    )
+    assert res_batch.status_code == 200
+    assert res_batch.json() == []
+
+    status = db.execute("SELECT status FROM monthly_student_reports WHERE id = %s", (report_id,)).fetchone()["status"]
+    assert status == "pending_approval"
+    assert _guardian_notification_count(db, ctx["guardian_user_id"]) == 0
+
+
+def test_review_and_publish_require_monthly_evaluation_permission(client, db):
+    """B2: a supervisor without the monthly_evaluation flag cannot review, publish or batch-publish."""
+    ctx = _seed_staff_fixture(db)
+    t_headers = _auth_header(ctx["teacher_id"], "teacher")
+    report_id = _submit_report(client, ctx, t_headers)
+
+    plain_sup_id = db.execute(
+        "INSERT INTO users (username, role, password_hash) VALUES ('supervisor_m5_noperm', 'supervisor', 'hash') RETURNING id"
+    ).fetchone()["id"]
+    db.execute(
+        "INSERT INTO user_permissions (branch_id, user_id, daily_evaluation, students) VALUES (%s, %s, TRUE, TRUE)",
+        (ctx["branch_id"], plain_sup_id),
+    )
+    db.commit()
+    p_headers = _auth_header(plain_sup_id, "supervisor")
+
+    res_rev = client.post(f"/api/v1/monthly-reports/{report_id}/review", json={"action": "approve"}, headers=p_headers)
+    assert res_rev.status_code == 403
+
+    # Approve with the permitted supervisor, then the plain one still cannot publish
+    s_headers = _auth_header(ctx["supervisor_id"], "supervisor")
+    assert client.post(f"/api/v1/monthly-reports/{report_id}/review", json={"action": "approve"}, headers=s_headers).status_code == 200
+
+    assert client.post(f"/api/v1/monthly-reports/{report_id}/publish", headers=p_headers).status_code == 403
+    res_batch = client.post(
+        "/api/v1/monthly-reports/batch-publish",
+        json={"room_id": str(ctx["room_id"]), "month": "2026-10"},
+        headers=p_headers,
+    )
+    assert res_batch.status_code == 403
+    assert _guardian_notification_count(db, ctx["guardian_user_id"]) == 0
+
+
+def test_cannot_approve_report_awaiting_revision(client, db):
+    """M1: a report sent back for revision must be resubmitted before approval."""
+    ctx = _seed_staff_fixture(db)
+    t_headers = _auth_header(ctx["teacher_id"], "teacher")
+    s_headers = _auth_header(ctx["supervisor_id"], "supervisor")
+    report_id = _submit_report(client, ctx, t_headers)
+
+    res_rev = client.post(
+        f"/api/v1/monthly-reports/{report_id}/review",
+        json={"action": "request_revision", "revision_notes": "يرجى استكمال الملاحظات"},
+        headers=s_headers,
+    )
+    assert res_rev.status_code == 200
+
+    res_app = client.post(f"/api/v1/monthly-reports/{report_id}/review", json={"action": "approve"}, headers=s_headers)
+    assert res_app.status_code == 422
+    status = db.execute("SELECT status FROM monthly_student_reports WHERE id = %s", (report_id,)).fetchone()["status"]
+    assert status == "needs_revision"
+
+
+def test_double_publish_notifies_guardian_once(client, db):
+    """M2: a repeated publish is rejected and guardians get exactly one notification."""
+    ctx = _seed_staff_fixture(db)
+    t_headers = _auth_header(ctx["teacher_id"], "teacher")
+    s_headers = _auth_header(ctx["supervisor_id"], "supervisor")
+    report_id = _submit_report(client, ctx, t_headers)
+    client.post(f"/api/v1/monthly-reports/{report_id}/review", json={"action": "approve"}, headers=s_headers)
+
+    assert client.post(f"/api/v1/monthly-reports/{report_id}/publish", headers=s_headers).status_code == 200
+    assert client.post(f"/api/v1/monthly-reports/{report_id}/publish", headers=s_headers).status_code == 422
+    assert _guardian_notification_count(db, ctx["guardian_user_id"]) == 1
+
+
+def test_publish_rejects_stale_read(db, monkeypatch):
+    """M2: when another publisher wins between the read and the update, the update matches no row."""
+    from edutrack_api.repositories import monthly_reports_repo
+
+    ctx = _seed_staff_fixture(db)
+    report = monthly_reports_repo.upsert_monthly_report(
+        db, ctx["branch_id"], ctx["student_id"], ctx["room_id"], "2026-10", ctx["teacher_id"], {}, [], action="submit"
+    )
+    monthly_reports_repo.review_monthly_report(db, report["id"], ctx["supervisor_id"], action="approve")
+    stale = dict(monthly_reports_repo.get_monthly_report_by_id(db, report["id"]))
+    db.execute("UPDATE monthly_student_reports SET status = 'published' WHERE id = %s", (report["id"],))
+
+    monkeypatch.setattr(monthly_reports_repo, "get_monthly_report_by_id", lambda conn, rid: stale)
+    with pytest.raises(ValueError):
+        monthly_reports_repo.publish_monthly_report(db, report["id"], ctx["supervisor_id"])
+
+
+def test_pdf_endpoint_rejects_student_role(client, db):
+    """M3: only staff and guardians may read the report PDF link; a student account cannot read a draft."""
+    ctx = _seed_staff_fixture(db)
+    t_headers = _auth_header(ctx["teacher_id"], "teacher")
+    report_id = _submit_report(client, ctx, t_headers)
+
+    student_user_id = db.execute(
+        "INSERT INTO users (username, role, password_hash, student_id) VALUES ('student_m5_pdf', 'student', 'hash', %s) RETURNING id",
+        (ctx["student_id"],),
+    ).fetchone()["id"]
+    db.commit()
+
+    res = client.get(f"/api/v1/monthly-reports/{report_id}/pdf", headers=_auth_header(student_user_id, "student"))
+    assert res.status_code == 403

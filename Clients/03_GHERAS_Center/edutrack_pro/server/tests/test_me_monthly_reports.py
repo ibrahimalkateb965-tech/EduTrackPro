@@ -77,6 +77,10 @@ def _seed_guardian_fixture(db):
     supervisor_id = db.execute(
         "INSERT INTO users (username, role, password_hash) VALUES ('supervisor_m5_me', 'supervisor', 'hash') RETURNING id"
     ).fetchone()["id"]
+    db.execute(
+        "INSERT INTO user_permissions (branch_id, user_id, monthly_evaluation) VALUES (%s, %s, TRUE)",
+        (branch_id, supervisor_id),
+    )
 
     db.commit()
     return {

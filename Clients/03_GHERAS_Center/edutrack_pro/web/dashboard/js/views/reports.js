@@ -199,8 +199,15 @@ async function fetchMonthlyReports() {
   }
 }
 
+// Review and publish require the monthly_evaluation flag; managers always have it
+function canReviewMonthlyReports() {
+  const user = currentApi?.currentUser;
+  if (!user || user.role === 'manager') return true;
+  return user.role === 'supervisor' && Boolean(user.permissions?.monthly_evaluation);
+}
+
 function showReportDetailsModal(report, onActionDone) {
-  const isSupervisorOrManager = !currentApi?.currentUser || ['manager', 'supervisor'].includes(currentApi.currentUser.role);
+  const isSupervisorOrManager = canReviewMonthlyReports();
   const stats = report.attendance_stats || {};
   const ratings = Array.isArray(report.subject_ratings) ? report.subject_ratings : [];
 
@@ -279,8 +286,8 @@ function showReportDetailsModal(report, onActionDone) {
   let currentModal = null;
 
   if (isSupervisorOrManager) {
-    // Approve button (if pending_approval or needs_revision)
-    if (['pending_approval', 'needs_revision'].includes(report.status)) {
+    // Approve button (if pending_approval)
+    if (report.status === 'pending_approval') {
       const approveBtn = el('button', {
         class: 'button',
         type: 'button',
@@ -520,7 +527,7 @@ function showCreateReportModal(onCreated) {
 }
 
 function renderMonthlySection(container) {
-  const isSupervisorOrManager = !currentApi?.currentUser || ['manager', 'supervisor'].includes(currentApi.currentUser.role);
+  const isSupervisorOrManager = canReviewMonthlyReports();
 
   // 1. Filter reports by search query
   const filteredReports = monthlyReports.filter(rep => {
@@ -640,7 +647,7 @@ function renderMonthlySection(container) {
           room_id: selectedRoomId,
           month: selectedMonth
         });
-        toast(`تم نشر ${res?.published_count || approvedCount} تقرير بنجاح وإشعار الأسر`);
+        toast(`تم نشر ${Array.isArray(res) ? res.length : approvedCount} تقرير بنجاح وإشعار الأسر`);
         await fetchMonthlyReports();
         renderMainView(container);
       } catch (err) {

@@ -341,11 +341,11 @@ def review_monthly_report(
     if not report:
         raise ValueError("التقرير غير موجود")
 
-    if report["status"] not in ("pending_approval", "needs_revision"):
+    if report["status"] != "pending_approval":
         raise ValueError(f"لا يمكن مراجعة التقرير في حالته الحالية: '{report['status']}'")
 
     if action == "approve":
-        conn.execute("""
+        row = conn.execute("""
             UPDATE monthly_student_reports
             SET 
                 status = 'approved',
@@ -353,12 +353,13 @@ def review_monthly_report(
                 reviewed_at = now(),
                 revision_notes = NULL,
                 updated_at = now()
-            WHERE id = %s
-        """, (reviewer_user_id, report_id))
+            WHERE id = %s AND status = 'pending_approval' AND deleted_at IS NULL
+            RETURNING id
+        """, (reviewer_user_id, report_id)).fetchone()
     elif action == "request_revision":
         if not revision_notes or len(revision_notes.strip()) < 3:
             raise ValueError("ملاحظات طلب التعديل مطلوبة ولا تقل عن 3 أحرف")
-        conn.execute("""
+        row = conn.execute("""
             UPDATE monthly_student_reports
             SET 
                 status = 'needs_revision',
@@ -366,10 +367,15 @@ def review_monthly_report(
                 reviewed_at = now(),
                 revision_notes = %s,
                 updated_at = now()
-            WHERE id = %s
-        """, (reviewer_user_id, revision_notes.strip(), report_id))
+            WHERE id = %s AND status = 'pending_approval' AND deleted_at IS NULL
+            RETURNING id
+        """, (reviewer_user_id, revision_notes.strip(), report_id)).fetchone()
     else:
         raise ValueError("إجراء غير صالح؛ يجب أن يكون 'approve' أو 'request_revision'")
+
+    # Another reviewer changed the status between the read and the update
+    if not row:
+        raise ValueError("تمت مراجعة التقرير بالفعل من مستخدم آخر")
 
     return get_monthly_report_by_id(conn, report_id)  # type: ignore
 
@@ -384,10 +390,10 @@ def publish_monthly_report(
     if not report:
         raise ValueError("التقرير غير موجود")
 
-    if report["status"] not in ("approved", "pending_approval"):
+    if report["status"] != "approved":
         raise ValueError(f"لا يمكن نشر التقرير في حالته الحالية: '{report['status']}'")
 
-    conn.execute("""
+    row = conn.execute("""
         UPDATE monthly_student_reports
         SET 
             status = 'published',
@@ -395,8 +401,13 @@ def publish_monthly_report(
             reviewed_by_user_id = COALESCE(reviewed_by_user_id, %s),
             reviewed_at = COALESCE(reviewed_at, now()),
             updated_at = now()
-        WHERE id = %s
-    """, (publisher_user_id, report_id))
+        WHERE id = %s AND status = 'approved' AND deleted_at IS NULL
+        RETURNING id
+    """, (publisher_user_id, report_id)).fetchone()
+
+    # A concurrent publish won the race; do not notify guardians twice
+    if not row:
+        raise ValueError("تم نشر التقرير بالفعل من مستخدم آخر")
 
     return get_monthly_report_by_id(conn, report_id)  # type: ignore
 

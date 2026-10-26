@@ -9,7 +9,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel, Field
 
-from edutrack_api.auth import current_user, require_roles
+from edutrack_api.auth import current_user, require_permission, require_roles
 from edutrack_api.db import get_conn
 from edutrack_api.errors import ApiError
 from edutrack_api.repositories import monthly_reports_repo
@@ -23,6 +23,8 @@ _CONN = Depends(get_conn)
 _USER = Depends(current_user)
 _STAFF = Depends(require_roles("teacher", "supervisor", "manager"))
 _SUPERVISOR_OR_MANAGER = Depends(require_roles("supervisor", "manager"))
+_MONTHLY_EVALUATION = Depends(require_permission("monthly_evaluation"))
+_REPORT_READER = Depends(require_roles("teacher", "supervisor", "manager", "guardian"))
 
 MONTH_REGEX = r"^[0-9]{4}-(0[1-9]|1[0-2])$"
 
@@ -187,7 +189,7 @@ def upsert_monthly_report(
     return row_to_json(report)
 
 
-@router.post("/{report_id}/review", dependencies=[_SUPERVISOR_OR_MANAGER])
+@router.post("/{report_id}/review", dependencies=[_SUPERVISOR_OR_MANAGER, _MONTHLY_EVALUATION])
 def review_monthly_report(
     report_id: UUID,
     payload: ReportReviewIn,
@@ -210,7 +212,7 @@ def review_monthly_report(
     return row_to_json(report)
 
 
-@router.post("/{report_id}/publish", dependencies=[_SUPERVISOR_OR_MANAGER])
+@router.post("/{report_id}/publish", dependencies=[_SUPERVISOR_OR_MANAGER, _MONTHLY_EVALUATION])
 def publish_monthly_report(
     report_id: UUID,
     conn=_CONN,
@@ -240,7 +242,7 @@ def publish_monthly_report(
     return row_to_json(report)
 
 
-@router.post("/batch-publish", dependencies=[_SUPERVISOR_OR_MANAGER])
+@router.post("/batch-publish", dependencies=[_SUPERVISOR_OR_MANAGER, _MONTHLY_EVALUATION])
 def batch_publish_monthly_reports(
     payload: BatchPublishIn,
     conn=_CONN,
@@ -269,7 +271,7 @@ def batch_publish_monthly_reports(
     return [row_to_json(r) for r in published_list]
 
 
-@router.get("/{report_id}/pdf")
+@router.get("/{report_id}/pdf", dependencies=[_REPORT_READER])
 async def download_monthly_report_pdf(
     report_id: UUID,
     conn=_CONN,
